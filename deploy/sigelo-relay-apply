@@ -1,0 +1,350 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# sigelo-relay-apply — the deploy user's one root command on the relay host. deploy/deploy.sh
+# installs the relay's dependencies where it runs (npm ci --omit=dev --ignore-scripts) and uploads
+# the relay with them to /var/lib/sigelo/relay-stage, as the deploy user; then, through sudo, this
+# helper:
+#
+#   1. reads the staged tree AS THE DEPLOY USER (setpriv, tar -c) into a root-owned file, refuses
+#      the release if a member is anything but a regular file or a directory, then unpacks it
+#      root-owned into /opt/sigelo-relay/app.new. Root never opens a path inside the stage: the
+#      deploy user owns it and can swap a directory for a symlink while a copy runs, and root
+#      would then copy files only root may read (and the step below makes them world-readable).
+#      A path holding a control character is refused too (the sha256 below reads paths by line);
+#   2. logs the sha256 of the code and of its dependencies to the journal (tag sigelo-relay-apply)
+#      and on stdout. The code hash leaves node_modules out, the deps hash is node_modules alone:
+#      deploy.sh computes both over what it staged and rolls the release back if either differs.
+#      It does not stop a stolen deploy key from shipping its own code; it records what ran, in a
+#      log the deploy user cannot rewrite;
+#   3. checks the release's deploy/nginx.conf against the allowlist below, installs it as
+#      /etc/nginx/conf.d/sigelo-relay.conf and runs nginx -t; a config that fails either leaves
+#      everything as it was;
+#   4. swaps app.new in, restarts sigelo-relay and waits for its ports (8791 for nginx, 8883 for
+#      MQTT over TLS); once it is up the old code is kept as app.prev; if it does not come up, the
+#      old code and its nginx config go back and the relay is restarted on them;
+#   5. reloads nginx. The site is app/site/dist, reached through the symlink
+#      /var/www/sigelo.ai/dist (nginx.conf's root) that server-setup.sh --relay makes, so it swaps
+#      with the code.
+#
+#   sigelo-relay-apply              install the staged release
+#   sigelo-relay-apply --rollback   swap app and app.prev back (its nginx config with it), restart
+#   sigelo-relay-apply --check FILE only the allowlist over FILE (refused as root; deploy.sh runs
+#                                   it on deploy/nginx.conf before uploading)
+#   sigelo-relay-apply --self-test  the allowlist refuses each hostile line of its list (no root)
+#
+# Why the allowlist: nginx's master process runs as root and opens what its config names (log
+# files, included files, certificates, modules, temp paths, unix sockets). The config comes from
+# the deploy user's upload, so without a filter the deploy key could point error_log at
+# /etc/cron.d, `include` any file or load a module: root. Every statement must be on its own line,
+# start with an allowlisted directive, and use the fixed values below: the web roots, the error
+# log, the sigelo.ai certificate, the relay's loopback upstream (http://127.0.0.1:8791), the one
+# proxy header X-Real-IP $remote_addr, ports 80 and 443. The check reads the root-owned copy in
+# /opt/sigelo-relay/app, the file that is installed. What a stolen deploy key can still do: run its
+# own code as sigelo-relay and change the site's content, headers and redirects. The filter is the
+# one site/deploy/sigelo-nginx-apply uses for sigelo.io, reviewed, not audited.
+#
+# Why the dependencies come up with the stage: nothing on the host fetches from the network, and
+# deploy.sh hashed them before they left. npm ci checked every package against package-lock.json's
+# integrity hashes there, and --ignore-scripts ran no install script. This helper only copies what
+# is staged. Installed on the host by the deploy user, they sat in its writable stage between the
+# install and this copy, under no hash anyone compared.
+#
+# Installed by site/deploy/server-setup.sh --relay as /usr/local/sbin/sigelo-relay-apply
+# (root:root 0755), with the sudoers rules (no other arguments)
+#   sigelo ALL=(root) NOPASSWD: /usr/local/sbin/sigelo-relay-apply "", /usr/local/sbin/sigelo-relay-apply --rollback
+set -eu
+SRC=/var/lib/sigelo/relay-stage
+DEPLOY_USER=sigelo
+DST=/opt/sigelo-relay
+WEB=/var/www/sigelo.ai/dist
+CONF=/etc/nginx/conf.d/sigelo-relay.conf
+UNIT=sigelo-relay.service
+
+say() { echo "[sigelo-relay-apply] $*"; }
+die() { echo "[sigelo-relay-apply] $*" >&2; exit 1; }
+
+check_conf() { # $1 = file; prints every offending line, returns 1 if any
+  # The tokenizer follows nginx's own (ngx_conf_read_token): a quote opens a string only at the
+  # start of a token and must be followed by a space, ; or {; a backslash escapes the next byte;
+  # # starts a comment only at the start of a token. Whatever it cannot place is refused: quotes
+  # inside a token, text after the terminator, strings spanning lines, and `${`: nginx keeps a {
+  # that follows an unescaped $ inside the token, so its statement would go on where this reader
+  # sees a block open.
+  awk '
+    function bad(msg) { printf "  line %d: %s: %s\n", NR, msg, raw; err = 1; return 0 }
+    function tokenize(l,    i, j, c, q, L) {   # fills tok[1..ntok] and term; 0 if malformed
+      ntok = 0; term = ""; L = length(l); i = 1
+      while (i <= L) {
+        c = substr(l, i, 1)
+        if (c == " " || c == "\t") { i++; continue }
+        if (term != "") return bad("text after the end of the statement")
+        if (c == ";" || c == "{" || c == "}") { term = c; i++; continue }
+        if (c == "#") return bad("comment after a statement (comments go on their own line)")
+        if (c == "\"" || c == "\047") {
+          q = c; j = i + 1
+          while (j <= L && substr(l, j, 1) != q) { if (substr(l, j, 1) == "\\") j++; j++ }
+          if (j > L) return bad("unterminated quoted string (strings stay on one line)")
+          tok[++ntok] = substr(l, i + 1, j - i - 1)
+          c = substr(l, j + 1, 1)
+          if (c != "" && c != " " && c != "\t" && c != ";" && c != "{") return bad("text right after a quoted string")
+          i = j + 1; continue
+        }
+        j = i
+        while (j <= L) {
+          c = substr(l, j, 1)
+          if (c == " " || c == "\t" || c == ";" || c == "{" || c == "}") break
+          if (c == "\"" || c == "\047") return bad("quote inside a token")
+          if (c == "$" && substr(l, j + 1, 1) == "{") return bad("${ inside a token (nginx reads that { as part of the token, not as a block)")
+          if (c == "\\") j++
+          j++
+        }
+        tok[++ntok] = substr(l, i, j - i); i = j
+      }
+      if (term == "") return bad("statement does not end on its line with ; or {")
+      return 1
+    }
+    BEGIN {
+      n = split("map limit_req_zone server listen server_name server_tokens return access_log " \
+        "error_log ssl_certificate ssl_certificate_key ssl_protocols ssl_ciphers " \
+        "ssl_prefer_server_ciphers ssl_session_timeout ssl_session_cache ssl_session_tickets " \
+        "ssl_reject_handshake http2 root index log_not_found types default_type charset " \
+        "charset_types gzip gzip_vary gzip_min_length gzip_types add_header location if rewrite " \
+        "try_files error_page internal limit_req limit_req_status client_max_body_size proxy_pass " \
+        "proxy_set_header", a, " ")
+      for (i = 1; i <= n; i++) allowed[a[i]] = 1
+      depth = 0; block = ""; blockdepth = 0
+    }
+    {
+      raw = $0; line = $0
+      sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+      if (line == "" || line ~ /^#/) next
+      if (!tokenize(line)) next
+      if (term == "}") {
+        if (ntok != 0) { bad("} must be alone on its line"); next }
+        if (depth == 0) { bad("unbalanced }"); next }
+        depth--; if (depth < blockdepth) { block = ""; blockdepth = 0 }
+        next
+      }
+      if (ntok == 0) { bad("empty statement"); next }
+      # nginx reads `include FILE` inside map and types blocks too (as root, at load), quoted or not
+      if (block == "map") {
+        k = tok[1]; gsub(/\\/, "", k)
+        if (k == "include") bad("include is not allowed (in a map either)")
+        else if (term != ";" || ntok != 2) bad("map entry is not key value;")
+        next
+      }
+      if (block == "types") {
+        ok = (term == ";" && ntok >= 2 && tok[1] ~ /^[a-z]+\/[a-z0-9.+-]+$/)
+        for (i = 2; i <= ntok; i++) if (tok[i] !~ /^[a-z0-9]+$/) ok = 0
+        if (!ok) bad("types entry is not type/subtype ext ...;")
+        next
+      }
+      d = tok[1]
+      if (!(d in allowed)) { bad("directive not allowed: " d); next }
+      if (term == "{") {
+        depth++
+        if (d == "map" || d == "types") { if (block != "") bad("nested map/types"); block = d; blockdepth = depth }
+        else if (d != "server" && d != "location" && d != "if") bad("block not allowed: " d)
+        next
+      }
+      v = (ntok == 2) ? tok[2] : ""
+      if (d == "root" && v != "/var/www/sigelo.ai/dist" && v != "/var/www/acme") bad("root must be /var/www/sigelo.ai/dist or /var/www/acme")
+      if (d == "access_log" && v != "off") bad("access_log must be off (relay/site/privacy.md: no access log)")
+      if (d == "error_log" && !(ntok == 3 && tok[2] == "/var/log/nginx/sigelo/error.log" && tok[3] ~ /^(crit|alert|emerg)$/)) bad("error_log must be /var/log/nginx/sigelo/error.log crit|alert|emerg")
+      if (d == "ssl_certificate" && v != "/etc/letsencrypt/live/sigelo.ai/fullchain.pem") bad("ssl_certificate must be /etc/letsencrypt/live/sigelo.ai/fullchain.pem")
+      if (d == "ssl_certificate_key" && v != "/etc/letsencrypt/live/sigelo.ai/privkey.pem") bad("ssl_certificate_key must be /etc/letsencrypt/live/sigelo.ai/privkey.pem")
+      if (d == "proxy_pass" && v != "http://127.0.0.1:8791") bad("proxy_pass must be http://127.0.0.1:8791 (the relay, RELAY_HTTP_PORT)")
+      if (d == "proxy_set_header" && !(ntok == 3 && tok[2] == "X-Real-IP" && tok[3] == "$remote_addr")) bad("proxy_set_header must be X-Real-IP $remote_addr")
+      if (d == "listen") {
+        ok = (ntok >= 2 && tok[2] ~ /^(\[::\]:)?(80|443)$/)
+        for (i = 3; i <= ntok; i++) if (tok[i] != "ssl" && tok[i] != "http2" && tok[i] != "default_server") ok = 0
+        if (!ok) bad("listen must be [[::]:]80|443 [ssl] [http2] [default_server]")
+      }
+      if (d == "error_page") {
+        ok = (ntok >= 3 && tok[ntok] ~ /^\/[A-Za-z0-9_.-]+$/)
+        for (i = 2; i < ntok; i++) if (tok[i] !~ /^[45][0-9][0-9]$/) ok = 0
+        if (!ok) bad("error_page must be <4xx|5xx>... /<file>")
+      }
+      if (d == "internal" && ntok != 1) bad("internal takes no value")
+      if (d == "limit_req_zone" && !(ntok == 4 && tok[2] == "$sigelo_net" && tok[3] ~ /^zone=sigelo_[a-z]+:[0-9]+m$/ && tok[4] ~ /^rate=[0-9]+r\/[ms]$/)) bad("limit_req_zone must be $sigelo_net zone=sigelo_<name>:<n>m rate=<n>r/s|m")
+      if (d == "limit_req" && !(ntok >= 2 && ntok <= 4 && tok[2] ~ /^zone=sigelo_[a-z]+$/ && (ntok < 3 || tok[3] ~ /^burst=[0-9]+$/) && (ntok < 4 || tok[4] == "nodelay"))) bad("limit_req must be zone=sigelo_<name> [burst=<n>] [nodelay]")
+      if (d == "limit_req_status" && v !~ /^(429|503)$/) bad("limit_req_status must be 429 or 503")
+      if (d == "client_max_body_size" && v !~ /^[0-9]+[km]?$/) bad("client_max_body_size must be <n>[k|m]")
+      if (d == "ssl_session_cache" && !(ntok == 2 && v ~ /^shared:[a-z_]+:[0-9]+m$/)) bad("ssl_session_cache must be shared:<name>:<n>m")
+    }
+    END { if (depth != 0) { printf "  unbalanced braces at end of file (depth %d)\n", depth; err = 1 } exit err }
+  ' "$1"
+}
+
+# Each line below, inside an otherwise allowed server block, must be refused (and the minimal
+# config allowed): the ways a config makes the root master process open a file of the writer's
+# choosing, or proxy somewhere else.
+self_test() {
+  t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+  f=0; n=0
+  printf 'server {\n    listen 443 ssl http2;\n    server_name relay.sigelo.ai;\n    access_log off;\n    error_log /var/log/nginx/sigelo/error.log crit;\n    location = /challenge {\n        proxy_pass http://127.0.0.1:8791;\n    }\n}\n' > "$t/ok.conf"
+  check_conf "$t/ok.conf" > "$t/out" || { cat "$t/out"; echo "FAIL the minimal allowed config is refused"; f=1; }
+  while IFS= read -r l; do
+    n=$((n + 1))
+    printf 'server {\n    listen 443 ssl;\n%s\n}\n' "$l" | sed 's/\\n/\n/g' > "$t/bad.conf"
+    if check_conf "$t/bad.conf" > /dev/null; then echo "FAIL allowed: $l"; f=1; fi
+  done <<'BAD'
+include /etc/shadow;
+"include" /etc/shadow;
+load_module /usr/lib/nginx/modules/x.so;
+error_log /etc/cron.d/x crit;
+error_log /var/log/nginx/sigelo/../../../../etc/cron.d/x crit;
+error_log /var/log/nginx/sigelo/error.log debug;
+error_log stderr crit;
+access_log /var/log/nginx/sigelo/access.log;
+access_log /etc/cron.d/x;
+ssl_certificate /etc/shadow;
+ssl_certificate_key /etc/ssh/ssh_host_ed25519_key;
+ssl_password_file /etc/shadow;
+ssl_dhparam /etc/shadow;
+root /;
+alias /etc/;
+auth_basic_user_file /etc/shadow;
+client_body_temp_path /etc/cron.d;
+proxy_temp_path /etc/cron.d;
+proxy_pass http://unix:/run/systemd/private;
+proxy_pass http://127.0.0.1:22;
+proxy_set_header X-Real-IP $http_x_forwarded_for;
+listen unix:/etc/cron.d/x;
+listen 127.0.0.1:8883;
+listen 443 ssl reuseport so_keepalive=on;
+pid /etc/cron.d/x;
+user root;
+access_log off; include /etc/shadow;
+location / {\n        include /etc/shadow;\n    }
+map $uri $x {\n        include /etc/shadow;\n    }
+map $uri $x {\n        "include" /etc/shadow;\n    }
+map $uri $x {\n        inc\lude /etc/shadow;\n    }
+map $uri ${\n        $a 1;\n    }
+types {\n        include /etc/shadow;\n    }
+error_page 404 =200 /etc/shadow;
+BAD
+  [ "$f" = 0 ] || die "self-test FAILED (above)"
+  say "self-test: the minimal config allowed, $n hostile configs refused"
+}
+
+case $# in
+  0) action=apply ;;
+  1) case $1 in --rollback) action=rollback ;; --self-test) self_test; exit 0 ;; *) die "takes no argument but --rollback (or --check FILE, --self-test)" ;; esac ;;
+  2) [ "$1" = --check ] || die "takes no argument but --rollback (or --check FILE, --self-test)"
+     # Its error lines repeat the file: as root that prints a file only root may read. The sudo rule
+     # allows no --check; this holds should a wider rule ever allow it.
+     [ "$(id -u)" != 0 ] || die "--check runs without root: as root it would print the lines of any file named"
+     check_conf "$2" || die "$2 fails the allowlist (lines above)"
+     say "$2 passes the allowlist"; exit 0 ;;
+  *) die "takes no argument but --rollback (or --check FILE, --self-test)" ;;
+esac
+[ "$(id -u)" = 0 ] || die "run as root (sudo -n $0)"
+[ -f /etc/sigelo-relay.env ] || die "/etc/sigelo-relay.env missing: run site/deploy/server-setup.sh --relay first"
+[ -L "$WEB" ] || die "$WEB is not a symlink to $DST/app/site/dist: run site/deploy/server-setup.sh --relay again"
+umask 022
+
+# sha256 of `sha256sum` over every file, sorted by path, from inside the tree; node_modules apart.
+# Paths are read one per line: a tree with a control character in a path is refused before this.
+code_hash() { (cd "$1" && find . -path ./node_modules -prune -o -type f -print | LC_ALL=C sort | while IFS= read -r f; do sha256sum "$f"; done | sha256sum | cut -d' ' -f1); }
+deps_hash() { (cd "$1" && find ./node_modules -type f | LC_ALL=C sort | while IFS= read -r f; do sha256sum "$f"; done | sha256sum | cut -d' ' -f1); }
+
+# The relay is up when its unit is active and both its listeners are open.
+up() {
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if systemctl is-active --quiet "$UNIT" && ss -ltn 'sport = :8791' | grep -q 8791 && ss -ltn 'sport = :8883' | grep -q 8883; then return 0; fi
+    sleep 1
+  done
+  journalctl --namespace=sigelo-relay -u "$UNIT" -n 20 --no-pager >&2 || true
+  return 1
+}
+
+# nginx.conf of the code now in $DST/app (root-owned) → allowlist → $CONF, then nginx -t. On
+# failure the file it replaced goes back and the function fails.
+install_conf() {
+  [ -f "$DST/app/deploy/nginx.conf" ] || { echo "[sigelo-relay-apply] $DST/app/deploy/nginx.conf missing" >&2; return 1; }
+  check_conf "$DST/app/deploy/nginx.conf" >&2 || { echo "[sigelo-relay-apply] $DST/app/deploy/nginx.conf fails the allowlist (lines above): the previous config is kept" >&2; return 1; }
+  if [ -f "$CONF" ]; then cp -p "$CONF" "$CONF.was"; fi
+  install -m 0644 -o root -g root "$DST/app/deploy/nginx.conf" "$CONF"
+  if nginx -t 2>&1; then rm -f "$CONF.was"; return 0; fi
+  if [ -f "$CONF.was" ]; then mv "$CONF.was" "$CONF"; else rm -f "$CONF"; fi
+  echo "[sigelo-relay-apply] nginx -t refused $DST/app/deploy/nginx.conf: the previous config is kept" >&2
+  return 1
+}
+
+swap_prev() {  # app <-> app.prev
+  mv "$DST/app" "$DST/app.swap"; mv "$DST/app.prev" "$DST/app"; mv "$DST/app.swap" "$DST/app.prev"
+}
+
+live() {  # log what now runs
+  c=$(code_hash "$DST/app"); d=$(deps_hash "$DST/app")
+  logger -t sigelo-relay-apply "$1: code sha256 $c deps sha256 $d" 2>/dev/null || true
+  say "$1: code sha256 $c deps sha256 $d"
+}
+
+if [ "$action" = rollback ]; then
+  [ -d "$DST/app.prev" ] || die "no $DST/app.prev to roll back to"
+  swap_prev
+  if ! install_conf; then swap_prev; die "rollback refused: the previous release's nginx config fails the allowlist or nginx -t; nothing changed"; fi
+  systemctl restart "$UNIT"
+  up || die "the previous release did not come up either: run --rollback again to return to the one before, then read journalctl --namespace=sigelo-relay"
+  systemctl reload nginx
+  live "rolled back"
+  exit 0
+fi
+
+install -d -m 0755 -o root -g root "$DST"
+rm -rf "$DST/app.new" "$DST/stage.tar"
+# Read as the deploy user, written by root's shell into a file under root-owned $DST: what the
+# deploy user can read of its own stage, and nothing else, whatever it changes meanwhile. A plain
+# command, not a pipe, so a failing tar stops the helper (sh has no pipefail).
+setpriv --reuid="$DEPLOY_USER" --regid="$DEPLOY_USER" --clear-groups tar -C "$SRC" -cf - . > "$DST/stage.tar" \
+  || { rm -f "$DST/stage.tar"; die "reading $SRC as $DEPLOY_USER failed: deploy.sh stages the release there"; }
+odd=$(tar -tvf "$DST/stage.tar" | cut -c1 | grep -v '^[-d]$' | head -n 1 || true)
+if [ -n "$odd" ]; then
+  members=$(tar -tvf "$DST/stage.tar" | grep -v '^[-d]' | head -n 3)
+  rm -f "$DST/stage.tar"; die "refused: not a regular file or directory: $members"
+fi
+install -d -m 0755 -o root -g root "$DST/app.new"
+tar -xf "$DST/stage.tar" -C "$DST/app.new" --no-same-owner --no-same-permissions \
+  || { rm -rf "$DST/app.new" "$DST/stage.tar"; die "unpacking the stage into $DST/app.new failed"; }
+rm -f "$DST/stage.tar"
+ctl=$(cd "$DST/app.new" && LC_ALL=C find . -name "$(printf '*[\001-\037\177]*')" | head -n 3)
+if [ -n "$ctl" ]; then rm -rf "$DST/app.new"; die "refused: a path with a control character (the sha256 reads paths by line): $ctl"; fi
+for f in server.mjs package.json package-lock.json deploy/nginx.conf site/dist/index.html; do
+  [ -f "$DST/app.new/$f" ] || { rm -rf "$DST/app.new"; die "$SRC/$f missing: deploy.sh stages the release there"; }
+done
+[ -d "$DST/app.new/node_modules" ] || { rm -rf "$DST/app.new"; die "$SRC/node_modules missing: deploy.sh uploads it with the stage (nothing installs on this host)"; }
+# a-st: no set-id or sticky bit survives, whatever the archive said
+chown -R root:root "$DST/app.new"; chmod -R u+rwX,go-w,go+rX,a-st "$DST/app.new"
+
+# The new code goes in as app, the running one waits as app.old until the new one is up; only then
+# does it become app.prev (what --rollback returns to). A release that fails leaves app.prev as it
+# was and is kept as app.failed.
+first=1; [ ! -d "$DST/app" ] || first=0
+rm -rf "$DST/app.failed" "$DST/app.old"
+if [ "$first" = 0 ]; then mv "$DST/app" "$DST/app.old"; fi
+mv "$DST/app.new" "$DST/app"
+back() {  # the new release out, the old one back
+  mv "$DST/app" "$DST/app.failed"
+  if [ "$first" = 0 ]; then mv "$DST/app.old" "$DST/app"; fi
+}
+if ! install_conf; then
+  back
+  die "nothing installed: the release's nginx config fails the allowlist or nginx -t (kept in $DST/app.failed)"
+fi
+live "installed"
+systemctl restart "$UNIT"
+if ! up; then
+  # A first release stays in place: systemd keeps restarting it, and it comes up by itself once
+  # what it lacked (a certificate, /etc/sigelo-relay.env) is there.
+  [ "$first" = 0 ] || die "the first release did not come up and stays installed: read journalctl --namespace=sigelo-relay"
+  back
+  install_conf || true
+  systemctl restart "$UNIT"
+  if up; then systemctl reload nginx; live "back on the previous release"; fi
+  die "the new release did not come up: the previous one is back (the new one is in $DST/app.failed)"
+fi
+if [ "$first" = 0 ]; then rm -rf "$DST/app.prev"; mv "$DST/app.old" "$DST/app.prev"; fi
+systemctl reload nginx
+say "sigelo-relay active on 127.0.0.1:8791 and :8883; nginx reloaded"

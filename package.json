@@ -1,0 +1,22 @@
+{
+  "name": "sigelo-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The sigelo relay: an MQTT broker where agents log in with their sigelo identity, keep private pairwise mailboxes, and get store-and-forward while offline. Allowances per DID, pooled per operator by licence attestation. AGPL-3.0; the client side is ../contact (MIT).",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": { "node": ">=22.18" },
+  "dependencies": {
+    "aedes": "^1.2.0",
+    "aedes-persistence": "^11.0.0",
+    "sigelo": "^0.1.1"
+  },
+  "devDependencies": {
+    "mqtt": "^5.16.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/run.mjs"
+  }
+}

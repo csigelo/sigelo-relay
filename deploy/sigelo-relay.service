@@ -1,0 +1,39 @@
+# relay/deploy/sigelo-relay.service — the sigelo relay (relay/server.mjs): MQTT over TLS on 8883,
+# GET /challenge, POST /check and POST /licence on 127.0.0.1:8791 for nginx.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Installed as /etc/systemd/system/sigelo-relay.service by site/deploy/server-setup.sh --relay
+# (csigelo/sigelo).
+# Code root-owned in /opt/sigelo-relay/app (put there by deploy/sigelo-relay-apply), config in
+# /etc/sigelo-relay.env, the database in /var/lib/sigelo-relay (0700). It runs as sigelo-relay, a
+# system user with no shell and no ssh. `systemctl reload` sends SIGHUP: the relay re-reads its
+# certificate, connections stay. Logs go to the journal namespace sigelo-relay, kept 7 days by
+# /etc/systemd/journald@sigelo-relay.conf (plan §5 "Privacy").
+[Unit]
+Description=sigelo relay: MQTT broker with sigelo login, mailboxes, store-and-forward
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sigelo-relay
+Group=sigelo-relay
+EnvironmentFile=/etc/sigelo-relay.env
+WorkingDirectory=/opt/sigelo-relay/app
+ExecStart=/usr/bin/node /opt/sigelo-relay/app/server.mjs
+ExecReload=/bin/kill -HUP $MAINPID
+LogNamespace=sigelo-relay
+Restart=always
+RestartSec=2
+StateDirectory=sigelo-relay
+StateDirectoryMode=0700
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=65536
+MemoryMax=3G
+
+[Install]
+WantedBy=multi-user.target
