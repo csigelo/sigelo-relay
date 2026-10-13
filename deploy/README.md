@@ -23,8 +23,8 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together, and separately GET /challenge |
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
-| `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to |
-| `RELAY_PRO_STORAGE_MB` | 1024 (a placeholder) | the most storage any Pro pool gets, whatever its licence says |
+| `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to. Until the vendor ceremony it is the placeholder and no licence verifies: Pro is not on sale, and the site says so |
+| `RELAY_PRO_STORAGE_MB` | 1024 (pro.md sells 1 GB) | the most storage any Pro pool gets, whatever its licence says; set the same where the site is built |
 | `RELAY_POW_BITS` | 22 | the proof of work a new identity sends once |
 | `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 24, 1000 | the proof asked once more than `RELAY_POW_LOAD` new identities have proven work in a clock hour, for that hour and the next |
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A native SHA-256 finds 26 bits in seconds, so this count, not the bits, bounds what one network mints |
@@ -46,7 +46,7 @@ journalctl --namespace=sigelo-relay -f                   # the unit logs to its 
 **Certificate.** Two Let's Encrypt lineages. `/etc/letsencrypt/live/sigelo.ai/` covers sigelo.ai,
 www.sigelo.ai and relay.sigelo.ai, and nginx serves all three with it. `/etc/letsencrypt/live/relay.sigelo.ai/`
 covers relay.sigelo.ai alone and is the broker's: the broker parses untrusted packets, and a key
-taken from it must not be valid for sigelo.ai, whose pay pages it could then forge. Let's Encrypt
+taken from it must not be valid for sigelo.ai, whose pay page it could then forge. Let's Encrypt
 keeps its keys readable by root only, so a certbot deploy hook copies the broker's lineage, and no
 other, for the relay and reloads it (new handshakes get the new certificate, connections stay);
 nginx reloads after either. nginx.conf names its lineage, so nginx cannot load it before the first
@@ -88,7 +88,9 @@ than the ones staged gets the release rolled back.
 
 ## nginx
 
-`relay/deploy/nginx.conf`: sigelo.ai serves the site (`relay/site/`, built `--final`), www.sigelo.ai
+`relay/deploy/nginx.conf`: sigelo.ai serves the site (`relay/site/`, built `--final`; Monero is the only payment, and
+`--final` takes the placeholder vendor DID only while pro.md and pay-monero.md say Pro is not on sale yet, and wants
+`site/launch.json` naming the sigelo-agent and sigelo-contact npm served when it was written), www.sigelo.ai
 and http:// redirect to it, and relay.sigelo.ai serves the front page, `/relay.json`, `/llms.txt`,
 its own `robots.txt`, and proxies the three HTTP calls to the relay on `127.0.0.1:8791`; any other
 path there redirects to sigelo.ai. Its header lists the headers it sets (HSTS for a year, a

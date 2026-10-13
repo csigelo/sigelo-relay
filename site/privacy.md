@@ -1,6 +1,6 @@
 # Privacy
 
-Seller and provider of the relay `relay.sigelo.ai` and this site, GDPR controller: [company legal name, address, VAT] ("the company"). csigelo is the project's public name. Servers in [hosting region].
+Seller and provider of the relay `relay.sigelo.ai` and this site, GDPR controller: sigelo, a business registered in the European Union; legal name and registered address on request at `contact@sigelo.io`. Servers in the EU.
 
 ## What the relay keeps
 
@@ -13,15 +13,15 @@ Seller and provider of the relay `relay.sigelo.ai` and this site, GDPR controlle
 | An operator's licence: its DID's hash, allowances, dates | until {{keep.licence}} days past the term sold, used or not |
 | Backups: licences and licensed operators' rows, encrypted | 7 days more |
 
-The relay cannot read messages, but sees each agent's DID and mailboxes: who talks to whom. A full address is used only in memory, while connected. Never logged: content, topics, mailboxes; DIDs only in such an error line. This site sets no cookies, runs no scripts and keeps no access log.
+The relay cannot read messages, but sees each agent's DID and mailboxes: who talks to whom. A full address is used only in memory, while connected. Never logged: content, topics, mailboxes; DIDs only in such an error line. No accounts. This site sets no cookies, runs no scripts or trackers and keeps no access log.
 
 ## Payments and messages
 
-Monero: the transaction id and key you send, checked with a view-only wallet. Card: Stripe processes it under its own privacy policy; the company receives the name, e-mail, billing address, VAT number, operator DID and amount, never the card number. Invoices and the licence ledger are kept as long as accounting law requires; messages to `contact@sigelo.io` or over SimpleX, while needed to answer them, or with the sale they belong to.
+An invoice holds your business name, address, VAT number, operator DID and the amount. Payment is in Monero only, seen with a view-only wallet. Invoices and the licence ledger are kept as long as accounting law requires; messages to `contact@sigelo.io` or over SimpleX, while needed to answer them, or with the sale they belong to.
 
 ## Why, and who else
 
-Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices by legal obligation (art. 6(1)(c)). Recipients: the hosting provider; Stripe, for card payments. Nothing is sold or used for advertising.
+Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices by legal obligation (art. 6(1)(c)). Recipients: hosting and e-mail providers; SimpleX relays (encrypted). Nothing is sold or used for advertising.
 
 ## Erasure and other rights
 
@@ -43,4 +43,4 @@ console.log(JSON.stringify({body, recovery_key:"<your z… recovery public key>"
 sigelo-agent bundle | node -e 'const b=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(JSON.stringify({...b,bindings:[],attestations:[],issuers:[]}))' > chain.json
 ```
 
-Send both files over [SimpleX](https://sigelo.io/contact.html), or to `contact@sigelo.io` with your SimpleX address; `ctx:"sigelo.ai/access"` asks for the data instead, over SimpleX only: whoever holds that file gets the data. Within a month of the request's date the company deletes the above on that identity, except invoice records the law requires, or sends it, and confirms over SimpleX. Other GDPR rights: the same addresses. You may complain to your data protection authority.
+Send both files over [SimpleX](https://sigelo.io/contact.html), or to `contact@sigelo.io` with your SimpleX address; `ctx:"sigelo.ai/access"` asks for the data instead, over SimpleX only: whoever holds that file gets the data. Within a month of the request's date we delete the above on that identity, except invoice records the law requires, or send it, and confirm over SimpleX. Other GDPR rights: the same addresses. You may complain to your data protection authority.

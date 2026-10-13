@@ -13,13 +13,15 @@
 // to write; no e-mail address but contact@sigelo.io; no form, no script but JSON-LD data, no account
 // wording; nothing loaded from another origin; links only to the pages, the agent files and an
 // allowed list of hosts; every placeholder listed in build.mjs and none forgotten; --final refusing
-// while one is open, and refusing a filled copy with a stagenet, mistyped or invented address, a
-// Stripe test link, a seller the pages do not name or an nginx config that logs what privacy.md says
-// it never logs; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
+// while one is open, and refusing a copy with a Monero address or a payment link on a page (an address
+// comes only with an invoice), a seller the pages do not name, an unset vendor DID once the pages no
+// longer say Pro is not on sale yet, or an nginx config that logs what privacy.md says it never logs;
+// Monero the only payment; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
 // against the pages and the relay's own code; the numbers, fields and steps the pages promise against
 // the relay's behaviour. In the private tree it also compares the official names with sigelo.io's
 // and relay/licence.ts with spend/licence.ts, and runs the internal runbook's self-test
-// (commercial/relay-pro-runbook.md §11). No network.
+// (commercial/relay-pro-runbook.md §11). No network: the registry check of --launch runs here against
+// stand-in registry documents.
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -27,9 +29,10 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   build, deployRefusals, launchRefusals, nginxTree, serversIn, everyDirective, DEPLOY, ORIGIN, HOST, REPO, ROOT, PAGES, PLACEHOLDERS,
-  PLACEHOLDER_RE, DRAFT_RE, STRIPE_RE, PRICE_RE, addressRefusal, linkRefusal, sellerRefusal, VALUES, NOBODY, MOTTO, DISCLOSURE, DOMAINS, HOSTS,
+  PLACEHOLDER_RE, DRAFT_RE, PRICE_RE, XMR_RE, PAYMENT_LINK_RE, paymentDetailRefusals, sellerRefusal, SELLER, VALUES, NOBODY, MOTTO, DISCLOSURE, DOMAINS, HOSTS,
   REPOSITORIES, CONTENT_HOSTS, PAYMENT_PLACES, PAYMENT_WORDS, POSITIONING, ISSUER_DID, STATEMENT, QUEUE_NOTE, titleOf, pageUrl, isPrivateTree, proStorageCap, launchGate,
-  LAUNCH_RECORD, fill,
+  LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
+  recordRefusals, registryRefusals, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast,
 } from './build.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -40,7 +43,7 @@ const ok = (cond, what) => { n++; if (cond) console.log(`ok ${what}`); else { fa
 const load = async (spec) => { try { return await import(spec); } catch (e) { ok(false, `import ${spec} (${e.message})`); return null; } };
 const sigelo = await load('sigelo'), monero = await load('sigelo/dist/monero.js');
 const allowance = await load('../allowance.mjs'), operator = await load('../operator.mjs'), auth = await load('../auth.mjs');
-const db = await load('../db.mjs'), mailbox = await load('../mailbox.mjs');
+const db = await load('../db.mjs'), mailbox = await load('../mailbox.mjs'), licence = await load('../licence.ts');
 const PKG = JSON.parse(readFileSync(join(RELAY, 'package.json'), 'utf8'));
 const thou = (x) => String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
@@ -65,10 +68,13 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
 // Every {{value}} filled: a size is two words ("50 MB"), so the source's count (docs-test/check-budgets.mjs)
-// is too low. With every placeholder filled too: below, after the --final checks.
+// is too low. With every placeholder filled too (none is left): below, after the --final checks.
+// pro.md's own budget is 200. While Pro is not on sale it also carries VENDOR_PENDING, which goes at
+// the vendor ceremony: until then its budget is 200 plus that sentence, then 200 again, and
+// docs-test/budgets.json must follow (below), so the allowance cannot outlive the sentence.
 const BUDGET = { index: 120, pro: 200, privacy: 530, 404: 40 };
-const budget = (slug) => BUDGET[slug] ?? 500;
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
+const budget = (slug) => (BUDGET[slug] ?? 500) + (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 for (const p of PAGES) {
   const n = words(fill(src[p.slug], p.slug));
   ok(n <= budget(p.slug), `budget: ${p.slug}.md ${n} words ≤ ${budget(p.slug)}, every {{value}} filled`);
@@ -87,13 +93,21 @@ const listed = Object.keys(PLACEHOLDERS);
 const unlisted = [...found].filter((x) => !listed.includes(x)), unused = listed.filter((x) => !found.has(x));
 ok(unlisted.length === 0, `placeholders: every one in the pages is listed in build.mjs${unlisted.length ? ` (unlisted: ${unlisted.join(', ')})` : ''}`);
 ok(unused.length === 0, `placeholders: every listed one is still in a page${unused.length ? ` (filled, remove from PLACEHOLDERS: ${unused.join(', ')})` : ''}`);
-ok(r.wrong.length === 0, `payment details, price, storage, seller: placeholders or well formed${r.wrong.length ? ` (${r.wrong.join('; ')})` : ''}`);
+ok(r.wrong.length === 0, `no payment address or link on a page; price, storage, seller well formed${r.wrong.length ? ` (${r.wrong.join('; ')})` : ''}`);
 let refused = null;
 try { build({ final: true, out: join(OUT, 'final') }); } catch (e) { refused = e.message; }
 const pending = [...r.open, ...r.wrong];
 ok(pending.length ? refused !== null && pending.every((x) => refused.includes(x)) : refused === null,
   `--final: ${pending.length ? `refuses while ${pending.length} are open, naming each` : 'builds, nothing open'}`);
-ok(!src.terms.includes('[law and courts]') || DRAFT_RE.test(src.terms), 'terms.md: marked DRAFT while the lawyer\'s inputs are open');
+ok(!DRAFT_RE.test(src.terms) && !r.open.includes('DRAFT') && !(src.terms.match(PLACEHOLDER_RE) ?? []).length
+  && src.terms.includes("**Law and courts.** The law and courts of the Seller's registered seat in the European Union."),
+'terms.md: final (no DRAFT mark, no placeholder), law and courts of the Seller\'s registered seat in the EU');
+// The Owner's decision: the pages name the seller by the trade name only, the legal name on request.
+// The terms add where a buyer finds it anyway: on the invoice (runbook §1, as VAT law requires).
+const SELLER_LINE = (where) => `${SELLER}, a business registered in the European Union; legal name and registered address ${where} \`contact@sigelo.io\``;
+ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('on request at')}.`) && src.terms.includes(`Seller: ${SELLER_LINE('on invoices and on request at')} ("the Seller").`)
+  && !/\b(?:Ltd|GmbH|BV|SRL|SA|NV|LLC|Inc|BVBA)\b\.?/.test(Object.values(src).join('\n')),
+  'seller: the trade name "sigelo", a business registered in the EU, legal name and address on request (terms: and on invoices), in privacy.md and terms.md; no company form named on any page');
 
 // ---- contact: one address, receive-only, no form, no account wording ---------------------------
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
@@ -101,10 +115,19 @@ for (const p of PAGES) {
   const mails = [...new Set([...(src[p.slug].match(EMAIL) ?? []), ...(html[p.slug].match(EMAIL) ?? [])])];
   ok(mails.every((m) => m === 'contact@sigelo.io'), `${p.slug}: no e-mail address but contact@sigelo.io${mails.length ? ` (${mails.join(', ')})` : ''}`);
 }
-// Whoever holds a txid and its tx key can claim the payment as theirs: SimpleX only, never e-mail.
-const step2 = src['pay-monero'].match(/^2\. [\s\S]*?(?=^3\. )/m)?.[0] ?? '';
-ok(step2.startsWith('2. Then send over SimpleX, to the address on `https://sigelo.io/contact.html` opened the same way (typed), never by e-mail') && !step2.includes('contact@'),
-  'pay-monero: the transaction id and key go over SimpleX only, never by e-mail, to the address on sigelo.io\'s contact page reached by typing it');
+// The invoice carries the payment address: it is asked for, and comes back, only in a SimpleX
+// conversation the buyer opened with the address on sigelo.io's contact page, typed (a phisher cannot
+// write into that conversation; anyone can send an e-mail), and the step that receives it says so.
+// Step 1 checks that address itself against a second source, SECURITY.md in the main repository
+// (every footer names it as official): whoever swaps sigelo.io's contact page must also change that
+// file's main branch. The launch gate checks the two carry the same address (launchRefusals).
+for (const s of ['pay-monero']) {
+  const ask = src[s].match(/^2\. [\s\S]*?(?=^3\. )/m)?.[0] ?? '', back = src[s].match(/^3\. .*$/m)?.[0] ?? '';
+  ok(src[s].includes(`1. Before you ask, open \`https://sigelo.io/contact.html\` yourself (typed, not from a link here). Its SimpleX address must match the one in \`SECURITY.md\` on the main branch of \`${REPOSITORIES[0].replace('https://', '')}\` (not a fork, issue or pull request).\n2. `)
+    && ask.startsWith('2. Ask for an invoice over SimpleX at that address.') && !ask.includes('contact@') && back.startsWith('3. The invoice comes back in that conversation')
+    && /^4\. .*sends? `licence\.json` in the same conversation\./m.test(src[s]),
+  `${s}: the invoice is asked for over SimpleX only, at the address on sigelo.io's contact page reached by typing it and checked against SECURITY.md on the main repository's main branch; invoice and licence come back in that conversation`);
+}
 const ACCOUNT = [/\bsign[ -]?(?:up|in)\b/i, /\blog ?in to\b/i, /\bpassword\b/i, /\b(?:create|open) (?:an |your )?account\b/i, /\busername\b/i];
 const FORM = /<(?:form|input|textarea|select|button)\b/i;
 for (const p of PAGES) {
@@ -115,27 +138,39 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 const H1 = { index: 'sigelo relay: encrypted messages between AI agents', pro: 'Pro: one allowance for all your agents', 'pay-monero': 'Pay Pro in Monero',
-  'pay-card': 'Pay Pro by card', privacy: 'Privacy', terms: 'Terms', 404: 'Not found' };
+  privacy: 'Privacy', terms: 'Terms', 404: 'Not found' };
 // SEO spec §3.2's rendered titles and descriptions, exactly. Pro's description takes its numbers from
 // relay/allowance.mjs TIERS, and names the largest message instead of the spec's "kept up to N days":
 // a reader away over a week takes no new messages on either tier (A5 review), so that promised more.
 const sizeOf = (b) => (b % (1024 * 1024) === 0 ? `${b / 1024 / 1024} MB` : `${b / 1024} KB`);
-const TITLE = { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', pro: 'Pro: one allowance for all your agents — sigelo relay',
-  'pay-monero': 'Pay Pro in Monero, at a discount — sigelo relay', 'pay-card': 'Pay Pro by card (Stripe) — sigelo relay',
-  privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', 404: 'Not found — sigelo relay' };
-const DESC = {
-  index: 'AI agents pair by a one-line code and exchange end-to-end encrypted messages over MQTT. The relay holds them while one is offline. No accounts; free tier.',
-  pro: `sigelo relay Pro pools one allowance across your agents: ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. A licence attestation to your operator DID; no account.`,
-  'pay-monero': 'Pay sigelo relay Pro in Monero, at a discount: send XMR to the published address, then your operator DID, transaction id and key over SimpleX.',
-  'pay-card': 'Pay sigelo relay Pro by card through a Stripe checkout, with your operator DID. The seller never sees the card number; the licence is issued by hand.',
-  privacy: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.',
-  terms: 'Terms for sigelo relay Pro, sold to businesses only: the free service, Pro as a licence attestation, no custody, no payment routing, liability, law.',
-  404: 'No page at this address on sigelo.ai. The relay pages: home, Pro, payment, privacy and terms; agents can start at /llms.txt or /index.json.',
-};
-const titles = PAGES.map((p) => html[p.slug].match(/<title>([^<]*)<\/title>/)?.[1].replace(/&amp;/g, '&') ?? '');
-const descs = PAGES.map((p) => html[p.slug].match(/<meta name="description" content="([^"]*)">/)?.[1].replace(/&amp;/g, '&') ?? '');
+// While Pro is not on sale (VENDOR_PENDING) the heads that would read as a sale say so: a search result
+// or a link preview shows the title and description, not the page's first paragraph (X2 review).
+// HEAD(pending) → { TITLE, DESC }; the on-sale heads are checked on the --final build below.
+const HEAD = (pending) => ({
+  TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', pro: 'Pro: one allowance for all your agents — sigelo relay',
+    'pay-monero': pending ? 'Paying for Pro in Monero (not on sale yet) — sigelo relay' : 'Pay Pro in Monero — sigelo relay',
+    privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', 404: 'Not found — sigelo relay' },
+  DESC: {
+    index: 'AI agents pair by a one-line code and exchange end-to-end encrypted messages over MQTT. The relay holds them while one is offline. No accounts; free tier.',
+    pro: pending
+      ? `sigelo relay Pro will pool one allowance across your agents: ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. Not on sale yet; free tier until then.`
+      : `sigelo relay Pro pools one allowance across your agents: ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. A licence attestation to your operator DID; no account.`,
+    'pay-monero': pending
+      ? 'How paying for sigelo relay Pro in Monero will work: an invoice over SimpleX, a one-time address, the licence back the same way. Not on sale yet.'
+      : 'Pay sigelo relay Pro in Monero: ask for an invoice over SimpleX, pay its one-time address, get the licence back the same way.',
+    privacy: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.',
+    terms: pending
+      ? 'Terms for sigelo relay: the free service, Pro (not on sale yet; businesses only) as a licence attestation, no custody, no payment routing, liability, law.'
+      : 'Terms for sigelo relay Pro, sold to businesses only: the free service, Pro as a licence attestation, no custody, no payment routing, liability, law.',
+    404: 'No page at this address on sigelo.ai. The relay pages: home, Pro, payment, privacy and terms; agents can start at /llms.txt or /index.json.',
+  },
+});
+const { TITLE, DESC } = HEAD(r.pending);
+const headOf = (h) => [h.match(/<title>([^<]*)<\/title>/)?.[1].replace(/&amp;/g, '&') ?? '', h.match(/<meta name="description" content="([^"]*)">/)?.[1].replace(/&amp;/g, '&') ?? ''];
+const titles = PAGES.map((p) => headOf(html[p.slug])[0]);
+const descs = PAGES.map((p) => headOf(html[p.slug])[1]);
 PAGES.forEach((p, i) => {
-  ok(titles[i] === titleOf(p) && titles[i].length <= 60 && titles[i].split(' — ').length <= 2 && titles[i].includes('sigelo relay'),
+  ok(titles[i] === titleOf(p, r.pending) && titles[i].length <= 60 && titles[i].split(' — ').length <= 2 && titles[i].includes('sigelo relay'),
     `${p.slug}: title "${titles[i]}" (${titles[i].length} chars ≤ 60, at most one " — ", names sigelo relay)`);
   ok(descs[i].length >= 50 && descs[i].length <= 155, `${p.slug}: meta description ${descs[i].length} chars (50–155)`);
   ok(titles[i] === TITLE[p.slug] && descs[i] === DESC[p.slug], `${p.slug}: title and meta description exactly as SEO spec §3.2 (pro's with TIERS.pro's numbers)${descs[i] === DESC[p.slug] ? '' : ` (description: "${descs[i]}")`}`);
@@ -147,6 +182,12 @@ PAGES.forEach((p, i) => {
 });
 ok(new Set(titles).size === titles.length && new Set(descs).size === descs.length, 'titles and descriptions: each unique');
 ok(descs.every((d) => !/\bkept up to\b|\bretention\b/i.test(d)), 'descriptions: none promises a retention (a reader away over a week takes no new messages, whatever the tier)');
+// Monero is the only payment, so a discount on it is no saving: no head offers one (runbook §7 Q5).
+// While Pro is not on sale, every head about Pro or paying says so.
+const SALE_HEADS = ['pro', 'pay-monero', 'terms'].map((slug) => PAGES.findIndex((p) => p.slug === slug));
+ok(![...titles, ...descs].some((t) => /discount/i.test(t))
+  && (!r.pending || (SALE_HEADS.every((i) => /not on sale yet/i.test(descs[i])) && /not on sale yet/.test(titles[SALE_HEADS[1]]))),
+  `titles and descriptions: none mentions a discount${r.pending ? '; the pro, pay-monero and terms descriptions and the pay page\'s title say Pro is not on sale yet' : ''}`);
 
 // ---- static: no script but one JSON-LD block, no inline style or handler, nothing from elsewhere -
 const VOID = new Set(['meta', 'link', 'br', 'hr', 'img', 'input', 'wbr']);
@@ -187,8 +228,8 @@ for (const [slug, g] of Object.entries(graphs).filter(([, x]) => x)) {
   const want = slug === 'index' ? 'Service,SoftwareApplication,WebPage,WebSite' : 'WebPage,WebSite';
   const refs = JSON.stringify(nodes).match(/\{"@id":"[^"]+"\}/g)?.map((x) => JSON.parse(x)['@id']) ?? [];
   const page = PAGES.find((p) => p.slug === slug), web = nodes.find((x) => x['@type'] === 'WebPage');
-  ok(types === want && refs.every((id) => ids.has(id)) && web?.url === pageUrl(page) && web?.name === titleOf(page),
-    `${slug}: JSON-LD nodes ${want}, every @id reference resolves, the WebPage is this page`);
+  ok(types === want && refs.every((id) => ids.has(id)) && web?.url === pageUrl(page) && web?.name === titleOf(page, r.pending) && web?.description === descs[PAGES.indexOf(page)],
+    `${slug}: JSON-LD nodes ${want}, every @id reference resolves, the WebPage is this page, with its title and meta description`);
 }
 if (graphs.index) {
   const service = graphs.index['@graph'].find((x) => x['@type'] === 'Service'), app = graphs.index['@graph'].find((x) => x['@type'] === 'SoftwareApplication');
@@ -209,9 +250,9 @@ for (const p of PAGES) {
       const [path, frag] = href.split('#');
       const slug = pageOf(path);
       if (slug ? !src[slug] || (path !== '/' && !files.has(path.slice(1))) || (frag && !ids[slug].has(frag)) : !files.has(path.slice(1)) || frag) bad.push(href);
-    } else if (!(ALLOWED.some((re) => re.test(href)) || (p.slug === 'pay-card' && STRIPE_RE.test(href)) || href === 'mailto:contact@sigelo.io')) bad.push(href);
+    } else if (!(ALLOWED.some((re) => re.test(href)) || href === 'mailto:contact@sigelo.io')) bad.push(href);
   }
-  ok(bad.length === 0, `${p.slug}: links resolve or go to sigelo.io, github.com/csigelo${p.slug === 'pay-card' ? ', buy.stripe.com' : ''}${bad.length ? ` (bad: ${bad.join(' ')})` : ''}`);
+  ok(bad.length === 0, `${p.slug}: links resolve or go to sigelo.io, github.com/csigelo (no payment link: it comes with an invoice)${bad.length ? ` (bad: ${bad.join(' ')})` : ''}`);
   const badMd = [...twin[p.slug].replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '').matchAll(/\]\((\/[^)\s]*)\)/g)]
     .map((m) => m[1]).filter((u) => !/^\/[\w-]+\.(?:md|txt|json)(#[\w-]+)?$/.test(u) || !files.has(u.slice(1).split('#')[0]));
   ok(badMd.length === 0, `${p.slug}.md twin: internal links go to the twins or the agent files${badMd.length ? ` (bad: ${badMd.join(' ')})` : ''}`);
@@ -235,31 +276,41 @@ for (const p of PAGES) {
   `${p.slug}: the footer has the seller line, every official host and repository, links to sigelo.io and its official statement, privacy, terms, /llms.txt, /index.json and the twin`);
 }
 ok(/^\*\*By AI, for AI\.\*\*\n\nBuilt and operated by an AI agent under a human owner, csigelo\.\n/m.test(src.index), 'index: "**By AI, for AI.**" directly followed by the disclosure paragraph (A8)');
-// One list of where payment details appear: the footer's sentence, index.json, each pay page. The
-// files and the branch, never the repository as a whole: GitHub serves a fork's commit, an issue or
+// One list of where how to pay is published: the footer's sentence, index.json, the pay page. The
+// file and the branch, never the repository as a whole: GitHub serves a fork's commit, an issue or
 // a pull request under the parent repository's URL.
-const narrow = `Payment details appear only on sigelo.ai and in site/pay-monero.md and site/pay-card.md on the main branch of ${REPO.replace('https://', '')}.`;
-ok(PAYMENT_PLACES.join() === [`${ORIGIN}/pay-monero.html`, `${ORIGIN}/pay-card.html`, `${REPO}/blob/main/site/pay-monero.md`, `${REPO}/blob/main/site/pay-card.md`].join()
+const narrow = `How to pay is published only on sigelo.ai and in site/pay-monero.md on the main branch of ${REPO.replace('https://', '')}.`;
+ok(PAYMENT_PLACES.join() === [`${ORIGIN}/pay-monero.html`, `${REPO}/blob/main/site/pay-monero.md`].join()
   && PAYMENT_WORDS === narrow && PAGES.every((p) => plainText(html[p.slug]).includes(narrow) && twin[p.slug].includes(narrow))
-  && PAGES.every((p) => !plainText(html[p.slug]).includes(`Payment details appear only on sigelo.ai and in ${REPO.replace('https://', '')}`)),
-'footer: payment details only on sigelo.ai\'s two pay pages and in their two files on the relay repository\'s main branch, as PAYMENT_PLACES says; never "in" the repository as a whole');
-// The second copy is reached from sigelo.io's statement, typed: a link on the page would move with
-// the address whoever swapped it. "Only on sigelo.ai": the page and its twin both serve it.
-for (const s of ['pay-monero', 'pay-card']) {
+  && PAGES.every((p) => !plainText(html[p.slug]).includes(`published only on sigelo.ai and in ${REPO.replace('https://', '')}`)),
+'footer: how to pay is published only on sigelo.ai\'s pay page and in its file on the relay repository\'s main branch, as PAYMENT_PLACES says; never "in" the repository as a whole');
+// "Only on sigelo.ai": the page and its twin both serve it. No link to a repository or to sigelo.io's
+// statement on the pay page: a link would move with whoever swapped the page.
+for (const s of ['pay-monero']) {
   ok(src[s].includes(`published only on sigelo.ai (this page, also as \`/${s}.md\`) and in \`site/${s}.md\` on the main branch of the relay repository.`)
-    && !src[s].includes('and in that repository')
-    && src[s].includes(`open \`${STATEMENT}\` yourself (typed, not from a link here), then, in the relay repository that page names, the file \`site/${s}.md\` on its main branch`)
-    && PAYMENT_PLACES.includes(`${REPO}/blob/main/site/${s}.md`)
-    && !src[s].includes(`](${REPO}`) && !src[s].includes(`](${STATEMENT}`),
-  `${s}: published only on sigelo.ai (the page and its twin) and in its file on the relay repository's main branch, which the buyer reaches from sigelo.io's statement, never by a link on this page`);
-  // Where the payment proof or the licence request goes is reached the same way: a link on a swapped
-  // page would send the transaction id and key to whoever swapped it (A5 review).
-  ok(!src[s].includes('](https://sigelo.io/contact.html)') && src[s].includes('over SimpleX, to the address on `https://sigelo.io/contact.html` opened the same way (typed)'),
+    && !src[s].includes('and in that repository') && PAYMENT_PLACES.includes(`${REPO}/blob/main/site/${s}.md`)
+    && !REPOSITORIES.some((x) => src[s].includes(`](${x}`)) && !src[s].includes(`](${STATEMENT}`),
+  `${s}: published only on sigelo.ai (the page and its twin) and in its file on the relay repository's main branch, never by a link on this page`);
+  // Where the invoice request goes is reached the same way: a link on a swapped page would send the
+  // buyer's details to whoever swapped it (A5 review).
+  ok(!src[s].includes('](https://sigelo.io/contact.html)') && src[s].includes('open `https://sigelo.io/contact.html` yourself (typed, not from a link here)'),
     `${s}: the SimpleX address is the one on sigelo.io's contact page, typed, never a link on this page`);
 }
-ok(!src['pay-card'].includes('checkout.stripe.com') && src['pay-card'].includes('it begins `https://buy.stripe.com/`, and a checkout reached any other way'),
-  'pay-card: the buyer starts from the buy.stripe.com link only, as linkRefusal accepts (any Stripe account can mint a checkout.stripe.com session)');
-ok(src['pay-monero'].includes('price less [discount] %, plus VAT where due,') || /price less \d+ %, plus VAT where due,/.test(src['pay-monero']), 'pay-monero: the Monero price adds VAT where due (the buyer pays before the invoice exists)');
+// Monero only: card payment is not offered, so no page, agent file or nav names a card, Stripe or a
+// card page, and Monero is the one pay page (PAGES, PAYMENT_PLACES, index.json's pay).
+const CARD = /\bstripe\b|\bcards?\b|pay-card/i;
+const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, src[p.slug]]), ...PAGES.map((p) => [`${p.slug}.html`, html[p.slug]]),
+  ...['llms.txt', 'llms-full.txt', 'index.json', 'relay.json', 'sitemap.xml'].map((f) => [f, read(f)])].filter(([, t]) => CARD.test(t)).map(([f]) => f);
+ok(cardHits.length === 0 && PAGES.filter((p) => p.slug.startsWith('pay-')).map((p) => p.slug).join() === 'pay-monero' && !existsSync(join(SITE, 'pay-card.md')),
+  `Monero only: no page or agent file names a card, Stripe or a card page; pay-monero is the one pay page${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
+const priceLineM = src.pro.match(PRICE_RE);
+// Kraken has dropped XMR in parts of the EEA: should it stop quoting XMR/EUR, the invoice names
+// another public rate, and neither page has to change before the next sale.
+ok(src['pay-monero'].includes(`price less ${priceLineM?.[3]} %, plus VAT where due, in XMR at Kraken's XMR/EUR rate when the invoice is made (if Kraken quotes none, another public rate the invoice names). An invoice is valid 24 hours.`)
+  && src['pay-monero'].includes('3. The invoice comes back in that conversation: your operator DID, the amount in XMR and a Monero address made for this invoice alone.')
+  && src.terms.includes("in Monero, less the stated discount, at the XMR/EUR rate the invoice names (Kraken's while it quotes one), within 24 hours."),
+'pay-monero, terms: pro.md\'s discount, VAT where due, Kraken\'s XMR/EUR rate when invoiced or another public rate the invoice names, valid 24 hours; the invoice names the operator DID and an address for it alone');
+ok(/nothing to install but SimpleX\./.test(src['pay-monero']), 'pay-monero: SimpleX is the one thing to install (the invoice and the licence come over it)');
 
 // ---- the words never to write (A7, A15, SEO spec §2, plan §11) ---------------------------------
 const index = JSON.parse(read('index.json')), relayInfo = JSON.parse(read('relay.json'));
@@ -308,8 +359,8 @@ const full = read('llms-full.txt');
 const inFull = indexable.filter((p) => !p.slug.startsWith('pay-'));
 ok(inFull.every((p) => full.includes(`Source: ${ORIGIN}/${p.slug}.md\n\n${body[p.slug].trimEnd()}\n`)) && !full.includes('# Not found') && full.includes(`${MOTTO} ${DISCLOSURE}`),
   'llms-full.txt: every indexable page\'s twin but the pay pages\', with the motto and the disclosure');
-ok(!/Pay Pro in|\[address\]|\[payment link\]|buy\.stripe\.com|\b[48][1-9A-HJ-NP-Za-km-z]{94}\b/.test(full) && full.includes(`published only at ${PAYMENT_PLACES.slice(0, -1).join(', ')} and ${PAYMENT_PLACES.at(-1)}.`),
-  'llms-full.txt: no payment details, only where they are published (a third copy would make the pay pages untrue)');
+ok(!/Pay Pro in/.test(full) && !XMR_RE.test(full) && !PAYMENT_LINK_RE.test(full) && full.includes(`published only at ${PAYMENT_PLACES.slice(0, -1).join(', ')} and ${PAYMENT_PLACES.at(-1)}.`),
+  'llms-full.txt: no pay page, address or link, only where how to pay is published (a third copy would make the pay pages untrue)');
 
 // ---- sitemap.xml, robots.txt, security.txt (A11–A13) -------------------------------------------
 const sitemap = read('sitemap.xml');
@@ -341,11 +392,22 @@ if (allowance) {
 ok(index.version === PKG.version && relayInfo.version === PKG.version && relayInfo.source === REPO && relayInfo.license === PKG.license && index.status === 'new' && index.audited === false,
   'index.json, relay.json: relay/package.json\'s version and licence, the source repository, new and unaudited');
 // Each value is null exactly while its input is open; a build that is not --final sells nothing.
-const nulls = { '[storage]': index.tiers.pro.storage_bytes, '[discount]': index.tiers.pro.price?.monero_discount_percent, '[install command]': index.client.install,
-  SELLER: index.official.seller, 'vendor DID': index.official.vendor_did };
+// Storage, discount and the install line have no input left open: never null. The vendor DID is null
+// exactly while the relay pins licence.ts's placeholder, open or not (VENDOR_PENDING).
+const nulls = { storage: index.tiers.pro.storage_bytes, discount: index.tiers.pro.price?.monero_discount_percent, install: index.client.install,
+  SELLER: index.official.seller };
 const nullWrong = Object.entries(nulls).filter(([k, v]) => (v === null) !== r.open.includes(k)).map(([k]) => k);
-ok(index.tiers.pro.on_sale === false && relayInfo.fees.on_sale === false && nullWrong.length === 0,
-  `index.json, relay.json: a draft is not on sale, and a value is null exactly while it is open${nullWrong.length ? ` (wrong: ${nullWrong.join(', ')})` : ''}`);
+const vendorUnset = pinnedVendor() === licence?.DEV_VENDOR_DID;
+ok(index.tiers.pro.on_sale === false && relayInfo.fees.on_sale === false && nullWrong.length === 0 && (index.official.vendor_did === null) === vendorUnset
+  && index.tiers.pro.not_yet_on_sale === r.pending && relayInfo.fees.not_yet_on_sale === r.pending && r.pending === (vendorPending(src) === true),
+  `index.json, relay.json: a draft is not on sale, not_yet_on_sale is what the pages say (${r.pending}), a value is null exactly while it is open, the vendor DID while unset${nullWrong.length ? ` (wrong: ${nullWrong.join(', ')})` : ''}`);
+// Until the vendor ceremony no licence can be issued: both pages say so, in the one sentence the build
+// reads (VENDOR_PENDING), and so do the home page's Pro line (HOME_PENDING) and llms.txt.
+ok(VENDOR_PENDING_PAGES.join() === 'pro,pay-monero' && VENDOR_PENDING === 'Pro licences are not on sale yet: the key that signs them is being set up. Every agent runs on the free tier until then.'
+  && (r.pending ? VENDOR_PENDING_PAGES.every((x) => body[x].includes(`\n\n${VENDOR_PENDING}\n\n`)) && /\(https:\/\/sigelo\.ai\/pro\.md\): [^\n]*; not on sale yet\n/.test(read('llms.txt'))
+      && /\(https:\/\/sigelo\.ai\/pay-monero\.md\): [^\n]*; not on sale yet\n/.test(read('llms.txt')) && src.index.includes(HOME_PENDING)
+    : !/not on sale yet/.test(read('llms.txt')) && !/not on sale yet/.test(src.index)),
+  `pro, pay-monero, index, llms.txt: ${r.pending ? 'pro and pay-monero each say, in a paragraph of its own, that Pro licences are not on sale yet (the vendor key is being set up); the home page\'s Pro line and llms.txt\'s Pro and Pay lines say so' : 'Pro is on sale: none says otherwise'}`);
 ok(index.relay.a2a === false && /not post-quantum/.test(index.crypto.signatures) && index.relay.mqtt.version === '3.1.1' && index.relay.host === HOST,
   'index.json: not A2A, signatures not post-quantum, MQTT 3.1.1 at relay.sigelo.ai');
 // Retention is how long a queued message waits; a reader away longer than its client claims ahead
@@ -370,10 +432,11 @@ const sees = index.crypto.relay_sees.join('\n'), missing = rows.filter((x) => !O
 ok(rows.length === Object.keys(SEES).length && missing.length === 0, `index.json: relay_sees names what each row of privacy.md's table keeps${missing.length ? ` (missing: ${missing.join('; ')})` : ''}`);
 const off = index.official;
 ok(same(off.payment_details_only_on, PAYMENT_PLACES) && same(off.never_asks_for, ['seed', 'identity or wallet private key', 'token'])
-  && same(off.never_sends_by_email_or_chat, ['payment address', 'payment link']) && off.payment_proof_only_via === 'https://sigelo.io/contact.html'
-  && NOBODY.includes('ask for a seed, an identity or wallet private key, or a token') && NOBODY.includes('send a payment address or link by e-mail or chat') && NOBODY.includes('`https://sigelo.io/contact.html`'),
-  'index.json: the official "never" and proof fields say what the "Nobody…" line says');
-for (const s of ['pay-monero', 'pay-card']) ok(src[s].includes(NOBODY), `${s}: carries the "Nobody from the project…" line verbatim`);
+  && off.payment_address_only_with === 'an invoice the buyer asked for' && off.invoice_only_via === 'https://sigelo.io/contact.html'
+  && !('never_sends_by_email_or_chat' in off) && !('payment_proof_only_via' in off) && !('payment_address_or_link_only_with' in off)
+  && NOBODY === 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.',
+  'index.json: the official "never" and invoice fields say what the "Nobody…" line says (an address only with an invoice the buyer asked for, over sigelo.io\'s SimpleX address)');
+for (const s of ['pay-monero']) ok(src[s].includes(NOBODY), `${s}: carries the "Nobody from the project…" line verbatim`);
 ok(same(relayInfo.official, off) && relayInfo.payments_url === `${ORIGIN}/pro.html`, 'relay.json: the same official names as index.json, and where to pay');
 const INFO_FIELDS = ['name', 'software', 'version', 'source', 'limits', 'fees', 'payments_url', 'terms', 'privacy', 'contact', 'official'];
 ok(INFO_FIELDS.every((k) => relayInfo[k] !== undefined && relayInfo[k] !== null) && relayInfo.limits.free && relayInfo.limits.pro && Array.isArray(relayInfo.official.domains),
@@ -472,87 +535,150 @@ ok(readme.includes('relay/deploy/nginx.conf') && !/^```nginx$/m.test(readme), 'd
   'deploy/README.md: by hand, a port-80 config serving /var/www/acme for the three names comes before the first certbot certonly');
 }
 
-// ---- --final over a filled copy: what passes, and each wrong thing it refuses ------------------
-// Every placeholder filled as the runbook's §0 would, at the most words each is likely to take.
-let mainnet, subaddr, stagenet, typo;
+// ---- --final over a copy of the pages: what passes, and each wrong thing it refuses ------------
+// No placeholder is left, so the copy is the pages as written (FILL stays for a placeholder added
+// later: each one filled as the runbook's §0 would, at the most words it is likely to take).
+let mainnet, subaddr, stagenet;
 if (monero) {
   const k = monero.keysFromSpend(new Uint8Array(32).fill(7));
   mainnet = monero.encodeAddress({ net: 'mainnet', kind: 'standard', spend: k.B, view: k.A });
   subaddr = monero.subaddress({ a: k.a, B: k.B, major: 0, minor: 1, net: 'mainnet' });
   stagenet = monero.encodeAddress({ net: 'stagenet', kind: 'standard', spend: k.B, view: k.A });
-  typo = mainnet.slice(0, 40) + (mainnet[40] === 'a' ? 'b' : 'a') + mainnet.slice(41);
-  ok(addressRefusal(mainnet) === undefined && addressRefusal(subaddr) === undefined, 'address: a mainnet address and a mainnet subaddress pass');
-  ok([stagenet, typo, '8' + '2'.repeat(94), mainnet + 'x'].every((a) => addressRefusal(a)), 'address: stagenet, a one-character typo, an invented 95-character string and a long one are refused (checksum by sigelo)');
+  ok([mainnet, subaddr, stagenet].every((a) => XMR_RE.test(`Pay to \`${a}\`.`)) && !XMR_RE.test(`${mainnet}x`) && !XMR_RE.test(ISSUER_DID),
+    'payment details: a mainnet address, a mainnet subaddress and a stagenet address are each recognised on a page; a DID is not');
 }
-ok(STRIPE_RE.test('https://buy.stripe.com/aBc123dEf456') && !STRIPE_RE.test('https://buy.stripe.com/test_8wM5mV0Ed2Ks0zm6oo') && linkRefusal('https://buy.stripe.com/test_8wM5mV0Ed2Ks0zm6oo'),
-  'payment link: a live-mode buy.stripe.com link passes, a test_ link is refused');
-const FILL = {
-  '[install command]': 'npm install -g example-a example-b', '[storage]': '500 MB', '[discount]': '15', '[rate source]': 'an example source',
-  '[address]': mainnet, '[payment link]': 'https://buy.stripe.com/aBc123dEf456',
-  '[company legal name, address, VAT]': 'Example Ltd, 1 Example Street, 00000 Example Town, Country, VAT EX000000000', '[law and courts]': 'Example law; the courts of Example Town',
-  '[hosting region]': 'the EU',
-};
+ok(['monero:8Bxyz?tx_amount=1', 'MONERO:4Abc', 'monero://4Abc', 'https://buy.stripe.com/aBc123dEf456', 'https://checkout.stripe.com/c/pay/cs_live_x'].every((u) => PAYMENT_LINK_RE.test(u))
+  && !PAYMENT_LINK_RE.test(src.pro) && !PAYMENT_LINK_RE.test('Monero: 10 % less. Pay in Monero.'),
+  'payment details: a monero: payment request and a card checkout URL are each recognised on a page; the price line\'s "Monero: 10 % less" is not');
+const FILL = Object.fromEntries(Object.keys(PLACEHOLDERS).map((ph) => [ph, 'one two three four five six seven eight nine ten']));
 const filled = (slug) => Object.entries(FILL).reduce((md, [ph, v]) => md.split(ph).join(v), src[slug]);
 const scratch = mkdtempSync(join(tmpdir(), 'relay-site-'));
 try {
   let k = 0;
   const vendor = sigelo ? sigelo.keygen({ recovery: 'sha256:' + '9'.repeat(64) }).did : 'did:sigelo:z' + '2'.repeat(44);
+  const DEV = licence?.DEV_VENDOR_DID;
   const emptyRoot = join(scratch, 'root'); mkdirSync(emptyRoot);   // the relay's own export: no SECURITY.md, no site/
-  // → the --final refusal for the filled pages with `change` applied, or null when it builds (dist in dir/dist).
-  const finalWith = (change = (pages) => pages, { deploy = confText, seller = 'Example Ltd', vendorDid = vendor, root = emptyRoot, proStorage = allowance?.TIERS.pro.storage, launched = true } = {}) => {
+  // The pages once Pro is on sale: the VENDOR_PENDING sentence gone from both. The default vendor DID
+  // follows the pages: the placeholder while they say Pro is not on sale yet, a real one once not.
+  const onSale = (pages) => Object.fromEntries(Object.entries(pages).map(([slug, md]) => [slug, md.split(`${VENDOR_PENDING}\n\n`).join('').split(HOME_PENDING).join(HOME_ON_SALE)]));
+  // The record --launch writes (recordRefusals): npm's versions of the two packages, as it saw them.
+  const RECORD = `${JSON.stringify({ npm: { 'sigelo-agent': CONTACT_VERBS_SINCE, 'sigelo-contact': CONTACT_VERBS_SINCE } })}\n`;
+  // → the --final refusal for the pages with `change` applied, or null when it builds (dist in dir/dist).
+  const finalWith = (change = (pages) => pages, { deploy = confText, seller = SELLER, vendorDid, root = emptyRoot, proStorage = allowance?.TIERS.pro.storage, launched = true } = {}) => {
     const dir = join(scratch, String(++k));
     mkdirSync(dir);
     const pages = change(Object.fromEntries(PAGES.map((p) => [p.slug, filled(p.slug).replace(/^> \*\*DRAFT\b.*\n\n?/m, '')])));
+    vendorDid ??= vendorPending(pages) === true ? DEV : vendor;
     for (const [slug, md] of Object.entries(pages)) writeFileSync(join(dir, `${slug}.md`), md);
-    if (launched) writeFileSync(join(dir, LAUNCH_RECORD), '{}\n');   // the export's record of the launch gate (launchGate)
+    if (launched) writeFileSync(join(dir, LAUNCH_RECORD), RECORD);   // the export's record of the launch gate (launchGate)
     writeFileSync(join(dir, 'nginx.conf'), deploy);
     try { build({ final: true, site: dir, out: join(dir, 'dist'), deploy: join(dir, 'nginx.conf'), root, seller, vendor: vendorDid, proStorage }); return null; } catch (e) { return e.message; }
   };
+  const set = (slug, from, to) => (pages) => ({ ...pages, [slug]: pages[slug].split(from).join(to) });
+  const filesIn = (dir, at = dir) => readdirSync(at, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesIn(dir, join(at, e.name)) : [relative(dir, join(at, e.name))]));
+  // A final build, as the pages are written and once Pro is on sale: what index.json, relay.json and the
+  // JSON-LD say about Pro in each.
+  const finalBuild = (pages, opts) => {
+    const why = finalWith(pages, opts);
+    if (why !== null) return { why };
+    const d = join(scratch, String(k), 'dist'), json = (f) => JSON.parse(readFileSync(join(d, f), 'utf8'));
+    const g = JSON.parse(readFileSync(join(d, 'index.html'), 'utf8').match(SCRIPT)[1])['@graph'];
+    return { why, d, index: json('index.json'), info: json('relay.json'), service: g.find((x) => x['@type'] === 'Service') };
+  };
+  const proOffers = (service) => service.offers.filter((o) => o.name.startsWith('Pro')).map((o) => `${o.priceSpecification.price}/${o.priceSpecification.billingDuration}`).join();
+  {
+    const asWritten = finalBuild(undefined, {});
+    ok(asWritten.why === null, `--final: the pages build, given the launch record${vendorPending(src) === true ? ', with the placeholder vendor DID while both pages say Pro is not on sale yet' : ' and a vendor DID'}${asWritten.why ? ` (${asWritten.why})` : ''}`);
+    const sold = finalBuild(onSale, {});
+    ok(sold.why === null, `--final: the pages with the not-on-sale sentence removed build, given a vendor DID${sold.why ? ` (${sold.why})` : ''}`);
+    if (asWritten.why === null && vendorPending(src) === true) {
+      const { index: x, info, service } = asWritten;
+      ok(x.tiers.pro.on_sale === false && x.tiers.pro.not_yet_on_sale === true && info.fees.on_sale === false && info.fees.not_yet_on_sale === true
+        && x.official.vendor_did === null && proOffers(service) === '' && service.provider?.name === SELLER && x.tiers.pro.price.EUR_month === Number(priceLine[1]),
+      '--final while the pages say Pro is not on sale yet: index.json and relay.json say not_yet_on_sale (on_sale false), no vendor DID, the JSON-LD names the seller but offers no Pro; the price stays, as what Pro will cost');
+    }
+    if (sold.why === null) {
+      const { d, index: fIndex, info, service } = sold;
+      ok(service.provider?.['@type'] === 'Organization' && service.provider.name === SELLER && service.termsOfService === `${ORIGIN}/terms.html`
+        && proOffers(service) === `${priceLine[1]}/P1M,${priceLine[2]}/P1Y`,
+      '--final, on sale: the JSON-LD names the seller as provider (an Organization), the terms, and the two Pro offers at pro.md\'s prices');
+      ok(fIndex.tiers.pro.on_sale === true && fIndex.tiers.pro.not_yet_on_sale === false && info.fees.on_sale === true && info.fees.not_yet_on_sale === false
+        && fIndex.tiers.pro.storage_bytes === allowance?.TIERS.pro.storage && fIndex.tiers.pro.price.monero_discount_percent === Number(priceLine[3])
+        && fIndex.client.install === 'npm i -g sigelo-agent' && fIndex.official.seller === SELLER && fIndex.official.vendor_did === vendor && same(fIndex.tiers.pro.pay, { monero: `${ORIGIN}/pay-monero.html` }),
+      `--final, on sale: index.json on sale, with the storage (TIERS.pro's ${allowance ? allowance.TIERS.pro.storage / allowance.MB : '?'} MB), discount, install line, seller, vendor DID and the one pay page, Monero`);
+      ok(readFileSync(join(d, 'pro.html'), 'utf8').includes(`Seller and provider: ${SELLER}.`), '--final: the footer names the seller');
+      const sale = HEAD(false), heads = PAGES.map((p) => headOf(readFileSync(join(d, `${p.slug}.html`), 'utf8')));
+      const llmsSold = readFileSync(join(d, 'llms.txt'), 'utf8');
+      ok(PAGES.every((p, i) => heads[i][0] === sale.TITLE[p.slug] && heads[i][1] === sale.DESC[p.slug] && heads[i][1].length <= 155 && heads[i][0].length <= 60)
+        && !/not on sale yet/.test(llmsSold) && llmsSold.includes('(https://sigelo.ai/pay-monero.md): the only way to pay, by invoice\n'),
+      '--final, on sale: titles and descriptions as SEO spec §3.2 once Pro is on sale (no "not on sale yet", no discount); llms.txt\'s Pay line is the only way to pay');
+    }
+    // No file of either build carries a payment address or link: an address comes only with an invoice.
+    const holders = [asWritten, sold].filter((b) => b.why === null).flatMap((b) => filesIn(b.d).filter((f) => { const t = readFileSync(join(b.d, f), 'utf8'); return XMR_RE.test(t) || PAYMENT_LINK_RE.test(t); }));
+    ok(holders.length === 0, `--final: no file of the build carries a Monero address or a payment link${holders.length ? ` (${holders.join(', ')})` : ''}`);
+  }
+  // The vendor DID follows the pages (VENDOR_PENDING): the placeholder only while both say Pro is not
+  // on sale yet; once the sentence is gone, a real one; never a real one while it stays; never the
+  // sentence on one page only. The same check in --launch (launchCheck).
+  if (DEV) {
+    const without = (slug) => (pages) => ({ ...pages, [slug]: pages[slug].split(`${VENDOR_PENDING}\n\n`).join('') });
+    ok(/vendor DID/.test(finalWith(onSale, { vendorDid: DEV }) ?? '') && finalWith(undefined, { vendorDid: DEV }) === null,
+      '--final: refuses the placeholder vendor DID once the pages no longer say Pro is not on sale yet, takes it while they do');
+    ok(/vendor DID: set .* still say Pro licences are not on sale yet/.test(finalWith(undefined, { vendorDid: vendor }) ?? ''),
+      '--final: refuses a vendor DID set while the pages still say Pro is not on sale yet');
+    ok(/is on pay-monero\.md but not on pro\.md/.test(finalWith(without('pro'), { vendorDid: DEV }) ?? '') && /is on pro\.md but not on pay-monero\.md/.test(finalWith(without('pay-monero'), { vendorDid: vendor }) ?? ''),
+      '--final: refuses the not-on-sale sentence on one page only, whatever the vendor DID');
+    const pagesNow = Object.fromEntries(PAGES.map((p) => [p.slug, src[p.slug]]));
+    ok(vendorRefusals(pagesNow, vendorPending(pagesNow) === true ? DEV : vendor).length === 0 && vendorRefusals(onSale(pagesNow), DEV).join() === 'vendor DID'
+      && vendorRefusals(onSale(pagesNow), vendor).length === 0
+      && /^vendor DID: set/.test(vendorRefusals({ ...pagesNow, ...onSale(pagesNow), index: `x ${HOME_PENDING} y`, pro: `x\n\n${VENDOR_PENDING}\n\ny`, 'pay-monero': VENDOR_PENDING }, vendor).join()),
+      'vendorRefusals: nothing for the pages with the vendor DID they call for; "vendor DID" for the placeholder once on sale; a refusal for a set DID while pending');
+    // The home page's Pro line follows the two pages (HOME_PENDING): never out of step with them.
+    const P = { index: `x ${HOME_PENDING} y`, pro: `a\n\n${VENDOR_PENDING}\n\nb`, 'pay-monero': VENDOR_PENDING }, S = { index: `x ${HOME_ON_SALE} y`, pro: 'a', 'pay-monero': 'b' };
+    ok(vendorRefusals(P, DEV).length === 0 && vendorRefusals(S, vendor).length === 0
+      && /^index\.md: its Pro line does not begin/.test(vendorRefusals({ ...P, index: S.index }, DEV).join()) && /^index\.md: still says Pro is not on sale yet/.test(vendorRefusals({ ...S, index: P.index }, vendor).join())
+      && /index\.md: its Pro line|index\.md: still says/.test(finalWith(vendorPending(pagesNow) === true ? set('index', HOME_PENDING, HOME_ON_SALE) : set('index', HOME_ON_SALE, HOME_PENDING)) ?? ''),
+      '--final, vendorRefusals: refuse a home page whose Pro line does not say "not on sale yet" while pro.md and pay-monero.md do, or still says it once they do not');
+    const sitePages = (change) => { const dir = join(scratch, `pages-${++k}`); mkdirSync(dir); for (const [slug, md] of Object.entries(change(pagesNow))) writeFileSync(join(dir, `${slug}.md`), md); return dir; };
+    // The two ROOT-based checks need the private tree (launchCheck stops at its first refusal
+    // elsewhere): in the relay's own export only the first holds.
+    ok(launchCheck({ root: emptyRoot, site: SITE, vendor: DEV }).some((w) => /not the private tree/.test(w))
+      && (!isPrivateTree(ROOT) || (launchCheck({ root: ROOT, site: sitePages(onSale), vendor: DEV }).includes('vendor DID')
+        && !launchCheck({ root: ROOT, site: sitePages((x) => x), vendor: vendorPending(pagesNow) === true ? DEV : vendor }).includes('vendor DID'))),
+      `--launch (launchCheck): refuses outside the private tree${isPrivateTree(ROOT) ? ', and refuses the placeholder vendor DID once the pages no longer say Pro is not on sale yet' : ' (the vendor checks need the private tree)'}`);
+  }
   if (monero) {
-    const why = finalWith();
-    ok(why === null, `--final: a filled copy builds${why ? ` (${why})` : ''}`);
-    if (why === null) {
-      const d = join(scratch, String(k), 'dist'), fIndex = JSON.parse(readFileSync(join(d, 'index.json'), 'utf8'));
-      const g = JSON.parse(readFileSync(join(d, 'index.html'), 'utf8').match(SCRIPT)[1])['@graph'], service = g.find((x) => x['@type'] === 'Service');
-      const offers = service.offers.filter((o) => o.name.startsWith('Pro'));
-      ok(service.provider?.['@type'] === 'Organization' && service.provider.name === 'Example Ltd' && service.termsOfService === `${ORIGIN}/terms.html`
-        && offers.map((o) => `${o.priceSpecification.price}/${o.priceSpecification.billingDuration}`).join() === `${priceLine[1]}/P1M,${priceLine[2]}/P1Y`,
-      '--final: the JSON-LD names the seller as provider (an Organization), the terms, and the two Pro offers at pro.md\'s prices');
-      ok(fIndex.tiers.pro.on_sale === true && fIndex.tiers.pro.storage_bytes === 500 * 1024 * 1024 && fIndex.tiers.pro.price.monero_discount_percent === 15
-        && fIndex.client.install === FILL['[install command]'] && fIndex.official.seller === 'Example Ltd' && fIndex.official.vendor_did === vendor,
-      '--final: index.json on sale, with the storage, discount, install line, seller and vendor DID filled');
-      ok(readFileSync(join(d, 'pro.html'), 'utf8').includes('Seller and provider: Example Ltd.'), '--final: the footer names the seller');
-      // The pay pages say where their details are published: no other file of the build carries them.
-      const filesIn = (dir, at = dir) => readdirSync(at, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesIn(dir, join(at, e.name)) : [relative(dir, join(at, e.name))]));
-      const holders = (needle) => filesIn(d).filter((f) => readFileSync(join(d, f), 'utf8').includes(needle)).sort().join();
-      ok(holders(mainnet) === 'pay-monero.html,pay-monero.md' && holders(FILL['[payment link]']) === 'pay-card.html,pay-card.md',
-        `--final: the address and the payment link are only on their pay page and its twin, as the pages say (address: ${holders(mainnet)}; link: ${holders(FILL['[payment link]'])})`);
+    for (const [name, a] of [['mainnet', mainnet], ['subaddress', subaddr], ['stagenet', stagenet]]) {
+      ok(/pay-monero: carries a Monero address/.test(finalWith(set('pay-monero', 'Pay that amount to that address', `Pay that amount to \`${a}\``)) ?? ''),
+        `--final: refuses the pay page carrying a ${name} address (addresses are per invoice)`);
     }
-    const set = (slug, from, to) => (pages) => ({ ...pages, [slug]: pages[slug].split(from).join(to) });
-    ok(/pay-card: the checkout link is not a live-mode/.test(finalWith(set('pay-card', FILL['[payment link]'], 'https://buy.stripe.com/test_8wM5mV0Ed2Ks0zm6oo')) ?? ''),
-      '--final: refuses a Stripe test-mode link');
-    for (const [name, a] of [['stagenet', stagenet], ['mistyped', typo], ['invented', '8' + '2'.repeat(94)]]) {
-      ok(/pay-monero: the address is/.test(finalWith(set('pay-monero', mainnet, a)) ?? ''), `--final: refuses a ${name} address`);
-    }
-    ok(/SELLER "Other GmbH" is not the seller privacy\.md and terms\.md name/.test(finalWith(undefined, { seller: 'Other GmbH' }) ?? ''), '--final: refuses a SELLER the pages do not name');
-    ok(/SELLER/.test(finalWith(undefined, { seller: null }) ?? '') && /vendor DID/.test(finalWith(undefined, { vendorDid: (await import('../licence.ts')).DEV_VENDOR_DID }) ?? ''),
-      '--final: refuses while SELLER is unset, or the relay pins the placeholder vendor DID');
-    ok(/Price: N €\/month/.test(finalWith(set('pro', 'excluding VAT', 'VAT excluded')) ?? ''), '--final: refuses a pro.md whose price line it cannot read');
-    ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name sigelo\.ai;\n[\s\S]*?) {4}access_log off;\n/, '$1') }) ?? ''),
-      '--final: refuses while a server block keeps nginx\'s default access log, naming the block');
-    ok(/lacks "error_log <file> crit;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name relay\.sigelo\.ai;\n[\s\S]*?) {4}error_log \S+ crit;\n/, '$1') }) ?? ''),
-      '--final: refuses while a server block logs refusals at "error"');
-    ok(/location = \/licence/.test(finalWith(undefined, { deploy: confText.replace(/ {4}location = \/licence \{\n[\s\S]*?\n {4}\}\n/, '') }) ?? ''), '--final: refuses while nginx does not proxy /licence');
-    ok(/X-Real-IP/.test(finalWith(undefined, { deploy: confText.replace(/ {4}proxy_set_header X-Real-IP \$remote_addr;\n/, '') }) ?? ''), '--final: refuses a relay proxy without X-Real-IP');
-    ok(/launch: no site\/launch\.json/.test(finalWith(undefined, { launched: false }) ?? ''),
-      '--final: in the relay export (no SECURITY.md above it) refuses without the launch record the private tree\'s --launch wrote');
-    if (allowance) {
-      const { MB } = allowance, big = set('pro', '| 500 MB |', '| 2 GB |');
-      ok(new RegExp(`the storage cell says 2 GB, more than the relay grants a Pro pool \\(${allowance.TIERS.pro.storage / MB} MB`).test(finalWith(big) ?? '') && finalWith(big, { proStorage: 2048 * MB }) === null,
-        '--final: refuses a Pro storage cell above what the relay grants (TIERS.pro.storage, or RELAY_PRO_STORAGE_MB where the site is built), and builds once that allows it');
-      ok(proStorageCap(undefined) === allowance.TIERS.pro.storage && proStorageCap('') === allowance.TIERS.pro.storage && proStorageCap('2048') === 2048 * MB
-        && ['0', '1e3', '-5', '10000001', ' 5'].every((v) => proStorageCap(v) === null), 'RELAY_PRO_STORAGE_MB: read as the relay reads it (a whole number of MB, 1 to 10,000,000), else TIERS.pro.storage');
-    }
+    ok(/privacy: carries a Monero address/.test(finalWith(set('privacy', 'Servers in the EU.', `Servers in the EU. Donations: ${mainnet}.`)) ?? ''), '--final: refuses a Monero address on any page, not only the pay page');
+  }
+  ok(/pay-monero: carries a payment link/.test(finalWith(set('pay-monero', 'Pay that amount to that address', 'Pay [that amount](monero:8Bxyz?tx_amount=1) to that address')) ?? '')
+    && /terms: carries a payment link/.test(finalWith(set('terms', 'Not reviewed by a lawyer.', 'Not reviewed by a lawyer. <https://buy.stripe.com/aBc123dEf456>')) ?? ''),
+    '--final: refuses a monero: payment request on the pay page, and a card checkout link on any page (card payment is not offered)');
+  ok(/SELLER "Other GmbH" is not the seller privacy\.md and terms\.md name/.test(finalWith(undefined, { seller: 'Other GmbH' }) ?? ''), '--final: refuses a SELLER the pages do not name');
+  ok(/SELLER/.test(finalWith(undefined, { seller: null }) ?? '') && /vendor DID/.test(finalWith(onSale, { vendorDid: DEV }) ?? ''),
+    '--final: refuses while SELLER is unset, or the relay pins the placeholder vendor DID once Pro is on sale');
+  ok(/\[law and courts\]/.test(finalWith(set('terms', "The law and courts of the Seller's registered seat in the European Union.", '[law and courts].')) ?? '')
+    && /DRAFT/.test(finalWith(set('terms', '# Terms\n', '# Terms\n\n> **DRAFT for review.**\n')) ?? ''),
+  '--final: refuses a placeholder that is not listed (unknown placeholders fail too), and the terms\' DRAFT mark');
+  ok(/Price: N €\/month/.test(finalWith(set('pro', 'excluding VAT', 'VAT excluded')) ?? '') && /Price: N €\/month/.test(finalWith(set('pro', 'Monero: 10 % less', 'Monero: [discount] % less')) ?? ''),
+    '--final: refuses a pro.md whose price line it cannot read, or whose discount is a placeholder again');
+  ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name sigelo\.ai;\n[\s\S]*?) {4}access_log off;\n/, '$1') }) ?? ''),
+    '--final: refuses while a server block keeps nginx\'s default access log, naming the block');
+  ok(/lacks "error_log <file> crit;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name relay\.sigelo\.ai;\n[\s\S]*?) {4}error_log \S+ crit;\n/, '$1') }) ?? ''),
+    '--final: refuses while a server block logs refusals at "error"');
+  ok(/location = \/licence/.test(finalWith(undefined, { deploy: confText.replace(/ {4}location = \/licence \{\n[\s\S]*?\n {4}\}\n/, '') }) ?? ''), '--final: refuses while nginx does not proxy /licence');
+  ok(/X-Real-IP/.test(finalWith(undefined, { deploy: confText.replace(/ {4}proxy_set_header X-Real-IP \$remote_addr;\n/, '') }) ?? ''), '--final: refuses a relay proxy without X-Real-IP');
+  ok(/launch: no site\/launch\.json/.test(finalWith(undefined, { launched: false }) ?? ''),
+    '--final: in the relay export (no SECURITY.md above it) refuses without the launch record the private tree\'s --launch wrote');
+  if (allowance) {
+    const { MB } = allowance, cell = src.pro.match(/^\| Storage queued \| [^|]+ \| ([^|]+) \|$/m)?.[1].trim(), big = set('pro', `| ${cell} |`, '| 2 GB |');
+    ok(new RegExp(`the storage cell says 2 GB, more than the relay grants a Pro pool \\(${allowance.TIERS.pro.storage / MB} MB`).test(finalWith(big) ?? '') && finalWith(big, { proStorage: 2048 * MB }) === null,
+      '--final: refuses a Pro storage cell above what the relay grants (TIERS.pro.storage, or RELAY_PRO_STORAGE_MB where the site is built), and builds once that allows it');
+    ok(proStorageCap(undefined) === allowance.TIERS.pro.storage && proStorageCap('') === allowance.TIERS.pro.storage && proStorageCap('2048') === 2048 * MB
+      && ['0', '1e3', '-5', '10000001', ' 5'].every((v) => proStorageCap(v) === null), 'RELAY_PRO_STORAGE_MB: read as the relay reads it (a whole number of MB, 1 to 10,000,000), else TIERS.pro.storage');
   }
   // The deploy gate itself: every server block, both logs down at its own level; quotes are text.
   const gate = (text) => { const f = join(scratch, `nginx-${++k}.conf`); writeFileSync(f, text); return deployRefusals(f); };
@@ -588,11 +714,12 @@ try {
     'nginx reader: quotes open a string only at the start of a token, and a backslash escapes the next character (as nginx\'s tokenizer)');
 
   // The launch gate: the official statement as the rest of the private tree says it.
-  const tree = (security, io) => {
+  const tree = (security, io, more = {}) => {
     const root = join(scratch, `root-${++k}`);
     mkdirSync(join(root, 'site', 'deploy'), { recursive: true });
     if (security !== null) writeFileSync(join(root, 'SECURITY.md'), security);
     if (io !== null) writeFileSync(join(root, 'site', 'deploy', 'nginx.conf'), io);
+    for (const [f, text] of Object.entries(more)) { mkdirSync(dirname(join(root, f)), { recursive: true }); writeFileSync(join(root, f), text); }
     return launchRefusals(root);
   };
   const goodSecurity = `- Repositories: ${REPOSITORIES.join(' and ')}.\n- ${NOBODY}\n`;
@@ -603,18 +730,70 @@ try {
     mkdirSync(join(root, 'site'), { recursive: true });
     writeFileSync(join(root, 'site', 'build.mjs'), '');
     const why = launchRefusals(root);
-    ok(said(why, /SECURITY\.md: not found/) && said(why, /site\/deploy\/nginx\.conf: not found/), 'launch gate: in the private tree (site/build.mjs beside relay/), a missing SECURITY.md or sigelo.io nginx.conf is refused, not skipped');
+    ok(['SECURITY\\.md', 'site/deploy/nginx\\.conf', 'site/src/official\\.mjs', 'adapters/moadim/sigelo-agent-contact\\.ts'].every((f) => said(why, new RegExp(`^${f}: not found`))),
+      'launch gate: in the private tree (site/build.mjs beside relay/), a missing SECURITY.md, sigelo.io nginx.conf, official.mjs or sigelo-agent contact verbs is refused, not skipped');
+  }
+  // In the private tree, also sigelo.io's own index.json (its build), the SimpleX address the pay
+  // pages' step 1 compares (sigelo.io's contact page and SECURITY.md) and the install line's verbs.
+  {
+    const SX = 'https://smp.example/a#launch-test', withSx = `${goodSecurity}- SimpleX: \`${SX}\`\n`;
+    const ioBuild = "official: { payment_address_only_with: 'an invoice the buyer asked for', invoice_only_via: 'https://sigelo.io/contact.html' }\n";
+    const privateTree = ({ security = withSx, build = ioBuild, official = `export const SIMPLEX = '${SX}';\n`, verbs = '// the contact verbs\n' } = {}) =>
+      tree(security, ioConf('sigelo.ai'), { 'site/build.mjs': build, 'site/src/official.mjs': official, 'adapters/moadim/sigelo-agent-contact.ts': verbs });
+    const none = privateTree();
+    ok(none.length === 0, `launch gate, private tree: SECURITY.md, sigelo.io's build, nginx and official.mjs and the contact verbs as index.json says: open nothing${none.length ? ` (${none.join('; ')})` : ''}`);
+    ok(said(privateTree({ build: "never_sends_by_email_or_chat: ['payment address', 'payment link'], payment_address_only_with: 'x'\n" }), /^site\/build\.mjs: sigelo\.io's index\.json still says/)
+      && said(privateTree({ build: "payment_proof_only_via: 'https://sigelo.io/contact.html', payment_address_only_with: 'x'\n" }), /^site\/build\.mjs: sigelo\.io's index\.json/)
+      && said(privateTree({ build: "payment_address_or_link_only_with: 'x', payment_address_only_with: 'x'\n" }), /still has payment_address_or_link_only_with/)
+      && said(privateTree({ build: 'official: {}\n' }), /lacks payment_address_only_with/),
+      'launch gate: refuses while sigelo.io\'s index.json says no payment address or link is sent by chat, keeps the older field, or lacks what sigelo.ai\'s says');
+    ok(said(privateTree({ security: goodSecurity }), /^SECURITY\.md: lacks the SimpleX address/) && said(privateTree({ official: "export const SIMPLEX = '<simplex address>';\n" }), /no SIMPLEX address/),
+      'launch gate: refuses while SECURITY.md lacks the SimpleX address sigelo.io\'s contact page shows (the pay page\'s step 1 compares them)');
+    ok(said(privateTree({ security: `${withSx}- Nobody from the project will ever ask for a seed, or send a payment address or link by e-mail or chat.\n` }), /^SECURITY\.md: still says no payment address/)
+      && said(privateTree({ security: `${withSx}- Payment proofs go only to the SimpleX address.\n` }), /^SECURITY\.md: still says/),
+      'launch gate: refuses a SECURITY.md that still carries the old line (no payment address or link by chat; payment proofs)');
+    ok(said(privateTree({ verbs: "note('the contact verbs are not in the npm release of sigelo-agent: run them from a clone');\n" }), /contact verbs still refuse when sigelo-agent is installed from npm/),
+      'launch gate: refuses while sigelo-agent refuses the contact verbs when installed from npm (index.md\'s install line would fail)');
   }
   // The relay export cannot run the launch gate (no SECURITY.md above it): there --final takes the
   // record the private tree's `--launch` wrote; in the private tree that record may exist only while
   // the gate passes. `--launch` writes it, so it is run here only where it refuses (writes nothing).
   const noRecord = join(scratch, `site-${++k}`), withRecord = join(scratch, `site-${++k}`);
-  mkdirSync(noRecord); mkdirSync(withRecord); writeFileSync(join(withRecord, LAUNCH_RECORD), '{}\n');
+  mkdirSync(noRecord); mkdirSync(withRecord); writeFileSync(join(withRecord, LAUNCH_RECORD), RECORD);
   ok(said(launchGate(emptyRoot, noRecord), /launch: no site\/launch\.json/) && launchGate(emptyRoot, withRecord).length === 0,
     'launch gate, outside the private tree: refused without the launch record, passed with it');
+  // A record must name what npm served (X2 review: one written from the source alone let sigelo.ai
+  // promise verbs the sigelo-agent on npm did not have).
+  const recordSays = (text) => { const dir = join(scratch, `site-${++k}`); mkdirSync(dir); writeFileSync(join(dir, LAUNCH_RECORD), text); return launchGate(emptyRoot, dir); };
+  const old = '{"checked":"SECURITY.md, site/build.mjs, site/deploy/nginx.conf and sigelo-agent do what index.json says; the vendor DID agrees with the pages","by":"relay/site/build.mjs --launch"}\n';
+  ok(said(recordSays(old), /does not record npm serving sigelo-agent and sigelo-contact at 0\.1\.2 or later/) && said(recordSays('{}\n'), /sigelo-agent and sigelo-contact/)
+    && said(recordSays('not json\n'), /does not record npm/) && said(recordSays('{"npm":{"sigelo-agent":"0.1.1","sigelo-contact":"0.1.2"}}\n'), /serving sigelo-agent at/)
+    && said(recordSays('{"npm":{"sigelo-agent":"0.1.2"}}\n'), /serving sigelo-contact at/) && said(recordSays('{"npm":{"sigelo-agent":"0.1.2-rc.1","sigelo-contact":"0.1.2"}}\n'), /serving sigelo-agent at/)
+    && recordSays('{"npm":{"sigelo-agent":"0.2.0","sigelo-contact":"0.1.10"}}\n').length === 0 && CONTACT_VERBS_SINCE === '0.1.2',
+  'launch gate, outside the private tree: refuses a record that does not name npm serving sigelo-agent and sigelo-contact at 0.1.2 or later (the first with the contact verbs): the record written before this check, an empty one, a stale version, a prerelease');
+  ok(versionAtLeast('0.1.10', '0.1.2') && !versionAtLeast('0.1.1', '0.1.2') && !versionAtLeast(undefined, '0.1.2') && !versionAtLeast('v0.1.2', '0.1.2'), 'versionAtLeast: compares numerically, refuses anything but x.y.z');
+  // --launch reads the registry once the tree passes (registryRefusals); here against stand-in documents.
+  {
+    const root = join(scratch, `npm-${++k}`); mkdirSync(join(root, 'adapters', 'moadim'), { recursive: true });
+    writeFileSync(join(root, 'adapters', 'moadim', 'package.json'), JSON.stringify({ name: 'sigelo-agent', version: '0.1.2' }));
+    const doc = (v, deps = {}, by = 'csigelo') => ({ 'dist-tags': { latest: v }, versions: { [v]: { version: v, dependencies: deps, _npmUser: { name: by } } } });
+    const reg = (docs) => registryRefusals({ root, get: async (n) => docs[n] ?? null });
+    const good = { 'sigelo-agent': doc('0.1.2', { sigelo: '^0.1.2', 'sigelo-contact': '^0.1.2' }), 'sigelo-contact': doc('0.1.2', { sigelo: '^0.1.2' }) };
+    const g = await reg(good), today = await reg({ 'sigelo-agent': doc('0.1.1', { sigelo: '^0.1.1' }) });
+    ok(g.why.length === 0 && same(g.npm, { 'sigelo-agent': '0.1.2', 'sigelo-contact': '0.1.2' }) && (await reg({ 'sigelo-agent': doc('0.1.3', { 'sigelo-contact': '^0.1.3' }), 'sigelo-contact': doc('0.1.3') })).why.length === 0,
+      'registry: npm\'s latest sigelo-agent at this tree\'s version or later, depending on sigelo-contact, which is there too, both from csigelo: passes, and the record gets the versions seen');
+    ok(said(today.why, /^npm: sigelo-agent's latest is 0\.1\.1, older than this tree's 0\.1\.2/) && said(today.why, /^npm: sigelo-agent 0\.1\.1 does not depend on sigelo-contact/) && said(today.why, /^npm: no sigelo-contact/),
+      'registry: refuses what npm served at the X2 review (sigelo-agent 0.1.1 without the contact verbs, no sigelo-contact), naming each');
+    ok(said((await reg({ ...good, 'sigelo-contact': doc('0.1.2', {}, 'someone-else') })).why, /^npm: sigelo-contact 0\.1\.2 was published by someone-else, not csigelo/)
+      && said((await reg({ ...good, 'sigelo-agent': doc('0.1.2', { sigelo: '^0.1.2' }) })).why, /does not depend on sigelo-contact/)
+      && said((await reg({ ...good, 'sigelo-contact': { 'dist-tags': {}, versions: {} } })).why, /^npm: no sigelo-contact/),
+      'registry: refuses a sigelo-contact from another publisher, a sigelo-agent without the dependency, a package with no latest version');
+    const down = await registryRefusals({ root, get: async () => { throw new Error('offline'); } });
+    ok(down.why.length === 1 && down.why[0].startsWith(`npm: could not read ${NPM_REGISTRY} (offline)`) && same(down.npm, {}), 'registry: an unreadable registry is a refusal, never a pass');
+  }
   if (isPrivateTree()) {
-    const now = launchRefusals(), record = existsSync(join(SITE, LAUNCH_RECORD));
-    ok(!record || now.length === 0, `launch gate: relay/site/${LAUNCH_RECORD} ${record ? 'exists, and the private tree still says what index.json says' : 'absent (not launched)'}${record && now.length ? ` (but: ${now.join('; ')})` : ''}`);
+    const record = existsSync(join(SITE, LAUNCH_RECORD)), now = launchRefusals(), stale = record ? [...now, ...recordRefusals(SITE)] : [];
+    ok(stale.length === 0, `launch gate: relay/site/${LAUNCH_RECORD} ${record ? 'exists, names the npm versions it saw, and the private tree still says what index.json says' : 'absent (not launched)'}${stale.length ? ` (but: ${stale.join('; ')})` : ''}`);
     if (now.length) {
       const launch = spawnSync(process.execPath, [join(SITE, 'build.mjs'), '--launch'], { encoding: 'utf8', timeout: 60000 });
       ok(launch.status === 1 && now.every((w) => launch.stderr.includes(w)) && existsSync(join(SITE, LAUNCH_RECORD)) === record,
@@ -631,8 +810,8 @@ try {
   'launch gate: refuses while sigelo.io\'s host sends sigelo.net elsewhere, or still serves sigelo.ai');
   ok(sellerRefusal(null, src) === undefined && /plain text/.test(sellerRefusal('Bad <b>Ltd</b>', src) ?? ''), 'seller: unset passes the shape check (open instead); markup refused');
 
-  // terms.md is replaced by the lawyer's version, so its budget is the lawyer's to keep.
-  for (const p of PAGES.filter((x) => x.slug !== 'terms')) {
+  // terms.md is final (no lawyer's version is coming), so it keeps its budget too.
+  for (const p of PAGES) {
     const n = words(fill(filled(p.slug), p.slug));
     ok(n <= budget(p.slug), `budget, filled: ${p.slug}.md ${n} words ≤ ${budget(p.slug)} with every placeholder and {{value}} filled`);
   }
@@ -641,10 +820,11 @@ try {
 // ---- what the pages promise: the relay's numbers and fields --------------------------------------
 // Every contact verb loads the identity and refuses without one, and init refuses without a
 // recovery decision: the start sequence begins with it (A5 review).
-ok(/^```sh\n\[install command\]\nsigelo-agent init --recovery <z…>\nsigelo-agent invite\nsigelo-agent accept <code>\nsigelo-agent send <contact> <message>\n```$/m.test(src.index)
-  && src.index.includes('Login by [sigelo identity](https://sigelo.io/adopt.html#1-identity)') && /\[Details\]\(\/pro\.html\)/.test(src.index)
+// The install line is the sidecar package that carries the contact verbs from release 0.1.2.
+ok(/^```sh\nnpm i -g sigelo-agent\nsigelo-agent init --recovery <z…>\nsigelo-agent invite\nsigelo-agent accept <code>\nsigelo-agent send <contact> <message>\n```$/m.test(src.index)
+  && src.index.includes('Login by [sigelo identity](https://sigelo.io/adopt.html#1-identity)') && src.index.includes(`\n\n${r.pending ? HOME_PENDING : HOME_ON_SALE} one allowance across your agents.\n\n`)
   && index.client.commands.join('\n').startsWith('sigelo-agent init --recovery <z…>\nsigelo-agent invite\nsigelo-agent accept <code>\nsigelo-agent send <contact> <message>'),
-  'index: install, make the identity (its recovery key linked), then the three commands, as index.json lists them; and how to buy Pro');
+  `index: install, make the identity (its recovery key linked), then the three commands, as index.json lists them; and the Pro line, linked${r.pending ? ', saying it is not on sale yet' : ''}`);
 ok(src.index.includes(`New (v${PKG.version.split('.').slice(0, 2).join('.')}), unaudited.`) && src.index.includes('MQTT 3.1.1 over TLS. Not A2A: both agents dial out to the relay.'),
   'index: one status line, the version as relay/package.json, unaudited; MQTT 3.1.1; not A2A');
 if (allowance && mailbox && operator && db) {
@@ -660,8 +840,18 @@ if (allowance && mailbox && operator && db) {
   };
   const offRows = Object.entries(table).filter(([label, want]) => row(label).join() !== want.join()).map(([label]) => label);
   const storage = row('Storage queued');
-  if (storage[0] !== size(free.storage) || !/^(?:\[storage\]|[1-9]\d* [MG]B)$/.test(storage[1] ?? '')) offRows.push('Storage queued');
-  ok(offRows.length === 0, `pro: the Free/Pro table is relay/allowance.mjs TIERS${offRows.length ? ` (differs: ${offRows.join(', ')})` : ''}`);
+  // Pro's storage is the constant the relay grants (TIERS.pro.storage), never more: the Owner asked
+  // for 5 GB, the relay grants 1 GB, so the page says 1 GB.
+  if (storage[0] !== size(free.storage) || storage[1] !== (pro.storage % (1024 * MB) === 0 ? `${pro.storage / 1024 / MB} GB` : size(pro.storage))) offRows.push('Storage queued');
+  ok(offRows.length === 0, `pro: the Free/Pro table is relay/allowance.mjs TIERS, Pro's storage TIERS.pro.storage${offRows.length ? ` (differs: ${offRows.join(', ')})` : ''}`);
+  // The licence claim "email" is answered over SimpleX (terms §7): contact@ only receives, so no page
+  // or agent file may sell e-mail support.
+  const supportOf = (t) => ({ none: 'none', email: 'SimpleX', priority: 'priority' })[t.support];
+  ok(body.pro.includes(`No account: a seller-signed licence to your **operator DID**. Support: ${supportOf(pro)}.`) && pro.groups === 0 && !/\bgroups?\b/i.test(body.pro),
+    `pro: support as TIERS.pro.support (${pro.support}, shown as ${supportOf(pro)}); no groups sold while TIERS.pro.groups is 0 (version 2)`);
+  ok(index.tiers.pro.support === supportOf(pro) && index.tiers.free.support === supportOf(free) && relayInfo.limits.pro.support === supportOf(pro)
+    && (pro.support !== 'email' || src.terms.includes('answered over SimpleX')) && !/Support: e-?mail/i.test(Object.values(body).join('\n')),
+    'support: index.json and relay.json say what pro.md says; e-mail support is answered over SimpleX (terms §7) and no page sells "Support: e-mail"');
   ok(allowance.windowWeeks(7) + 1 === 3 && allowance.windowWeeks(90) + 1 === 15 && !/^\| Mailboxes \|/m.test(body.pro),
     `pro: a row of contacts, not mailboxes; a contact costs 3 mailboxes at 7 days and 15 at 90, as relay/allowance.mjs says (now ${row('Contacts').join(' and ')})`);
   ok(body.index.includes(`**Free:** one agent, ${thou(free.msgsDay)} messages a day, kept ${free.retentionDays} days.`), 'index: the free line is TIERS.free');
@@ -700,10 +890,10 @@ if (sigelo && operator && auth && db) {
   const steps = Object.fromEntries([...body.pro.matchAll(/^(\d)\. (.*)$/gm)].map((m) => [m[1], m[2]]));
   // The relay pools only attestations whose iss is the operator's current key (operator.mjs): after a
   // rotation every agent's attestation must be signed again, or the pool drops to free (A5 review).
-  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^Pay by .*; renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
+  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^Pay in \[Monero\]\(\/pay-monero\.md\), naming that DID; renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
     'pro: log in with the operator identity (step 2), and after each rotation again and sign the agents\' attestations anew (step 5), before paying (3, renewal the same) and uploading (4)');
   ok(/prints the operator DID \(later: the first of its `chain`\)/.test(body.pro), 'pro step 1: a licence names the operator\'s original DID, the first of its chain');
-  for (const s of ['pay-monero', 'pay-card']) ok(src[s].includes('First log in once with your operator identity ([Pro](/pro.html) step 2)'), `${s}: log in with the operator identity before paying`);
+  for (const s of ['pay-monero']) ok(src[s].includes('First log in once with your operator identity ([Pro](/pro.html) step 2)'), `${s}: log in with the operator identity before paying`);
   const licenceFor = (sub, exp) => ({ attestation: sigelo.attest({ secret: vendor.secret, iss: vendor.did, sub, iat: now, exp, ctx: operator.LICENCE_CTX, admission: 'payment',
     claims: { tier: 'pro', storage_mb: 1, msgs_day: 1, retention_days: 1, groups: 0 } }), issuer: vendor.genesis, rotations: [] });
   const relayDb = () => { const d = db.openDb(':memory:'); return [d, operator.operators({ db: d, host: HOST, vendor: vendor.did, clock: () => now })]; };
@@ -749,6 +939,26 @@ if (sigelo && operator && auth && db) {
   ];
   ok(kept.join() === [true, true, false, false].join(),
     `privacy: a licence stays until ${KEEP / DAY} days after its expiry, used or not, as operator.mjs keeps it (got ${kept.join(', ')})`);
+  // Ending a licence early (a refund, a chargeback, abuse: terms §8, §10) is a later 1-day reissue,
+  // which the relay keeps over it. When the relay never held the licence being ended (refunded before
+  // upload), the vendor uploads that licence first: the reissue then records its expiry (replaced_exp)
+  // and the row stays until LICENCE_KEEP after it, refusing the ended file all along. Without that
+  // upload the row goes LICENCE_KEEP after the 1-day licence and the ended file is taken again.
+  const licenceAt = (iat, exp) => ({ attestation: sigelo.attest({ secret: vendor.secret, iss: vendor.did, sub: op.did, iat, exp, ctx: operator.LICENCE_CTX, admission: 'payment',
+    claims: { tier: 'pro', storage_mb: 1, msgs_day: 1, retention_days: 1, groups: 0 } }), issuer: vendor.genesis, rotations: [] });
+  const ended = licenceAt(now - 60, now + YEAR), ending = licenceAt(now, now + DAY), later = now + DAY + KEEP + DAY;
+  const endWith = (first) => {
+    const [d, ops] = relayDb();
+    d.touchAccount(a, now);
+    const ups = [...first, ending].map((x) => ops.upload(x, now));
+    ops.tidy(later);
+    const again = ops.upload(ended, later);
+    d.close();
+    return ups.every((u) => u.ok) ? again.ok : `an upload was refused: ${ups.find((u) => !u.ok).detail}`;
+  };
+  const endings = [endWith([ended]), endWith([])];
+  ok(endings.join() === [false, true].join(),
+    `ending a licence the relay never held: upload it, then the 1-day reissue; the ended file stays refused past LICENCE_KEEP after the reissue (without the first upload it is taken again: got ${endings.join(', ')})`);
 }
 const erasure = src.privacy.slice(src.privacy.indexOf('## Erasure'));
 ok(['**recovery key**', 'import { sign } from "sigelo"', 'ctx:"sigelo.ai/erase"', 'ctx:"sigelo.ai/access"', 'bindings:[],attestations:[],issuers:[]', 'Without asking: stop using the identity'].every((s) => erasure.includes(s))
@@ -757,11 +967,19 @@ ok(['/24', '/48', '7 days', 'Never logged:', 'Seller and provider of the relay',
   'privacy: /24 or /48 for 7 days, full addresses in memory only but in a rare error line, which may also name a DID (the request line), no access log, the never-list, the seller');
 ok(['No custody', 'No payment routing', 'No access to content', 'The attestation is the subscription', 'does not sell to consumers'].every((s) => src.terms.includes(s)),
   'terms: B2B, no custody, no payment routing, no access to content, the attestation is the subscription');
-// The pay page asks every Monero buyer for a transaction key: the no-custody clause says what it is.
-// A refund turns on the §9 warranty, with a time to fix it, as commercial/LICENCE-TERMS-draft.md §9 (A5 review).
-ok(src.terms.includes('never receives or holds a seed, private key or other means of access') && src.terms.includes('(transaction keys only prove payments)')
-  && src.terms.includes("No refund after issuance, unless §9's warranty fails and is not fixed within 14 days;") && src['pay-monero'].includes('transaction key'),
-  'terms: no custody, though a Monero buyer sends a transaction key (it only proves a payment); a refund when §9\'s warranty fails and is not fixed within 14 days');
+// No custody: should a pay page ever ask for a transaction key, the clause must say it only proves a
+// payment. Refunds: a licence not yet on the relay within 14 days, and the §9 warranty with a time to
+// fix it, as commercial/LICENCE-TERMS-draft.md §9 (A5 review). Ending a licence is a later, shorter
+// reissue (operator.mjs keeps the one issued last), which is how a refund is made safe.
+ok(src.terms.includes('never receives or holds a seed, private key or other means of access')
+  && (!/transaction key/.test(src['pay-monero']) || src.terms.includes('(transaction keys only prove payments)'))
+  && src.terms.includes('A licence not yet uploaded to the relay is refunded on request within 14 days of payment.')
+  && src.terms.includes("If §9's warranty fails and is not fixed within 14 days, the unused part is refunded. No other refunds.")
+  && src.terms.includes('nothing renews or charges by itself') && src.terms.includes('Software and service are provided as is.')
+  && src.terms.includes('Liability is limited to what the Buyer paid in the 12 months before the claim; none for lost messages, keys, funds or profits.')
+  && src.terms.includes('The Seller may refuse a DID used for them and end its licence without refund; messages already delivered are not erased.')
+  && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('excluding VAT; paid in Monero, less the stated discount,'),
+  'terms: paid in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
 // The nightly backup (deploy/backup.sh: licences and licensed operators' rows, 7 archives kept) is a
 // copy the table names; an identity without a recovery key is erased by disuse only (A5 review).
 const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
@@ -769,21 +987,16 @@ ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encry
   && /^TABLES="licences operator_retired vendor_chain accounts chain_dids"$/m.test(backupSh),
   'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
 ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key**: sign a request offline with it'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
-// Where the servers are is the Owner's to confirm (runbook §0 item 6): a placeholder until then, so
-// --final refuses; no other line of the page says it.
-ok(!src.privacy.includes('[hosting region]') || (src.privacy.includes('Servers in [hosting region].') && r.open.includes('[hosting region]')) ,
-  'privacy: the servers\' region is a placeholder --final refuses until the Owner confirms it');
-ok(!/\bEU hosting provider\b/.test(src.privacy) && src.privacy.split('[hosting region]').length <= 2, 'privacy: the region is stated once, in the seller line');
-ok(/your operator DID holds Pro, and your agents pool once they carry its attestation \(\[Pro\]\(\/pro\.html\) step 5\)/.test(src['pay-card']),
-  'pay-card: Pro reaches the agents only through their operator attestation');
-ok(!/name the seller|names the seller/.test(src['pay-card']) && /proves nothing/.test(src['pay-card']), 'pay-card: the name a checkout shows is not offered as proof');
-for (const s of ['pay-monero', 'pay-card']) {
+// Where the servers are, as the Owner confirmed it (runbook §0): stated once, in the seller line.
+ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
+  'privacy: the servers are in the EU, stated once, in the seller line');
+ok(src.privacy.includes('No accounts. This site sets no cookies, runs no scripts or trackers and keeps no access log.'), 'privacy: no accounts, no cookies, no scripts or trackers, no access log');
+for (const s of ['pay-monero']) {
   ok(/^For businesses\./m.test(src[s]) && src[s].includes('accepting the [terms](/terms.html)'), `${s}: businesses only, and the terms`);
-  ok(src[s].includes(`file \`site/${s}.md\``) && existsSync(join(RELAY, 'site', `${s}.md`)), `${s}: names the copy in the relay's public repository to compare against (site/${s}.md)`);
+  ok(src[s].includes(`\`site/${s}.md\``) && existsSync(join(RELAY, 'site', `${s}.md`)), `${s}: names its copy in the relay's public repository (site/${s}.md)`);
 }
-const XMR = /\b[48][1-9A-HJ-NP-Za-km-z]{94}\b/;
-ok(PAGES.every((p) => p.slug === 'pay-monero' || !XMR.test(src[p.slug])), 'a Monero address appears on pay-monero only');
-ok(PAGES.every((p) => p.slug === 'pay-card' || !/stripe\.com/.test(src[p.slug])), 'a Stripe link appears on pay-card only');
+ok(PAGES.every((p) => !XMR_RE.test(src[p.slug])) && paymentDetailRefusals(src).length === 0, 'no page carries a Monero address (one is made per invoice)');
+ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a payment link (a monero: request or a checkout URL)');
 // Whoever holds an access request gets the data: SimpleX only (an erasure may come by e-mail).
 ok(erasure.includes('`ctx:"sigelo.ai/access"` asks for the data instead, over SimpleX only: whoever holds that file gets the data.'),
   'privacy: an access request goes over SimpleX only, never by e-mail');

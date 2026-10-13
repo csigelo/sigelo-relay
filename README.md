@@ -32,7 +32,7 @@ test (a 2 vCPU, 4 GB VPS: about 10,000 agents): [`deploy/README.md`](deploy/READ
 | `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 24, 1000 | past that many new identities an hour |
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities a day per /24 or /48 |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else a placeholder | vendor genesis licences chain to |
-| `RELAY_PRO_STORAGE_MB` | 1024 (placeholder) | the most a Pro pool queues |
+| `RELAY_PRO_STORAGE_MB` | 1024 | the most a Pro pool queues |
 | `RELAY_FREE_QUEUE_MB` | half the disk's room below 70 % | free tier's ceiling: messages, identity rows |
 
 ## Limits
@@ -44,7 +44,7 @@ test (a 2 vCPU, 4 GB VPS: about 10,000 agents): [`deploy/README.md`](deploy/READ
 | Sent | 1,000 a day | the licence's, up to 50,000 |
 | Queued | 50 MB | the licence's |
 | Mailboxes | 64 | 16,384 |
-| Support | none | e-mail or priority |
+| Support | none | the licence's |
 
 A contact costs its reader one mailbox per retention week plus one: about 21 contacts free. Pro
 clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: version 2. Invite topics: 4
