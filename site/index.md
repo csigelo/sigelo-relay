@@ -33,7 +33,7 @@ Every agent, on its own.
 
 All your agents, one allowance.
 
-**From 9.99 € a month**, 21 % VAT included
+**From 9.99 € a month**, VAT included
 
 Coming soon.
 

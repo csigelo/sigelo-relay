@@ -164,7 +164,7 @@ export const PAGES = [
   { slug: 'connect', nav: 'Connect', title: 'Connect two agents in a minute',
     description: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.' },
   { slug: 'pro', nav: 'Pro', title: 'Pro: all your agents on one allowance',
-    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. From 9.99 € a month, 21 % VAT included, for businesses.',
+    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. From 9.99 € a month, VAT included, for businesses.',
     pending: { description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Coming soon; free until then.' } },
   { slug: 'enterprise', nav: 'Enterprise', title: 'Enterprise: teams and swarms of agents',
     description: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.' },
@@ -233,23 +233,24 @@ export const PLACEHOLDERS = {};
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
 // pro.md's plans (gross prices only: no net amount on the pages, the Owner 2026-10-14) and the lines
-// under them, which the JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %].
+// under them, which the JSON-LD offers and index.json read. PRICE_RE → [Monero discount %]. VAT
+// included, no rate and no reverse-charge wording on the pages (the Owner, 2026-10-14).
 // PLAN_RE, a plan a period → [months, save %, a month, for the period]; the one-month plan has no
 // "save" badge and no period total, the others have both.
-export const PRICE_RE = /^Prices include ([1-9]\d?) % VAT\. EU businesses outside Belgium with a VAT number: give it with your order and the invoice is issued under reverse charge\.\n\nFor businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
+export const PRICE_RE = /^VAT included\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
 export const PLAN_RE = /^### ([1-9]\d*) months?(?: \*save ([1-9]\d?) %\*)?\n\n\*\*(\d+\.\d\d) €\*\* a month\n\n(?:(\d+\.\d\d) € for \1 months\n\n)?\[Get Pro\]\(\/contact\.html\)$/gm;
-// → { vat, discount, periods: [{ months, month, period }] } in euros, or null when the line or the plans
+// → { discount, periods: [{ months, month, period }] } in euros, or null when the line or the plans
 // are missing, or a plan does not add up to the cent: the period is the months times the month, and
 // the badge saves what the month saves on the one-month plan's, rounded to the whole per cent.
 export function priceOf(text) {
   const line = text.match(PRICE_RE), rows = [...text.matchAll(PLAN_RE)];
   if (!line || !rows.length) return null;
-  const vat = Number(line[1]), cent = (a, b) => Math.abs(a - b) < 0.006;
+  const cent = (a, b) => Math.abs(a - b) < 0.006;
   const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[3]), period: Number(m[4] ?? m[3]), save: m[2] && Number(m[2]),
     shape: [m[2], m[4]].every((x) => (x === undefined) === (m[1] === '1')) }));
   const base = periods.find((p) => p.months === 1)?.month;
   const adds = base && periods.every((p) => p.shape && cent(p.period, p.month * p.months) && (p.months === 1 || p.save === Math.round(100 * (1 - p.month / base))));
-  return adds ? { vat, discount: Number(line[2]), periods: periods.map(({ months, month, period }) => ({ months, month, period })) } : null;
+  return adds ? { discount: Number(line[1]), periods: periods.map(({ months, month, period }) => ({ months, month, period })) } : null;
 }
 // pro.md's storage cell: N MB or N GB.
 export const STORAGE_RE = /^\| Room for waiting messages \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
@@ -979,7 +980,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const price = priceOf(md.pro), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no price table (a "### N months *save n %*" plan a period: "**x €** a month", "y € for N months", "[Get Pro](/contact.html)", adding up to the cent) and "Prices include n % VAT. … Bank transfer, or Monero at n % off." lines',
+    !price && 'pro: no price table (a "### N months *save n %*" plan a period: "**x €** a month", "y € for N months", "[Get Pro](/contact.html)", adding up to the cent) and "VAT included. … Bank transfer, or Monero at n % off." line',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
@@ -1048,7 +1049,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
-      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, eu_business_outside_belgium_with_vat_number: 'reverse charge', billed: 'up front for the period',
+      price: price ? { currency: 'EUR', vat_included: true, billed: 'up front for the period',
         periods: price.periods.map((p) => ({ months: p.months, month: p.month, period: p.period })), monero_discount_percent: discount } : null,
       on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` } },
     enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },

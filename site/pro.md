@@ -36,9 +36,7 @@ Best value
 :::
 ::::
 
-Prices include 21 % VAT. EU businesses outside Belgium with a VAT number: give it with your order and the invoice is issued under reverse charge.
-
-For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
+VAT included. For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
 
 ## Free against Pro
 
