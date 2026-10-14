@@ -1299,9 +1299,9 @@ const fresh = (name, extra = {}) => {
 {
   now += DAY;
   const { free, pro } = DEFAULT_TIERS;
-  ok(free.retentionDays === 7 && free.maxMessage === 256 * KB && free.mailboxes === 64 && free.groups === 0 && free.support === 'none'
-    && pro.retentionDays === 90 && pro.maxMessage === MB && pro.groups === 0 && pro.support === 'email' && windowWeeks(free.retentionDays) === 2 && windowWeeks(pro.retentionDays) === 14,
-    `the default tiers (§11): free 7 days, 256 KB, 64 mailboxes, no support; Pro 90 days, 1 MB, e-mail support; a reader's window ${windowWeeks(7)} weeks free, ${windowWeeks(90)} Pro`);
+  ok(free.retentionDays === 14 && free.maxMessage === 512 * KB && free.mailboxes === 128 && free.msgsDay === 3000 && free.storage === 100 * MB && free.groups === 0 && free.support === 'none'
+    && pro.retentionDays === 90 && pro.maxMessage === MB && pro.groups === 0 && pro.support === 'email' && windowWeeks(free.retentionDays) === 3 && windowWeeks(pro.retentionDays) === 14,
+    `the default tiers (§11): free 3,000 a day, 14 days, 512 KB, 100 MB, 128 mailboxes, no support; Pro 90 days, 1 MB, e-mail support; a reader's window ${windowWeeks(14)} weeks free, ${windowWeeks(90)} Pro`);
   // A licence table without support (and with the day of use an older one kept): its rows read as
   // "email", and the sweep's rebuild in key order copies the table as made now.
   const old = new DatabaseSync(join(dir, 'default tiers.db'));   // fresh('default tiers') opens it
@@ -1322,8 +1322,8 @@ const fresh = (name, extra = {}) => {
   const t = D.tier(agd).limits, f = D.tier(frd).limits;
   ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 1024 * MB && t.groups === 0 && t.support === 'priority',
     'a licence selling 365 days, 2 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 1 GB, groups 0 until they exist, support "priority"');
-  ok(f.retentionDays === 7 && f.maxMessage === 256 * KB && f.mailboxes === 64 && f.support === 'none' && D.pol.retention(accountOf(agd.original)) === 90 * DAY,
-    'a free identity: 7 days, 256 KB, 64 mailboxes, no support; the pooled agent\'s messages are kept 90 days');
+  ok(f.retentionDays === 14 && f.maxMessage === 512 * KB && f.mailboxes === 128 && f.support === 'none' && D.pol.retention(accountOf(agd.original)) === 90 * DAY,
+    'a free identity: 14 days, 512 KB, 128 mailboxes, no support; the pooled agent\'s messages are kept 90 days');
   await R.close();
 }
 

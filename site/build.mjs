@@ -7,7 +7,7 @@
 //   node relay/site/build.mjs --launch  in the private tree: the official statement, then what npm
 //                                       serves; writes relay/site/launch.json when both pass (launchGate)
 //
-// Six pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
+// Nine pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
 // plus what agents and crawlers read: robots.txt (and relay-robots.txt, which nginx serves as
 // relay.sigelo.ai's), sitemap.xml, llms.txt, llms-full.txt, index.json, relay.json (the relay info
 // document of plan §11) and .well-known/security.txt. nginx (relay/deploy/nginx.conf) serves
@@ -18,7 +18,7 @@
 // The numbers are not typed into the pages: a source writes {{free.msgsDay}} and the build fills it
 // from the relay's own constants (relay/allowance.mjs TIERS, mailbox.mjs, operator.mjs), so a page
 // cannot promise what the relay does not do. Open: a placeholder, the terms' DRAFT mark, SELLER
-// unset, the vendor DID unset while the pages do not say Pro is not on sale yet (VENDOR_PENDING), a
+// unset, the vendor DID unset while pro.md does not say Pro is coming soon (VENDOR_PENDING), a
 // server fact the pages promise that relay/deploy/nginx.conf does not deliver, and in the private
 // tree an official statement (SECURITY.md, sigelo.io's index.json and nginx) or a sigelo-agent source
 // that does not yet do what index.json says (in the relay's export, which lacks them, no record of
@@ -56,41 +56,40 @@ const PKG = JSON.parse(readFileSync(join(RELAY, 'package.json'), 'utf8'));
 export const SELLER = 'sigelo';
 
 // Pro is not on sale until the vendor identity exists: the Owner mints it at a terminal
-// (commercial/vendor-ceremony-runbook.md §2–3), and no licence can be issued before. pro.md and
-// pay-monero.md say so in this sentence, and the build reads it from the pages (vendorPending), so the
-// two cannot drift: while both carry it, --final and --launch take the relay's placeholder vendor DID,
-// index.json and relay.json mark Pro not_yet_on_sale, the JSON-LD offers only the free tier, and the
-// titles, descriptions and llms.txt lines that would read as a sale say "not on sale yet" (PAGES
-// `pending`, llmsTxt). index.md's Pro line says so too (HOME_PENDING). Once the sentence is gone from
-// both, the vendor DID is required again. A vendor DID set while the sentence stays, the sentence on
-// one page only, or index.md out of step with the two, is refused (vendorRefusals).
-export const VENDOR_PENDING = 'Pro licences are not on sale yet: the key that signs them is being set up. Every agent runs on the free tier until then.';
-export const VENDOR_PENDING_PAGES = ['pro', 'pay-monero'];
-// index.md's Pro line while Pro is not on sale, and once it is.
-export const HOME_PENDING = '**[Pro](/pro.html)** (not on sale yet):';
-export const HOME_ON_SALE = '**[Pro](/pro.html):**';
+// (commercial/vendor-ceremony-runbook.md §2–3), and no licence can be issued before. pro.md says so in
+// this sentence at its top, and the build reads it from the page (vendorPending), so the two cannot
+// drift: while it is there, --final and --launch take the relay's placeholder vendor DID, index.json
+// and relay.json mark Pro not_yet_on_sale, the JSON-LD offers only the free tier, and the
+// descriptions and llms.txt lines that would read as a sale say "coming soon" (PAGES `pending`,
+// llmsTxt). The home page's Pro card says so too (HOME_PENDING). Once the sentence is gone, the
+// vendor DID is required again. A vendor DID set while the sentence stays, or the home card out of
+// step with pro.md, is refused (vendorRefusals). The Owner's words: "coming soon", no date.
+export const VENDOR_PENDING = 'Pro is coming soon. Every agent runs free until then.';
+export const VENDOR_PENDING_PAGES = ['pro'];
+// The home page's Pro card, under its price: this line while Pro is coming soon, the other once on sale.
+export const HOME_PENDING = 'Coming soon.';
+export const HOME_ON_SALE = 'Available now.';
 // → true while every page of VENDOR_PENDING_PAGES carries the sentence, false while none does, and
 // why not while only some do.
 export function vendorPending(md) {
   const on = VENDOR_PENDING_PAGES.filter((slug) => (md[slug] ?? '').includes(VENDOR_PENDING));
   if (on.length === 0 || on.length === VENDOR_PENDING_PAGES.length) return on.length > 0;
   const off = VENDOR_PENDING_PAGES.filter((slug) => !on.includes(slug));
-  return `pages: "Pro licences are not on sale yet…" is on ${on.map((x) => `${x}.md`).join(' and ')} but not on ${off.map((x) => `${x}.md`).join(' and ')} (both pages, or neither)`;
+  return `pages: "${VENDOR_PENDING}" is on ${on.map((x) => `${x}.md`).join(' and ')} but not on ${off.map((x) => `${x}.md`).join(' and ')} (both pages, or neither)`;
 }
 // The vendor DID against the pages. → [why …]: 'vendor DID' while it is unset (the relay pins
-// licence.ts's placeholder) and the pages do not say Pro is not on sale yet; a refusal while it is set
-// and they still say so, or while only one page says so; a refusal while index.md's Pro line does not
-// say what the two pages say (HOME_PENDING while pending, no "not on sale yet" once on sale); nothing
-// otherwise.
+// licence.ts's placeholder) and pro.md does not say Pro is coming soon; a refusal while it is set and
+// pro.md still says so; a refusal while the home page's Pro card does not say what pro.md says
+// (HOME_PENDING while pending, HOME_ON_SALE once on sale); nothing otherwise.
 export function vendorRefusals(md, vendor) {
   const pending = vendorPending(md), set = vendor !== DEV_VENDOR_DID;
   if (typeof pending === 'string') return [pending];
   const why = [];
   const home = md.index ?? '';
-  if (pending && !home.includes(HOME_PENDING)) why.push(`index.md: its Pro line does not begin "${HOME_PENDING}", though pro.md and pay-monero.md say Pro licences are not on sale yet`);
-  if (!pending && /not on sale yet/.test(home)) why.push(`index.md: still says Pro is not on sale yet, though pro.md and pay-monero.md no longer do (write "${HOME_ON_SALE}")`);
+  if (pending && !home.includes(`\n\n${HOME_PENDING}\n\n`)) why.push(`index.md: its Pro card does not say "${HOME_PENDING}" under the price, though pro.md says Pro is coming soon`);
+  if (!pending && home.includes(HOME_PENDING)) why.push(`index.md: its Pro card still says "${HOME_PENDING}", though pro.md no longer does (write "${HOME_ON_SALE}")`);
   if (!set && !pending) why.push('vendor DID');
-  if (set && pending) why.push(`vendor DID: set (${vendor}), but ${VENDOR_PENDING_PAGES.map((x) => `${x}.md`).join(' and ')} still say Pro licences are not on sale yet: remove that sentence from both`);
+  if (set && pending) why.push(`vendor DID: set (${vendor}), but ${VENDOR_PENDING_PAGES.map((x) => `${x}.md`).join(' and ')} still says "${VENDOR_PENDING}": remove that sentence`);
   return why;
 }
 // The vendor DID the relay pins where this runs: RELAY_VENDOR_DID, else licence.ts's (SIGELO_VENDOR_DID
@@ -111,7 +110,7 @@ export const DOMAINS = [
 export const HOSTS = [{ name: HOST, what: 'relay broker' }];
 export const REPOSITORIES = ['https://github.com/csigelo/sigelo', REPO];
 export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ...HOSTS].map((d) => d.name);
-// SECURITY.md's line, which the pay page carries verbatim (SEO spec §4.10). A payment address is made
+// SECURITY.md's line, which the contact page carries verbatim (SEO spec §4.10). A payment address is made
 // per invoice, so it is sent: only in answer to the buyer's own request, in the SimpleX conversation
 // the buyer opened from sigelo.io's contact page (a conversation a phisher cannot write into).
 // index.json's official.payment_address_only_with and invoice_only_via say so, as sigelo.io's do.
@@ -131,42 +130,54 @@ export const POSITIONING = [
 // sigelo.io's world issuer DID, as SECURITY.md and sigelo.io's index.json name it (SEO spec §4.10).
 // Copied, as DOMAINS is; relay/site/test.mjs compares it with world/genesis.json in the private tree.
 export const ISSUER_DID = 'did:sigelo:zEqNZjQDBiiufPs4NHrLw1kJD8rBitbFPyoQJoKuJFTM7';
-// sigelo.io's official-channels statement: the second source the pay page sends a buyer to.
+// sigelo.io's official-channels statement.
 export const STATEMENT = 'https://sigelo.io/security.html#official-channels';
-// Where how to pay is published: the pay page (Monero only), and on the relay repository's main
-// branch its one file, not the repository as a whole (anyone can put text under its URL: an issue, a
-// pull request, a fork's commit, which GitHub serves under the parent's URL). The address itself is
-// on neither: it comes with an invoice (NOBODY). index.json says so (as payment_details_only_on, the
-// name sigelo.io's site/src/official.mjs uses for the same places); the footer and the pay page name
-// the same file and branch in words.
-export const PAYMENT_PLACES = [`${ORIGIN}/pay-monero.html`, `${REPO}/blob/main/site/pay-monero.md`];
-export const PAYMENT_WORDS = `How to pay is published only on sigelo.ai and in site/pay-monero.md on the main branch of ${REPO.replace(/^https:\/\//, '')}.`;
+// Where how to pay is published: the contact page (Monero only, by invoice over SimpleX), and on the
+// relay repository's main branch its one file, not the repository as a whole (anyone can put text
+// under its URL: an issue, a pull request, a fork's commit, which GitHub serves under the parent's
+// URL). The address itself is on neither: it comes with an invoice (NOBODY). index.json says so (as
+// payment_details_only_on, the name sigelo.io's site/src/official.mjs uses for the same places), and
+// the contact page names the same file and branch in words (PAYMENT_WORDS), so a page that says
+// otherwise, anywhere, is not ours. Until 2026-10-14 the place was a pay page, /pay-monero.html,
+// which nginx now sends to /pro.html.
+export const PAYMENT_PLACES = [`${ORIGIN}/contact.html`, `${REPO}/blob/main/site/contact.md`];
+export const PAYMENT_WORDS = `How to pay is published only here and in \`site/contact.md\` on the main branch of \`${REPO.replace(/^https:\/\//, '')}\`.`;
+// The SimpleX address sigelo.io's contact page shows (site/src/official.mjs SIMPLEX), copied as
+// DOMAINS is: relay/site/test.mjs compares the two in the private tree, and --launch SECURITY.md's.
+export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3gPLNts_ovwxmZM';
 
-// The pages, in nav order (the not-found page has no nav entry: not in the nav, the sitemap,
-// llms.txt or index.json's pages). Titles get " — sigelo relay" but the home page's. `pending`: the
-// title or description while Pro is not on sale (VENDOR_PENDING), for each page whose head would
-// otherwise read as a sale; a search result or link preview shows the head, not the page's first
-// paragraph. No title or description mentions the Monero discount (runbook §7 Q5). The word budgets
-// (docs-test/budgets.json) hold for what a reader sees: relay/site/test.mjs counts each page as `wc -w`
-// would with every {{value}} filled, a size being two words ("50 MB"), and again with every
-// placeholder filled as the runbook would. docs-test/check-budgets.mjs counts the source as written.
+// The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only. The
+// home page is reached by the wordmark; the agents' page (the Pro steps and erasure requests, what an
+// agent runs for its operator) and the not-found page are in neither: the agents' page is linked from
+// /pro and /privacy, and listed in llms.txt, the sitemap and index.json; the not-found page nowhere.
+// Titles get " — sigelo relay" but the home page's. `pending`: the title or description while Pro is
+// coming soon (VENDOR_PENDING), for each page whose head would otherwise read as a sale; a search
+// result or link preview shows the head, not the page's first paragraph. No title or description
+// mentions the Monero discount (runbook §7 Q5). The word budgets: relay/site/test.mjs counts each
+// page as `wc -w` would with every {{value}} filled, a size being two words ("50 MB"): the prose
+// (PROSE_BUDGET there: no table, card, code block or directive line) and the whole file
+// (docs-test/budgets.json, which docs-test/check-budgets.mjs checks on the source as written).
 export const PAGES = [
-  { slug: 'index', nav: 'Relay', title: 'sigelo relay — end-to-end encrypted messaging for AI agents',
-    description: 'AI agents pair by a one-line code and exchange end-to-end encrypted messages over MQTT. The relay holds them while one is offline. No accounts; free tier.' },
-  { slug: 'pro', nav: 'Pro', title: 'Pro: one allowance for all your agents',
-    description: 'sigelo relay Pro pools one allowance across your agents: {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. A licence attestation to your operator DID; no account.',
-    pending: { description: 'sigelo relay Pro will pool one allowance across your agents: {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Not on sale yet; free tier until then.' } },
-  { slug: 'pay-monero', nav: 'Pay in Monero', title: 'Pay Pro in Monero',
-    description: 'Pay sigelo relay Pro in Monero: ask for an invoice over SimpleX, pay its one-time address, get the licence back the same way.',
-    pending: { title: 'Paying for Pro in Monero (not on sale yet)',
-      description: 'How paying for sigelo relay Pro in Monero will work: an invoice over SimpleX, a one-time address, the licence back the same way. Not on sale yet.' } },
-  { slug: 'privacy', nav: 'Privacy', title: 'Privacy: what the relay keeps',
+  { slug: 'index', nav: null, title: 'sigelo relay — end-to-end encrypted messaging for AI agents',
+    description: 'Connect your AI agent to the agents you trust: a one-line code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.' },
+  { slug: 'connect', nav: 'Connect', title: 'Connect two agents in a minute',
+    description: 'Pair two AI agents in a minute: install sigelo-agent, make a one-line code, hand it over, their agent enters it. Then they message end-to-end encrypted.' },
+  { slug: 'pro', nav: 'Pro', title: 'Pro: all your agents on one allowance',
+    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. 10 € a month or 100 € a year, for businesses.',
+    pending: { description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Coming soon; free until then.' } },
+  { slug: 'enterprise', nav: 'Enterprise', title: 'Enterprise: teams and swarms of agents',
+    description: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.' },
+  { slug: 'contact', nav: 'Contact', title: 'Contact',
+    description: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.' },
+  { slug: 'privacy', nav: 'Privacy', foot: true, title: 'Privacy: what the relay keeps',
     description: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.' },
-  { slug: 'terms', nav: 'Terms', title: 'Terms of service',
+  { slug: 'terms', nav: 'Terms', foot: true, title: 'Terms of service',
     description: 'Terms for sigelo relay Pro, sold to businesses only: the free service, Pro as a licence attestation, no custody, no payment routing, liability, law.',
-    pending: { description: 'Terms for sigelo relay: the free service, Pro (not on sale yet; businesses only) as a licence attestation, no custody, no payment routing, liability, law.' } },
+    pending: { description: 'Terms for sigelo relay: the free service, Pro (coming soon; businesses only) as a licence attestation, no custody, no payment routing, liability, law.' } },
+  { slug: 'agents', nav: null, title: 'For agents: Pro setup and data requests',
+    description: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.' },
   { slug: '404', nav: null, noindex: true, title: 'Not found',
-    description: 'No page at this address on sigelo.ai. The relay pages: home, Pro, payment, privacy and terms; agents can start at /llms.txt or /index.json.' },
+    description: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.' },
 ];
 export const pageUrl = (p) => (p.slug === 'index' ? `${ORIGIN}/` : `${ORIGIN}/${p.slug}.html`);
 const headOf = (p, pending) => ({ title: p.title, description: p.description, ...(pending && p.pending) });
@@ -182,8 +193,8 @@ const size = (b) => (b % MB === 0 ? `${b / MB} MB` : `${b / KB} KB`);
 const days = (s) => String(s / DAY);
 const keep = (t) => days(Math.max(ACCOUNT_KEEP, t.retentionDays * DAY + IDLE_GRACE));
 // Contacts a tier's mailboxes hold: a contact costs its reader one mailbox per ISO week of its
-// retention window and one for the week ahead its client claims (allowance.mjs windowWeeks), so 3
-// on the free tier and 15 at 90 days. About: near a Monday it may cost one more.
+// retention window and one for the week ahead its client claims (allowance.mjs windowWeeks), so 4
+// on the free tier's 14 days and 15 at 90 days. About: near a Monday it may cost one more.
 const contacts = (t) => thou(Math.floor(t.mailboxes / (windowWeeks(t.retentionDays) + 1)));
 // A tier's support, as the pages and index.json write it (operator.mjs SUPPORT). The licence claim
 // "email" is answered over SimpleX: contact@sigelo.io only receives (terms §7), so a page saying
@@ -197,6 +208,7 @@ export const VALUES = Object.freeze({
   'pro.maxMessage': size(TIERS.pro.maxMessage), 'pro.mailboxes': thou(TIERS.pro.mailboxes), 'pro.contacts': contacts(TIERS.pro), 'pro.support': support(TIERS.pro),
   'keep.account.free': keep(TIERS.free), 'keep.account.pro': keep(TIERS.pro), 'keep.licence': days(LICENCE_KEEP),
   'operator.days': String(OPERATOR_DAYS),
+  'contact.simplex': SIMPLEX,
 });
 // Retention is how long a queued message waits, not how long its reader may stay away: the relay
 // queues only to a mailbox its reader holds (no_reader otherwise), and the client claims about a
@@ -220,9 +232,9 @@ export const PLACEHOLDERS = {};
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
 // pro.md's price line, which the JSON-LD offers and index.json read. → [month, year, discount].
-export const PRICE_RE = /^Price: ([1-9]\d*) €\/month or ([1-9]\d*) €\/year, excluding VAT; Monero: ([1-9]\d?) % less\. Businesses only\.$/m;
+export const PRICE_RE = /^\*\*([1-9]\d*) € a month or ([1-9]\d*) € a year\*\*, excluding VAT, for businesses\. You pay in Monero, at ([1-9]\d?) % off\.$/m;
 // pro.md's storage cell: N MB or N GB.
-export const STORAGE_RE = /^\| Storage queued \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
+export const STORAGE_RE = /^\| Room for waiting messages \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
 const storageBytes = (cell) => Number(cell.split(' ')[0]) * (cell.endsWith('GB') ? 1024 * MB : MB);
 // The most storage the relay grants a Pro pool, whatever a licence claims: RELAY_PRO_STORAGE_MB where
 // the site is built, read as relay/allowance.mjs relayPolicyFromEnv reads it on the relay (a whole
@@ -332,13 +344,13 @@ export const everyDirective = (b) => [...b.directives, ...b.blocks.flatMap(every
 // before a deploy (SEO spec §4.10, task 8): SECURITY.md carries the "Nobody…" line, no longer the
 // old one that said no payment address or link is ever sent by chat, names the relay's repository
 // and carries the SimpleX address sigelo.io's contact page shows (site/src/official.mjs SIMPLEX: the
-// pay page's step 1 has buyers compare the two); sigelo.io's own index.json (site/build.mjs) says
+// contact page sends buyers to compare the two); sigelo.io's own index.json (site/build.mjs) says
 // what sigelo.ai's does about payment addresses, in the same fields; site/deploy/nginx.conf
 // (sigelo.io's host) no longer serves sigelo.ai, and each live redirect in DOMAINS answers 301 to its
 // target there. The file is read, not the live server: it is what the next deploy of sigelo.io
 // serves, so the record can be written before that deploy. A redirect marked live: false (its DNS
 // does not reach us yet: sigelo.online, sigelo.dev) is not required. And
-// the install line index.md and index.json give works: the sigelo-agent package no longer refuses
+// the install line connect.md and index.json give works: the sigelo-agent package no longer refuses
 // the contact verbs when installed from npm. The private tree is the one with sigelo.io's
 // site/build.mjs beside relay/; there every file named here must be found. Elsewhere they are
 // absent: see launchGate. → [why …].
@@ -363,9 +375,9 @@ export function recordRefusals(site = SITE) {
   let rec = null;
   try { rec = JSON.parse(readFileSync(f, 'utf8')); } catch { /* refused below */ }
   const short = LAUNCH_PACKAGES.filter((n) => !versionAtLeast(rec?.npm?.[n], CONTACT_VERBS_SINCE));
-  return short.length ? [`launch: site/${LAUNCH_RECORD} does not record npm serving ${short.join(' and ')} at ${CONTACT_VERBS_SINCE} or later (index.md's install line needs both): publish them, then ${again}`] : [];
+  return short.length ? [`launch: site/${LAUNCH_RECORD} does not record npm serving ${short.join(' and ')} at ${CONTACT_VERBS_SINCE} or later (connect.md's install line needs both): publish them, then ${again}`] : [];
 }
-// What npm serves. index.md's `npm i -g sigelo-agent` installs npm's latest sigelo-agent, which runs
+// What npm serves. connect.md's `npm i -g sigelo-agent` installs npm's latest sigelo-agent, which runs
 // the contact verbs only from CONTACT_VERBS_SINCE, through the sigelo-contact package it depends on;
 // launchRefusals reads the source, which is ahead of npm until the release is published. So --launch,
 // once everything else passes, reads the registry (no credentials): the latest sigelo-agent at least
@@ -393,9 +405,9 @@ export async function registryRefusals({ root = ROOT, get = npmPackument } = {})
   }
   LAUNCH_PACKAGES.forEach((name, i) => {
     const doc = docs[i], v = doc?.['dist-tags']?.latest, meta = doc?.versions?.[v], by = meta?._npmUser?.name;
-    if (!meta) { why.push(`npm: no ${name}${name === 'sigelo-agent' ? " (index.md's install line)" : ' (sigelo-agent needs it for the contact verbs; the name is ours only once published)'}`); return; }
+    if (!meta) { why.push(`npm: no ${name}${name === 'sigelo-agent' ?  " (connect.md's install line)" : ' (sigelo-agent needs it for the contact verbs; the name is ours only once published)'}`); return; }
     npm[name] = v;
-    if (!versionAtLeast(v, want)) why.push(`npm: ${name}'s latest is ${v}, older than this tree's ${want}; publish ${want} first${name === 'sigelo-agent' ? ' (`npm i -g sigelo-agent` would install one without the contact verbs index.md lists)' : ''}`);
+    if (!versionAtLeast(v, want)) why.push(`npm: ${name}'s latest is ${v}, older than this tree's ${want}; publish ${want} first${name === 'sigelo-agent' ? ' (`npm i -g sigelo-agent` would install one without the contact verbs connect.md lists)' : ''}`);
     if (by !== NPM_USER) why.push(`npm: ${name} ${v} was published by ${by ?? 'no one named'}, not ${NPM_USER}`);
     if (name === 'sigelo-agent' && !meta.dependencies?.['sigelo-contact']) why.push(`npm: sigelo-agent ${v} does not depend on sigelo-contact, which carries the contact verbs`);
   });
@@ -414,16 +426,17 @@ export function launchRefusals(root = ROOT) {
   }
   const s = read(security);
   if (s !== null) {
-    if (!s.includes(NOBODY)) why.push('SECURITY.md: lacks the "Nobody from the project…" line the pay pages carry (SEO spec §4.10)');
+    if (!s.includes(NOBODY)) why.push('SECURITY.md: lacks the "Nobody from the project…" line the contact page carries (SEO spec §4.10)');
     if (/send a payment address or link by e-mail or chat|Payment proofs/.test(s)) why.push('SECURITY.md: still says no payment address or link is sent by chat, or where payment proofs go; an invoice now carries the address over SimpleX');
-    if (!s.includes(REPO)) why.push(`SECURITY.md: does not name ${REPO} as official (the pages say how to pay is published in its site/pay-monero.md)`);
+    if (!s.includes(REPO)) why.push(`SECURITY.md: does not name ${REPO} as official (the contact page says how to pay is published in its site/contact.md)`);
   }
-  // The address the pay page's step 1 has a buyer compare: sigelo.io's contact page and SECURITY.md.
+  // The address the contact page shows: sigelo.io's contact page's, which SECURITY.md carries too.
   const o = read(ioOfficial);
   if (o !== null) {
     const simplex = o.match(/^export const SIMPLEX = '([^'<>\n]+)';$/m)?.[1];
     if (!simplex) why.push('site/src/official.mjs: no SIMPLEX address (the one sigelo.io/contact.html shows)');
-    else if (s !== null && !s.includes(simplex)) why.push('SECURITY.md: lacks the SimpleX address sigelo.io/contact.html shows (site/src/official.mjs SIMPLEX); the pay page tells buyers to compare the two');
+    else if (s !== null && !s.includes(simplex)) why.push('SECURITY.md: lacks the SimpleX address sigelo.io/contact.html shows (site/src/official.mjs SIMPLEX), which sigelo.ai/contact.html shows too');
+    if (simplex && simplex !== SIMPLEX) why.push('relay/site/build.mjs: SIMPLEX is not the address site/src/official.mjs gives sigelo.io/contact.html (sigelo.ai/contact.html shows it)');
   }
   // sigelo.io's index.json `official`, which SECURITY.md names as the machine-readable statement.
   const b = isPrivateTree(root) ? read(ioBuild) : null;
@@ -432,7 +445,7 @@ export function launchRefusals(root = ROOT) {
   }
   const v = read(verbs);
   if (v !== null && /not in the npm release of sigelo-agent/.test(v)) {
-    why.push('adapters/moadim/sigelo-agent-contact.ts: the contact verbs still refuse when sigelo-agent is installed from npm, so index.md\'s `npm i -g sigelo-agent` then `sigelo-agent invite` fails');
+    why.push('adapters/moadim/sigelo-agent-contact.ts: the contact verbs still refuse when sigelo-agent is installed from npm, so connect.md\'s `npm i -g sigelo-agent` then `sigelo-agent invite` fails');
   }
   const n = read(io);
   if (n !== null) {
@@ -461,7 +474,33 @@ export function launchCheck({ root = ROOT, site = SITE, vendor = pinnedVendor() 
 // ---------------------------------------------------------------------------------------------
 // Markdown → HTML, copied from site/build.mjs: ATX headings, paragraphs, fenced code, block
 // quotes, nested lists, GFM tables, rules, inline code, links, autolinks, bold, italic. No raw
-// HTML passes through: every `<` that is not ours is escaped.
+// HTML passes through: every `<` that is not ours is escaped. Added here for the layout, not in
+// sigelo.io's copy: containers, `::: name [modifier]` … `:::` (as many colons to close as opened,
+// so `::::` holds `:::`), rendered as <div class="name modifier"> (<section> for the hero), and
+// `::: svg <name>`, one of DRAWINGS below. Names are [a-z-] only. The .md twins drop those lines.
+const BOX = /^(:{3,})[ \t]*([a-z][a-z-]*)(?:[ \t]+([a-z][a-z-]*))?[ \t]*$/;
+export const stripBoxes = (md) => md.split('\n').filter((l) => !BOX.test(l) && !/^:{3,}\s*$/.test(l)).join('\n').replace(/\n{3,}/g, '\n\n');
+// The drawings, inline SVG: line art in the accent colour (style.css .art), a title for screen
+// readers, no script, nothing fetched. relay: an envelope going from one agent through the relay to
+// the other.
+const agentHead = (x) => `<rect class="art" x="${x - 45}" y="58" width="90" height="80" rx="18"></rect>`
+  + `<line class="art" x1="${x}" y1="58" x2="${x}" y2="40"></line><circle class="art-dot" cx="${x}" cy="35" r="6"></circle>`
+  + `<circle class="art-dot" cx="${x - 16}" cy="92" r="6"></circle><circle class="art-dot" cx="${x + 16}" cy="92" r="6"></circle>`
+  + `<path class="art" d="M${x - 15} 115 q15 10 30 0"></path>`;
+const envelope = (x, y) => `<rect class="art art-paper" x="${x}" y="${y}" width="54" height="36" rx="3"></rect><path class="art" d="M${x} ${y} l27 20 l27 -20"></path>`;
+export const DRAWINGS = {
+  relay: `<figure class="drawing"><svg class="art-svg" viewBox="0 0 640 200" role="img" aria-labelledby="drawing-relay-title">
+<title id="drawing-relay-title">Your agent sends an envelope to the sigelo relay, which passes it on to their agent.</title>
+${agentHead(95)}${agentHead(545)}
+<rect class="art" x="268" y="66" width="104" height="64" rx="12"></rect><line class="art" x1="290" y1="98" x2="350" y2="98"></line>
+<path class="art art-dash" d="M150 98 H258"></path><path class="art" d="M250 90 l8 8 l-8 8"></path>
+<path class="art art-dash" d="M382 98 H490"></path><path class="art" d="M482 90 l8 8 l-8 8"></path>
+${envelope(177, 80)}
+<text class="art-label" x="95" y="186" text-anchor="middle">your agent</text>
+<text class="art-label" x="320" y="186" text-anchor="middle">sigelo relay</text>
+<text class="art-label" x="545" y="186" text-anchor="middle">their agent</text>
+</svg></figure>`,
+};
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const slugify = (text) => text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s_-]/gu, '').trim().replace(/\s/g, '-');
 const plain = (md) => md.replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1');
@@ -518,6 +557,22 @@ function blocks(lines, out, link, ids) {
     const line = lines[i];
     if (/^\s*$/.test(line)) { flush(); i++; continue; }
     if (/^\s*<!--/.test(line)) { flush(); while (i < lines.length && !lines[i].includes('-->')) i++; i++; continue; }
+    const box = line.match(BOX);
+    if (box) {
+      flush();
+      if (box[2] === 'svg') {
+        if (!DRAWINGS[box[3]]) throw new Error(`::: svg ${box[3]}: no such drawing (DRAWINGS in relay/site/build.mjs)`);
+        out.push(DRAWINGS[box[3]]); i++; continue;
+      }
+      const close = new RegExp(`^${box[1]}\\s*$`), body = []; i++;
+      while (i < lines.length && !close.test(lines[i])) body.push(lines[i]), i++;
+      if (i >= lines.length) throw new Error(`${box[1]} ${box[2]}: not closed by ${box[1]}`);
+      i++;
+      const inner = []; blocks(body, inner, link, ids);
+      const tag = box[2] === 'hero' ? 'section' : 'div';
+      out.push(`<${tag} class="${box[2]}${box[3] ? ` ${box[3]}` : ''}">\n${inner.join('\n')}\n</${tag}>`);
+      continue;
+    }
     const fence = line.match(/^( {0,3})(`{3,}|~{3,})\s*([\w+-]*)/);
     if (fence) {
       flush();
@@ -625,54 +680,107 @@ function rewriteMd(md, link) {
   }).join('\n');
 }
 
-// sigelo.io's stylesheet minus the parts these pages do not use. Light by default, dark by preference.
-const STYLE = `/* sigelo relay — one stylesheet, no web fonts, no scripts. */
-:root { --bg: #fdfdfb; --fg: #1d1d1b; --muted: #5d5d58; --line: #d9d9d2; --code: #f1f1ec; --link: #0b5cad; }
+// The stylesheet: paper, ink and a wax-red accent (the seal the logo will be), light by default,
+// dark by preference. No web font, no image: the drawing is inline SVG in the page.
+const STYLE = `/* sigelo relay — one stylesheet: no web fonts, no scripts, nothing fetched. Paper, ink and wax. */
+:root {
+  --bg: #f7f2e8; --paper: #fcf9f2; --fg: #1f1a17; --muted: #6b625a; --line: #e3d9c6; --code: #efe7d6;
+  --accent: #9b2226; --accent-hover: #7a1a1d; --on-accent: #fcf9f2; --link: #9b2226; --art: #9b2226;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: light dark;
+}
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #151514; --fg: #e6e6e1; --muted: #a3a39c; --line: #3a3a36; --code: #232321; --link: #7fb6f0; }
+  :root { --bg: #1d1916; --paper: #26211d; --fg: #efe7d8; --muted: #b5aa9b; --line: #3d3530; --code: #2e2823;
+    --accent: #9b2226; --accent-hover: #b4292e; --on-accent: #fcf9f2; --link: #ec8d8f; --art: #ec8d8f; }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { margin: 0 auto; max-width: 52rem; padding: 0 16px 3rem; background: var(--bg); color: var(--fg);
-  font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow-wrap: break-word; }
-a { color: var(--link); }
-header { border-bottom: 1px solid var(--line); padding: 1rem 0 .5rem; }
-.site { margin: 0 0 .5rem; color: var(--muted); }
-.site a { color: var(--fg); font-weight: 700; text-decoration: none; }
-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem .9rem; font-size: .95rem; }
-nav a[aria-current="page"] { color: var(--fg); font-weight: 700; text-decoration: none; }
-main { padding-top: .5rem; }
-h1, h2, h3 { line-height: 1.25; margin: 1.6em 0 .5em; }
-h1 { font-size: 1.7rem; margin-top: 1rem; }
-h2 { font-size: 1.3rem; border-bottom: 1px solid var(--line); padding-bottom: .2em; }
-code, pre { font: .88em/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code); border-radius: 3px; }
-code { padding: .05em .3em; }
-pre { padding: .75rem; overflow-x: auto; }
-pre code { padding: 0; background: none; font-size: 1em; }
-blockquote { margin: 1em 0; padding: 0 1em; border-left: 4px solid var(--line); color: var(--muted); }
-.table { overflow-x: auto; margin: 1em 0; }
-table { border-collapse: collapse; font-size: .92rem; }
-th, td { border: 1px solid var(--line); padding: .35em .55em; text-align: left; vertical-align: top; }
-th { background: var(--code); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1.0625rem/1.65 var(--sans); overflow-wrap: break-word; }
+a { color: var(--link); text-underline-offset: .18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--fg); }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; border-radius: 3px; }
+
+/* header and footer */
+.top { border-bottom: 1px solid var(--line); }
+.bar { max-width: 62rem; margin: 0 auto; padding: 1rem 20px; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem 1.5rem; }
+.wordmark { font: 700 1.45rem/1 var(--serif); color: var(--fg); text-decoration: none; letter-spacing: .01em; }
+.wordmark:hover { color: var(--link); }
+nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
+nav a { color: var(--muted); text-decoration: none; font-size: .98rem; }
+nav a:hover, nav a[aria-current="page"] { color: var(--link); }
+nav a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: .4em; }
+footer { border-top: 1px solid var(--line); margin-top: 4.5rem; }
+footer .bar { padding: 1.6rem 20px 2.4rem; color: var(--muted); font-size: .95rem; }
+footer .wordmark { font-size: 1.15rem; color: var(--muted); }
+
+/* the text column; cards and the drawing take more room */
+main { max-width: 62rem; margin: 0 auto; padding: 0 20px; }
+main > * { max-width: 42rem; margin-left: auto; margin-right: auto; }
+main > .cards, main > .drawing { max-width: 62rem; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.2; letter-spacing: -.005em; }
+h1 { font-size: clamp(2rem, 7vw, 2.8rem); margin-top: 2.6rem; margin-bottom: 1rem; }
+h2 { font-size: 1.45rem; margin-top: 2.6rem; margin-bottom: .6rem; }
+h3 { font-size: 1.2rem; margin: 0 0 .4rem; }
+p, ul, ol, pre, .table { margin-top: 0; margin-bottom: 1.1rem; }
+li { margin-bottom: .45rem; }
+strong { font-weight: 650; }
+code, pre { font-family: var(--mono); font-size: .88em; background: var(--code); border-radius: 6px; }
+code { padding: .08em .35em; overflow-wrap: anywhere; }
+pre { padding: .85rem 1rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); }
+pre code { padding: 0; background: none; font-size: 1em; border-radius: 0; }
+.table { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { border-bottom: 1px solid var(--line); padding: .55em .6em; text-align: left; vertical-align: top; }
+th { font-weight: 650; border-bottom-width: 2px; }
+td:first-child, th:first-child { padding-left: 0; }
 .center { text-align: center; } .right { text-align: right; }
-footer { margin-top: 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+
+/* home: hero, drawing, cards */
+.hero { padding: 1rem 0 .4rem; }
+.hero h1 { font-size: clamp(2.6rem, 11vw, 4.2rem); margin: 1.4rem 0 .6rem; }
+.hero h1 + p { font: 600 clamp(1.25rem, 4.8vw, 1.55rem)/1.35 var(--serif); margin-bottom: 1.1rem; }
+.cta { margin: 1.6rem auto 1.4rem; }
+.cta p { margin: 0; }
+.cta a { display: inline-block; background: var(--accent); color: var(--on-accent); text-decoration: none; font-weight: 650;
+  padding: .85rem 1.4rem; border-radius: 10px; border: 1px solid var(--accent); }
+.cta a:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+.drawing { margin: 1.4rem auto 2rem; }
+.art-svg { display: block; width: 100%; max-width: 34rem; height: auto; margin: 0 auto; }
+.art { fill: none; stroke: var(--art); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.art-paper { fill: var(--paper); }
+.art-dot { fill: var(--art); }
+.art-dash { stroke-dasharray: 2 9; }
+.art-label { fill: var(--muted); font: 25px var(--sans); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1.1rem; margin: 2.6rem auto 0; }
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 1.4rem 1.4rem 1.2rem; display: flex; flex-direction: column; }
+.card.pro { border-color: var(--accent); }
+.card p { margin-bottom: .7rem; }
+.card h3 + p { color: var(--muted); }
+.card p:nth-of-type(2) { font: 700 1.3rem/1.3 var(--serif); margin: .2rem 0 .7rem; }
+.card p:last-child { margin: auto 0 0; padding-top: .6rem; }
+.card p:last-child a { font-weight: 600; }
+.card.pro p:nth-of-type(3) { color: var(--link); font-weight: 650; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; }
+
+/* connect: the numbered steps */
+.steps ol { list-style: none; counter-reset: step; padding: 0; margin: 2rem 0; }
+.steps li { counter-increment: step; position: relative; margin: 0 0 0 1.1rem; padding: 0 0 1.5rem 2.1rem; border-left: 1px solid var(--line); }
+.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.steps li::before { content: counter(step); position: absolute; left: -1.1rem; top: -.15rem; width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent); font: 700 1rem/2.2rem var(--sans); text-align: center; }
+.steps li > p:first-child { margin-bottom: .6rem; }
+.steps pre { margin-bottom: .7rem; }
 `;
 
 // ---------------------------------------------------------------------------------------------
-// The footer, once in Markdown: the twin ends with it as written, the HTML page renders it, so the
-// two say the same (relay/site/test.mjs). The home page leaves out the motto line: its body has it.
-const bare = (u) => u.replace(/^https:\/\//, '');
-function footerMd(page, seller) {
-  const hosts = [...CONTENT_HOSTS.filter((h) => h.endsWith('sigelo.ai')), ...CONTENT_HOSTS.filter((h) => !h.endsWith('sigelo.ai'))]
-    .map((h) => (h === 'sigelo.io' ? '[sigelo.io](https://sigelo.io/)' : h));
-  const repos = REPOSITORIES.map((r) => (r === REPO ? `[${bare(r)}](${r}) (AGPL-3.0)` : bare(r)));
-  return [
-    ...(page.slug === 'index' ? [] : [`**${MOTTO}** ${DISCLOSURE}`]),
-    `Identity by [sigelo](https://sigelo.io/). ${POSITIONING.slice(0, -1).join(' ')}`,
-    `Seller and provider: ${seller ?? 'not yet named'}. [Privacy](/privacy.html) · [Terms](/terms.html)`,
-    `[Official](${STATEMENT}): ${[...hosts, ...repos].join(', ')}. ${PAYMENT_WORDS} Agents: [/${page.slug}.md](/${page.slug}.md) · [/llms.txt](/llms.txt) · [/index.json](/index.json)`,
-  ].join('\n\n');
-}
+// The footer, every page the same: the wordmark and the six links, nothing else (the Owner). The
+// twin ends with it as Markdown, the page as HTML, with the same links in the same order
+// (relay/site/test.mjs). The seller is named on privacy and terms; how to pay on contact.
+export const FOOTER = PAGES.filter((p) => p.nav);
+const href = (p) => (p.slug === 'index' ? '/' : `/${p.slug}.html`);
+const footerMd = () => ['sigelo', ...FOOTER.map((p) => `[${p.nav}](${href(p)})`)].join(' · ');
+const navList = (pages, page) => `<ul>${pages.map((p) => `<li><a href="${href(p)}"${p.slug === page.slug ? ' aria-current="page"' : ''}>${esc(p.nav)}</a></li>`).join('')}</ul>`;
 
 // JSON-LD (SEO spec §3.4): the WebSite everywhere, the page's WebPage, and on the home page the
 // hosted Service and the SoftwareApplication. The seller (provider) and the terms only in a final
@@ -684,7 +792,7 @@ function jsonld(page, ctx) {
   const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: `${MOTTO} ${DISCLOSURE}`, inLanguage: 'en' };
   const webPage = { '@type': 'WebPage', '@id': `${url}#page`, url, name: titleOf(page, ctx.pending), description: descriptionOf(page, ctx.pending), isPartOf: { '@id': site['@id'] }, inLanguage: 'en' };
   if (page.slug === 'index') Object.assign(webPage, { about: [{ '@id': service }, { '@id': software }], relatedLink: ['https://sigelo.io/'] });
-  if (['pro', 'pay-monero'].includes(page.slug)) webPage.about = { '@id': service };
+  if (['connect', 'pro', 'enterprise', 'contact', 'agents'].includes(page.slug)) webPage.about = { '@id': service };
   const graph = [site, webPage];
   if (page.slug === 'index') {
     const free = TIERS.free;
@@ -709,7 +817,6 @@ function jsonld(page, ctx) {
 }
 
 function htmlPage(page, body, ctx) {
-  const nav = PAGES.filter((p) => p.nav).map((p) => `<li><a href="${p.slug === 'index' ? '/' : `/${p.slug}.html`}"${p.slug === page.slug ? ' aria-current="page"' : ''}>${esc(p.nav)}</a></li>`).join('');
   const indexed = page.noindex ? '<meta name="robots" content="noindex">\n' : `<link rel="canonical" href="${pageUrl(page)}">\n`;
   const ld = page.noindex ? '' : `<script type="application/ld+json">\n${jsonld(page, ctx)}\n</script>\n`;
   return `<!doctype html>
@@ -724,16 +831,17 @@ ${indexed}<link rel="alternate" type="text/markdown" href="/${page.slug}.md" tit
 <link rel="stylesheet" href="/style.css">
 ${ld}</head>
 <body>
-<header>
-<p class="site"><a href="/">sigelo relay</a></p>
-<nav aria-label="Pages"><ul>${nav}</ul></nav>
-</header>
+<header class="top"><div class="bar">
+<a class="wordmark" href="/"${page.slug === 'index' ? ' aria-current="page"' : ''}>sigelo</a>
+<nav aria-label="Pages">${navList(FOOTER.filter((p) => !p.foot), page)}</nav>
+</div></header>
 <main>
 ${body}
 </main>
-<footer>
-${render(footerMd(page, ctx.seller), linker('html'))}
-</footer>
+<footer><div class="bar">
+<a class="wordmark" href="/">sigelo</a>
+<nav aria-label="Footer">${navList(FOOTER, page)}</nav>
+</div></footer>
 </body>
 </html>
 `;
@@ -752,28 +860,35 @@ const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths
 function llmsTxt(version, pending) {
   return `# sigelo relay
 
-> End-to-end encrypted messages between AI agents. Agents pair by a one-line invite code and log in with a sigelo identity (no accounts). The relay holds messages while one is offline; it cannot read them, but can tell who talks to whom. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
+> End-to-end encrypted messages between AI agents, paired by a one-line code; login by sigelo identity, no accounts. Messages wait while one is offline; the relay cannot read them, but sees who talks to whom. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
 
 ${MOTTO} ${DISCLOSURE}
 
 ## Docs
 
-- [Relay](${ORIGIN}/index.md): what it is, the commands, the free tier
-- [Pro](${ORIGIN}/pro.md): one allowance for all your agents, no account${pending ? '; not on sale yet' : ''}
-- [Index](${ORIGIN}/index.json): host, port, HTTP calls, limits, encryption, licences, status
+- [Connect](${ORIGIN}/connect.md): the commands
+- [Relay](${ORIGIN}/index.md): what it is, the plans
+- [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
+- [Agents](${ORIGIN}/agents.md): Pro setup, data requests
+- [Index](${ORIGIN}/index.json): host, port, calls, limits, status
 - [Identity](https://sigelo.io/llms.txt): the identity agents log in with
 
 ## Pay
 
-- [Pay in Monero](${ORIGIN}/pay-monero.md): ${pending ? 'how paying will work; not on sale yet' : 'the only way to pay, by invoice'}
+- [Contact](${ORIGIN}/contact.md): invoices over SimpleX, the only way to pay${pending ? '; Pro coming soon' : ''}
 
 ## Optional
 
+- [Enterprise](${ORIGIN}/enterprise.md): teams and swarms, by contract
 - [Privacy](${ORIGIN}/privacy.md): what the relay keeps
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
-- [Source](${REPO}): the relay, AGPL-3.0
+- [Source](${REPO}): AGPL-3.0
 `;
 }
+
+// The quick start: connect.md's ```sh blocks, in order, as one list of lines (an install line, then
+// the commands). index.json's client.install and client.commands are these.
+export const quickStart = (md) => [...md.matchAll(/^( *)```sh\n([\s\S]*?)\n\1```$/gm)].flatMap((m) => m[2].split('\n').map((l) => l.slice(m[1].length)));
 
 // → { pages, open, wrong, pending, built }. open: the placeholders still in the sources, 'DRAFT' while
 // the terms carry their draft mark, SELLER unset, what vendorRefusals(), deployRefusals() and
@@ -794,8 +909,8 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const price = md.pro.match(PRICE_RE), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no "Price: N €/month or N €/year, excluding VAT; Monero: n % less. Businesses only." line',
-    !storage && 'pro: no "| Storage queued | … | N MB or N GB |" row',
+    !price && 'pro: no "**N € a month or N € a year**, excluding VAT, for businesses. You pay in Monero, at n % off." line',
+    !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
       && `pro: the storage cell says ${storage}, more than the relay grants a Pro pool (${proStorage / MB} MB: RELAY_PRO_STORAGE_MB where the site is built, else TIERS.pro.storage)`,
@@ -803,12 +918,12 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     !/^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/.test(vendor) && 'vendor DID: RELAY_VENDOR_DID is not a did:sigelo DID',
   ].filter(Boolean);
   if (final && (open.length || wrong.length)) throw new Error(`--final: ${[...open, ...wrong].join('; ')} (commercial/relay-pro-runbook.md §0)`);
-  for (const p of PAGES) if (!/^# /.test(md[p.slug])) throw new Error(`${p.slug}.md: does not start with an H1`);
+  for (const p of PAGES) if (!/^# /.test(stripBoxes(md[p.slug]))) throw new Error(`${p.slug}.md: does not start with an H1 (containers aside)`);
 
   // Final: every value is filled (the gate above). A draft writes null for each open value and
   // offers nothing for sale.
   const discount = price ? Number(price[3]) : null;
-  const install = md.index.match(/^```sh\n(.*)$/m)?.[1];
+  const [install, ...commands] = quickStart(md.connect);
   const onSale = final && !pending;   // a final build refuses an unset vendor DID unless pending
   const ctx = { final, onSale, pending, seller, price: price && { month: price[1], year: price[2] } };
   const version = PKG.version.split('.').slice(0, 2).join('.');
@@ -821,8 +936,8 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const twins = {};
   for (const p of PAGES) {
     const text = fill(md[p.slug], `${p.slug}.md`);
-    twins[p.slug] = rewriteMd(text, linker('md'));
-    put(`${p.slug}.md`, `${twins[p.slug].trimEnd()}\n\n---\n\n${rewriteMd(footerMd(p, seller), linker('md'))}\n`);
+    twins[p.slug] = rewriteMd(stripBoxes(text), linker('md'));
+    put(`${p.slug}.md`, `${twins[p.slug].trimEnd()}\n\n---\n\n${rewriteMd(footerMd(), linker('md'))}\n`);
     put(`${p.slug}.html`, htmlPage(p, render(text, linker('html')), ctx));
   }
   put('style.css', STYLE);
@@ -843,10 +958,10 @@ Sitemap: ${ORIGIN}/sitemap.xml
   put('relay-robots.txt', 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /licence\n');
 
   // llms.txt, and llms-full.txt: the pages' twins in one file, for an agent that wants it all at once.
-  // The pay pages stay out: they say how to pay is published only on themselves and in
+  // The contact page stays out: it says how to pay is published only on itself and in its file on
   // the relay repository (PAYMENT_PLACES), and a third copy would make that untrue.
   put('llms.txt', llmsTxt(version, pending));
-  const fullPages = PAGES.filter((p) => !p.noindex && !p.slug.startsWith('pay-'));
+  const fullPages = PAGES.filter((p) => !p.noindex && !PAYMENT_PLACES.includes(pageUrl(p)));
   put('llms-full.txt', `# sigelo relay: the pages in one file
 
 ${MOTTO} ${DISCLOSURE}
@@ -864,7 +979,8 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
       price: price ? { EUR_month: Number(price[1]), EUR_year: Number(price[2]), vat_included: false, monero_discount_percent: discount } : null,
-      on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { monero: `${ORIGIN}/pay-monero.html` } },
+      on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { monero: `${ORIGIN}/contact.html` } },
+    enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },
   };
   const redirects = (live) => Object.fromEntries(DOMAINS.filter((d) => d.role === 'redirect' && d.live === live).map((d) => [d.name, `https://${d.to}/`]));
   const official = {
@@ -897,7 +1013,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     },
     tiers,
     client: { install: install ?? null,
-      commands: ['sigelo-agent init --recovery <z…>', 'sigelo-agent invite', 'sigelo-agent accept <code>', 'sigelo-agent send <contact> <message>', 'sigelo-agent inbox'], mcp: null },
+      commands, mcp: null },
     identity: { home: 'https://sigelo.io/', llms_txt: 'https://sigelo.io/llms.txt', index: 'https://sigelo.io/index.json', spec: 'https://sigelo.io/spec.md', mcp: 'https://sigelo.io/mcp' },
     official,
     agent_surfaces: { llms_txt: `${ORIGIN}/llms.txt`, llms_full_txt: `${ORIGIN}/llms-full.txt`, relay_json: `https://${HOST}/relay.json`,
@@ -950,7 +1066,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     // The registry only once the tree passes: a refusal needs no network.
     const why = launchCheck(), seen = why.length ? { why: [], npm: {} } : await registryRefusals();
     why.push(...seen.why);
-    for (const w of why) console.error(`relay/site/build --launch: ${w === 'vendor DID' ? 'vendor DID: the relay pins licence.ts\'s placeholder and the pages no longer say Pro is not on sale yet' : w}`);
+    for (const w of why) console.error(`relay/site/build --launch: ${w === 'vendor DID' ? 'vendor DID: the relay pins licence.ts\'s placeholder and pro.md no longer says Pro is coming soon' : w}`);
     if (why.length === 0) {
       const checked = 'SECURITY.md, site/build.mjs and site/deploy/nginx.conf say what index.json says; the sigelo-agent source runs the contact verbs from an npm install; npm served sigelo-agent and sigelo-contact from csigelo at the versions under npm; the vendor DID agrees with the pages';
       writeFileSync(join(SITE, LAUNCH_RECORD), `${JSON.stringify({ checked, npm: seen.npm, by: 'relay/site/build.mjs --launch' })}\n`);
@@ -962,8 +1078,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const r = build({ final: process.argv.includes('--final') });
     console.log(`relay/site/dist: ${r.pages} pages (+ .md twins) and the agent files, from ${r.built.commit?.slice(0, 12) ?? 'no git commit'}${r.built.dirty ? ' (relay/ has uncommitted changes)' : ''}`);
     const label = { DRAFT: "DRAFT — the terms' draft mark (terms.md)", SELLER: 'SELLER — the name the pages give the seller (relay/site/build.mjs)',
-      'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and the pages do not say Pro is not on sale yet: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md and pay-monero.md' };
-    if (r.pending) console.log('note: Pro is not on sale yet (pro.md and pay-monero.md say so): the vendor DID is not required, index.json and relay.json say not_yet_on_sale');
+      'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
+    if (r.pending) console.log('note: Pro is coming soon (pro.md says so): the vendor DID is not required, index.json and relay.json say not_yet_on_sale');
     for (const p of r.open) console.log(`open: ${PLACEHOLDERS[p] ? `${p} — ${PLACEHOLDERS[p]}` : label[p] ?? p}`);
     for (const w of r.wrong) console.log(`wrong: ${w}`);
   } catch (e) { console.error(`relay/site/build: ${e.message}`); process.exit(1); }

@@ -13,7 +13,7 @@ RELAY_HOST=relay.example.org RELAY_TLS_CERT=fullchain.pem RELAY_TLS_KEY=privkey.
 
 ## Run your own
 
-One Node process (≥ 22.18), one SQLite file, MQTT over TLS on 8883. nginx on 443 serves
+One Node process (22.18 or newer; tested on 24), one SQLite file, MQTT over TLS on 8883. nginx on 443 serves
 `/challenge`, `/check`, `/licence` and [`/relay.json`](https://relay.sigelo.ai/relay.json) (built by `site/build.mjs`).
 `licence.ts`: sigelo's `spend/licence.ts` (MIT), copied. Unit, nginx, protocol, load
 test (a 2 vCPU, 4 GB VPS: about 10,000 agents): [`deploy/README.md`](deploy/README.md).
@@ -39,14 +39,14 @@ test (a 2 vCPU, 4 GB VPS: about 10,000 agents): [`deploy/README.md`](deploy/READ
 
 | | Free (per identity) | Pro (per operator pool) |
 |---|---|---|
-| Kept | 7 days, or until read | the licence's, up to 90 days |
-| Largest message | 256 KB | 1 MB between Pro agents |
-| Sent | 1,000 a day | the licence's, up to 50,000 |
-| Queued | 50 MB | the licence's |
-| Mailboxes | 64 | 16,384 |
+| Kept | 14 days, or until read | the licence's, up to 90 days |
+| Largest message | 512 KB | 1 MB between Pro agents |
+| Sent | 3,000 a day | the licence's, up to 50,000 |
+| Queued | 100 MB | the licence's |
+| Mailboxes | 128 | 16,384 |
 | Support | none | the licence's |
 
-A contact costs its reader one mailbox per retention week plus one: about 21 contacts free. Pro
+A contact costs its reader one mailbox per retention week plus one: about 32 contacts free. Pro
 clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: version 2. Invite topics: 4
 messages, 64 KB, 7 days.
 
@@ -58,8 +58,8 @@ or message. Refusals reach the client by name on `$sigelo/notice`.
 
 ## What it logs and keeps
 
-Logged, 7 days: logins, refusals by check name, disconnects, errors, each with the address cut
-to /24 or /48. Never a DID, client id, topic or payload.
+Logged, 7 days: logins, refusals by check name, disconnects, errors, each address cut to /24 or
+/48. Never a DID, client id, topic or payload.
 
 Kept: accounts as SHA-256 of the original DID; claims; envelopes until read or expired;
 rotations, encrypted; licences until 30 days past the term sold. Times by the UTC day;

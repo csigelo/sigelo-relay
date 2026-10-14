@@ -7,14 +7,14 @@
 //   node deploy/check.mjs --origin URL --relay HOST [--mqtt HOST:PORT]
 //
 // Checks: the front page (200, HTML) and its headers (HSTS, nosniff, a Content-Security-Policy, a
-// Referrer-Policy, no cookie); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
+// Referrer-Policy, no cookie); /pay-monero.html (301 to /pro.html); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
 // open, cached an hour, the plan's first fields: design/relay-plan.md §11 "Relay info");
 // https://<relay>/challenge?did=… (200, a relay-login body naming this relay, a whole pow_bits);
 // MQTT over TLS on <relay>:8883 answering a CONNECT without credentials with CONNACK 4 (check
 // `password`), and nothing else: 0 means the login was accepted, 3 the login rate or the relay
 // itself failing (`internal`); a timeout or a closed socket is a failure too; the certificate on
 // 8883 naming <relay> and nothing else (the broker parses untrusted packets: a key taken from it
-// must be valid for no other name, sigelo.ai's pay pages included, so it holds a lineage of its
+// must be valid for no other name, sigelo.ai's pages included, so it holds a lineage of its
 // own); and the certificate on 443 and on 8883 valid 14 more days (the broker's copy comes from
 // certbot's deploy hook: a renewal that never reached it shows here). Prints PASS/FAIL lines, then ALL PASS and exit
 // 0, or FAIL and exit 1. No dependencies, node >= 22. Certificates are verified as any client
@@ -66,6 +66,13 @@ await check('front page headers', `${ORIGIN}/`, (r) => {
   if (h('set-cookie')) missing.push('no Set-Cookie');
   return missing.length ? `missing ${missing.join(', ')}` : '';
 });
+// The old pay page (until 2026-10-14) answers 301 to /pro.html, so a link to it still lands (nginx.conf).
+{
+  const { r, err } = await get(`${ORIGIN}/pay-monero.html`), name = '/pay-monero.html 301 to /pro.html';
+  if (err) fail(name, err);
+  else if (r.status !== 301 || !/\/pro\.html$/.test(r.headers.get('location') ?? '')) fail(name, `status ${r.status}, location ${r.headers.get('location')}`);
+  else pass(name);
+}
 await check('llms.txt', `${ORIGIN}/llms.txt`, (r, b) => (!type(r).startsWith('text/') ? `content-type ${type(r)}` : !b.startsWith('# ') ? 'does not start with "# "' : ''));
 await check('relay.json', `https://${RELAY}/relay.json`, (r, b) => {
   if (!type(r).startsWith('application/json')) return `content-type ${type(r)}`;

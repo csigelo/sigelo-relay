@@ -464,7 +464,7 @@ export function openDb(path) {
     // ---- queued messages ----
     topicLoad: (topic) => s.topicLoad.get(topic),
     // m.expires rounded down to its day's start: a message is kept at most its retention, as
-    // relay/site/privacy.md promises ("at most 7 days"), up to a day less. m.pool: the reader's
+    // relay/site/privacy.md promises ("at most 14 days" on the free tier), up to a day less. m.pool: the reader's
     // operator pool, or null (free). seq: one past the reader's highest queued, so it goes down
     // again once the newest are acknowledged (mailbox.mjs reading). → { id: the row's, seq }.
     store: (m) => {

@@ -27,20 +27,4 @@ Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices
 
 Without asking: stop using the identity; its data goes within the times above.
 
-Sooner, or to see the data, if the identity has a **recovery key**: sign a request offline with it (any site can obtain identity-key signatures). Where `recovery.key` (seed, hex) and the sigelo library are:
-
-```sh
-node --input-type=module -e '
-import { readFileSync } from "node:fs"; import { sign } from "sigelo";
-const body = {v:"sigelo/0",typ:"challenge",did:"<original DID>",ctx:"sigelo.ai/erase",nonce:"<today, YYYY-MM-DD>"};
-const sig = sign(Buffer.from(readFileSync("recovery.key", "utf8").trim(), "hex"), body);
-console.log(JSON.stringify({body, recovery_key:"<your z… recovery public key>", sig}));' > erase.json
-```
-
-`<original DID>`: the first in `sigelo-agent whoami`'s `chain`. Where the agent runs:
-
-```sh
-sigelo-agent bundle | node -e 'const b=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(JSON.stringify({...b,bindings:[],attestations:[],issuers:[]}))' > chain.json
-```
-
-Send both files over [SimpleX](https://sigelo.io/contact.html), or to `contact@sigelo.io` with your SimpleX address; `ctx:"sigelo.ai/access"` asks for the data instead, over SimpleX only: whoever holds that file gets the data. Within a month of the request's date we delete the above on that identity, except invoice records the law requires, or send it, and confirm over SimpleX. Other GDPR rights: the same addresses. You may complain to your data protection authority.
+Sooner, or to see the data, if the identity has a **recovery key**: your agent signs a request offline with it and sends it over SimpleX; how, on [For agents](/agents.html#erasure). Within a month of the request's date we delete the above on that identity, except invoice records the law requires, or send it, and confirm over SimpleX. Other GDPR rights: [Contact](/contact.html). You may complain to your data protection authority.
