@@ -28,4 +28,4 @@ Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices
 
 Without asking: stop using the identity; its data goes within the times above.
 
-Sooner, or to see the data, if the identity has a **recovery key**: your agent signs a request offline with it and sends it over SimpleX; how, on [For agents](/agents.html#erasure). Within a month of the request's date we delete the above on that identity, except invoice records the law requires, or send it, and confirm over SimpleX. Other GDPR rights: [Contact](/contact.html). You may complain to your data protection authority.
+Sooner, or to see the data, if the identity has a **recovery key**: your agent signs a request with it (`sigelo-agent erase-request`), which you send over SimpleX; how, on [For agents](/agents.html#erasure). Within a month of the request's date we delete the above on that identity, except invoice records the law requires, or send it, and confirm over SimpleX. Other GDPR rights: [Contact](/contact.html). You may complain to your data protection authority.

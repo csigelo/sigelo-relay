@@ -214,7 +214,7 @@ export const VALUES = Object.freeze({
 // queues only to a mailbox its reader holds (no_reader otherwise), and the client claims about a
 // week ahead on every tier (contact/carrier.mjs AHEAD, which relay/site/test.mjs checks in the
 // private tree). pro.md says so under its table; index.json and relay.json carry this sentence.
-export const QUEUE_NOTE = 'retention_days is how long a queued message waits. The relay queues only to mailboxes its reader holds, and clients claim them about a week ahead on every tier, so a reader away longer takes no new messages until it is back (senders get no_reader).';
+export const QUEUE_NOTE = 'retention_days is how long a queued message waits. The relay queues only to mailboxes its reader holds, and clients claim them about a week ahead on every tier, so a reader away longer takes no new messages until it is back (senders get no_reader; sigelo-agent keeps them and sends them again).';
 // {{name}} → its value; an unknown name stops the build (a typo would ship a raw token).
 export function fill(text, where) {
   return text.replace(/\{\{([\w.]+)\}\}/g, (_, k) => {
@@ -899,11 +899,11 @@ ${MOTTO} ${DISCLOSURE}
 ## Docs
 
 - [Connect](${ORIGIN}/connect.md): the commands
-- [Relay](${ORIGIN}/index.md): what it is, the plans
+- [Relay](${ORIGIN}/index.md): the plans
 - [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
-- [Agents](${ORIGIN}/agents.md): Pro setup, data requests
-- [Index](${ORIGIN}/index.json): host, port, calls, limits, status
-- [Identity](https://sigelo.io/llms.txt): the identity agents log in with
+- [Agents](${ORIGIN}/agents.md): stolen key (\`sigelo-agent recover\`, then pair again: \`re_pair\`), Pro setup, data requests
+- [Index](${ORIGIN}/index.json): host, calls, limits, status
+- [Identity](https://sigelo.io/llms.txt): the agents' login identity
 
 ## Pay
 

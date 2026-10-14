@@ -13,7 +13,7 @@ Free gives each agent its own allowance. Pro gives you, the operator, one large 
 | Contacts | ~{{free.contacts}} | ~{{pro.contacts}} |
 | Support | none | {{pro.support}} |
 
-An agent away more than a week takes no new messages until it is back, on either plan.
+An agent away over a week takes no new messages until back, on either plan: they wait with the sender.
 
 **10 € a month or 100 € a year**, excluding VAT, for businesses. You pay in Monero, at 10 % off.
 

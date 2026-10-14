@@ -454,8 +454,8 @@ ok(index.relay.a2a === false && /not post-quantum/.test(index.crypto.signatures)
 // Retention is how long a queued message waits; a reader away longer than its client claims ahead
 // takes no new messages on either tier (A5 review): pro.md says so under its table, the data files too.
 ok(index.relay.queue === QUEUE_NOTE && relayInfo.limits.queue === QUEUE_NOTE && /no_reader/.test(QUEUE_NOTE) && /about a week ahead on every tier/.test(QUEUE_NOTE)
-  && /^\| Messages wait up to \|[^\n]*\n(?:\|[^\n]*\n)*\nAn agent away more than a week takes no new messages until it is back, on either plan\.$/m.test(body.pro)
-  && body.connect.includes('Messages wait while an agent is offline. After a week away it takes no new ones until it is back.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
+  && /^\| Messages wait up to \|[^\n]*\n(?:\|[^\n]*\n)*\nAn agent away over a week takes no new messages until back, on either plan: they wait with the sender\.$/m.test(body.pro)
+  && body.connect.includes('Messages wait while an agent is offline: 14 days at the relay; past a week, with the sender.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
   'pro, connect, agents, index.json, relay.json: retention is how long a queued message waits; an agent away over a week takes no new messages (no_reader), whatever the tier');
 const carrier = join(ROOT, 'contact', 'carrier.mjs');
 if (existsSync(carrier)) {
@@ -899,12 +899,12 @@ try {
 // recovery decision: the start sequence begins with it (A5 review). The lines are the live test's
 // quick start (2026-10-14, run against relay.sigelo.ai), with recovery-key (release 0.1.3, never
 // run there) in place of its keygen one-liner, so the key comes from the install itself; the code
-// named so that `send bob` finds the contact; and `inbox`, which completes the pairing when the
+// named so that `send bob` finds the contact, and the answer so that `send alice` does (0.1.4); and `inbox`, which completes the pairing when the
 // inviter was offline at `accept`.
 // The install line is the sidecar package that carries the contact verbs from release 0.1.2. On
 // /connect each step's lines sit in its own code block, under the step, framed as what you tell your
 // agent; quickStart() reads them back in order.
-const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name bob', 'sigelo-agent accept <code>',
+const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name bob', 'sigelo-agent accept <code> --name alice',
   'sigelo-agent inbox', 'sigelo-agent send bob "hello"'];
 const steps4 = [...src.connect.matchAll(/^(\d)\. \*\*([^*]+)\*\*/gm)].map((m) => `${m[1]} ${m[2]}`);
 ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps4.join() === '1 Install, once on each side.,2 Make a code.,3 They enter it.,4 Talk.'
@@ -1055,10 +1055,10 @@ if (sigelo && operator && auth && db) {
 }
 // The request's commands are on the agents' page (an agent runs them); privacy.md says what it is and links there.
 const erasure = src.agents.slice(src.agents.indexOf('## Erasure'));
-ok(src.privacy.includes('if the identity has a **recovery key**: your agent signs a request offline with it and sends it over SimpleX; how, on [For agents](/agents.html#erasure).')
+ok(src.privacy.includes('if the identity has a **recovery key**: your agent signs a request with it (`sigelo-agent erase-request`), which you send over SimpleX; how, on [For agents](/agents.html#erasure).')
   && src.privacy.includes('Without asking: stop using the identity') && /\sid="erasure"/.test(html.agents),
   'privacy: erasure by disuse, or a recovery-key request whose steps are on /agents#erasure');
-ok(['**recovery key**', 'import { sign } from "sigelo"', 'ctx:"sigelo.ai/erase"', 'ctx:"sigelo.ai/access"', 'bindings:[],attestations:[],issuers:[]', 'Without asking: stop using the identity'].every((s) => erasure.includes(s))
+ok(['**recovery key**', 'sigelo-agent erase-request --recovery-key recovery.key > erase.json', 'ctx:"sigelo.ai/erase"', 'ctx:"sigelo.ai/access"', 'Without asking: stop using the identity'].every((s) => erasure.includes(s))
   && !/sign-challenge/.test(erasure), 'privacy: erasure by disuse, or by a recovery-key request (never an identity-key challenge, which any world can obtain)');
 ok(['/24', '/48', '7 days', 'Never logged:', 'Seller and provider of the relay', 'Web access log, for visit counts: address cut to /24 or /48, time, page without query', 'rarely, one holds a full address and the request, which may name a DID', 'DIDs only in such an error line', 'only in memory, while connected'].every((s) => src.privacy.includes(s)),
   'privacy: /24 or /48 for 7 days, full addresses in memory only but in a rare error line, which may also name a DID (the request line), the web access log as nginx.conf keeps it (cut address, no query), the never-list, the seller');
@@ -1086,7 +1086,7 @@ const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
 ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encrypted | 7 days more |") && /\| tail -n \+8 \| xargs -r rm -f/.test(backupSh)
   && /^TABLES="licences operator_retired vendor_chain accounts chain_dids"$/m.test(backupSh),
   'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
-ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key**: sign a request offline with it'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
+ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key** (any site can obtain identity-key signatures), where the identity file and `recovery.key` are:'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
 // Where the servers are, as the Owner confirmed it (runbook §0): stated once, in the seller line.
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
@@ -1096,7 +1096,7 @@ ok(src.contact.includes('`site/contact.md`') && existsSync(join(RELAY, 'site', '
 ok(PAGES.every((p) => !XMR_RE.test(src[p.slug])) && paymentDetailRefusals(src).length === 0, 'no page carries a Monero address (one is made per invoice)');
 ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a payment link (a monero: request or a checkout URL)');
 // Whoever holds an access request gets the data: SimpleX only (an erasure may come by e-mail).
-ok(erasure.includes('`ctx:"sigelo.ai/access"` asks for the data instead, over SimpleX only: whoever holds that file gets the data.'),
+ok(erasure.includes('access requests over SimpleX only: whoever holds one gets the data.'),
   'privacy: an access request goes over SimpleX only, never by e-mail');
 
 // ---- the internal runbook's self-test (private tree only) --------------------------------------
