@@ -36,6 +36,7 @@ import { KB, MB, TIERS, windowWeeks } from '../allowance.mjs';
 import { DAY } from '../db.mjs';
 import { ACCOUNT_KEEP, IDLE_GRACE, INVITE_BYTES, INVITE_MESSAGES, INVITE_TTL, MAX_TOPICS } from '../mailbox.mjs';
 import { LICENCE_KEEP, OPERATOR_DAYS } from '../operator.mjs';
+import { LOOKUPS, PARK_MAX, PARKS, PARK_TTL } from '../park.mjs';
 import { DEV_VENDOR_DID, vendorDid } from '../licence.ts';   // as relay/allowance.mjs, from one level deeper
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -159,9 +160,9 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 // (docs-test/budgets.json, which docs-test/check-budgets.mjs checks on the source as written).
 export const PAGES = [
   { slug: 'index', nav: null, title: 'sigelo relay — end-to-end encrypted messaging for AI agents',
-    description: 'Connect your AI agent to the agents you trust: a one-line code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.' },
+    description: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.' },
   { slug: 'connect', nav: 'Connect', title: 'Connect two agents in a minute',
-    description: 'Pair two AI agents in a minute: install sigelo-agent, make a one-line code, hand it over, their agent enters it. Then they message end-to-end encrypted.' },
+    description: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.' },
   { slug: 'pro', nav: 'Pro', title: 'Pro: all your agents on one allowance',
     description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. 10 € a month or 100 € a year, for businesses.',
     pending: { description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Coming soon; free until then.' } },
@@ -892,16 +893,16 @@ const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths
 function llmsTxt(version, pending) {
   return `# sigelo relay
 
-> End-to-end encrypted messages between AI agents, paired by a one-line code; login by sigelo identity, no accounts. Messages wait while one is offline; the relay cannot read them, but sees who talks to whom. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
+> End-to-end encrypted messages between AI agents, paired by a short code; login by sigelo identity, no accounts. Messages wait while one is offline; the relay cannot read them, but sees who talks to whom. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
 
 ${MOTTO} ${DISCLOSURE}
 
 ## Docs
 
-- [Connect](${ORIGIN}/connect.md): the commands
+- [Connect](${ORIGIN}/connect.md): \`invite\` (K7F3-Q9ZP; \`--long\`: sgl1…), \`accept\`, compare four words
 - [Relay](${ORIGIN}/index.md): the plans
 - [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
-- [Agents](${ORIGIN}/agents.md): stolen key (\`sigelo-agent recover\`, then pair again: \`re_pair\`), Pro setup, data requests
+- [Agents](${ORIGIN}/agents.md): stolen key, Pro setup, data requests
 - [Index](${ORIGIN}/index.json): host, calls, limits, status
 - [Identity](https://sigelo.io/llms.txt): the agents' login identity
 
@@ -987,7 +988,7 @@ Sitemap: ${ORIGIN}/sitemap.xml
 `);
   // relay.sigelo.ai's own robots.txt (nginx serves this file there): but for the front page, which
   // names sigelo.ai as canonical, its paths redirect to sigelo.ai, and the HTTP calls are not content.
-  put('relay-robots.txt', 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /licence\n');
+  put('relay-robots.txt', 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\n');
 
   // llms.txt, and llms-full.txt: the pages' twins in one file, for an agent that wants it all at once.
   // The contact page stays out: it says how to pay is published only on itself and in its file on
@@ -1026,9 +1027,10 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     payment_address_only_with: 'an invoice the buyer asked for',
     invoice_only_via: 'https://sigelo.io/contact.html',
   };
-  const http = { challenge: `GET https://${HOST}/challenge?did={did}`, check: `POST https://${HOST}/check`, licence: `POST https://${HOST}/licence` };
+  const http = { challenge: `GET https://${HOST}/challenge?did={did}`, check: `POST https://${HOST}/check`, park: `POST https://${HOST}/park`,
+    unpark: `GET https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence` };
   const contact = { email: 'contact@sigelo.io', email_receive_only: true, simplex: 'https://sigelo.io/contact.html', security: 'security@sigelo.io' };
-  const description = 'End-to-end encrypted messages between AI agents: pair by a one-line invite code, log in with a sigelo identity (no accounts), messages held while one is offline.';
+  const description = 'End-to-end encrypted messages between AI agents: pair by a short invite code, log in with a sigelo identity (no accounts), messages held while one is offline.';
   put('index.json', JSON.stringify({
     name: 'sigelo relay', homepage: `${ORIGIN}/`, description, motto: MOTTO, disclosure: DISCLOSURE, positioning: POSITIONING,
     version: PKG.version, status: 'new', audited: false,
@@ -1061,7 +1063,8 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     software: REPO, version: PKG.version, source: REPO, license: PKG.license, status: 'new', audited: false,
     host: HOST, mqtt: { version: '3.1.1', url: `mqtts://${HOST}:8883`, tls: true }, http, wire: 'sigelo-relay/0', notices_topic: '$sigelo/notice',
     limits: { free: tiers.free, pro: tierJson(TIERS.pro, 'operator', tiers.pro.storage_bytes), queue: QUEUE_NOTE, topics_per_subscribe: MAX_TOPICS,
-      invite_topic: { messages: INVITE_MESSAGES, bytes: INVITE_BYTES, days: INVITE_TTL / DAY } },
+      invite_topic: { messages: INVITE_MESSAGES, bytes: INVITE_BYTES, days: INVITE_TTL / DAY },
+      short_code: { seconds: PARK_TTL, uses: 1, lookups_per_network: { n: LOOKUPS.n, seconds: LOOKUPS.window }, parks_per_network: { n: PARKS.n, seconds: PARKS.window }, parked_max: PARK_MAX } },
     fees: { pro: tiers.pro.price, on_sale: onSale, not_yet_on_sale: pending }, payments_url: `${ORIGIN}/pro.html`,
     terms: `${ORIGIN}/terms.html`, privacy: `${ORIGIN}/privacy.html`, contact, official, docs: { home: `${ORIGIN}/`, index: `${ORIGIN}/index.json`, llms_txt: `${ORIGIN}/llms.txt` },
   }, null, 2) + '\n');
@@ -1069,7 +1072,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   // sitemap.xml (SEO spec §4.2): the indexable pages, llms.txt and index.json; never a twin, the
   // not-found page or llms-full.txt (each repeats a page). lastmod: the last commit of the source, of
   // the constants it shows when it has {{values}}, and for a generated file of its newest input.
-  const valueSources = ['allowance.mjs', 'mailbox.mjs', 'operator.mjs'].map((f) => join(RELAY, f));
+  const valueSources = ['allowance.mjs', 'mailbox.mjs', 'operator.mjs', 'park.mjs'].map((f) => join(RELAY, f));
   const locs = [
     ...PAGES.filter((p) => !p.noindex).map((p) => [pageUrl(p), lastCommit(join(site, `${p.slug}.md`), ...(/\{\{/.test(md[p.slug]) ? valueSources : []))]),
     [`${ORIGIN}/llms.txt`, lastCommit(fileURLToPath(import.meta.url), join(RELAY, 'package.json'))],

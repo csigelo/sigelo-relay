@@ -10,6 +10,7 @@
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
 //   POST /check   {username, client_id, password, clean?} → {ok: true} | {ok: false, check, detail}
 //   GET  /stats   the relay's counts, no identifier (stats.mjs)
+//   POST /park, GET /park/<hash>   short invite codes (park.mjs), when a parking is given
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
 //
@@ -37,6 +38,7 @@ import { createServer } from 'node:http';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { canonicalize, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
+import { PARK_FIELDS, ParkError } from './park.mjs';
 
 export const V = 'sigelo-relay/0';
 // The body a login signs: a type of its own, never a SPEC §5.2 challenge. An agent's general-purpose
@@ -152,7 +154,7 @@ function checkPow(pow, ctx, policy) {
 // login, keep: whether a new identity's account and chain are stored), none by default (no work
 // asked, all stored).
 // log(line): never a DID or topic.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null }) {
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
@@ -526,7 +528,30 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!isObject(body)) throw httpFail(400, 'body is not a JSON object');
         return send(200, check(body, prefix));
       }
-      throw httpFail(['/challenge', '/check'].includes(url.pathname) ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check`);
+      // Short invite codes (park.mjs). The park brake first, before the body or the login.
+      if (park && route === 'POST /park') {
+        const prefix = httpPrefix(req);
+        try { park.charge('park', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }); }
+        let body;
+        try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
+        if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
+          || typeof body.username !== 'string' || typeof body.client_id !== 'string' || typeof body.password !== 'string') {
+          throw httpFail(400, `want {${PARK_FIELDS.join(', ')}}: POST /check's login fields, then what to park`);
+        }
+        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        if (o.check === 'internal') throw httpFail(503, o.detail);
+        if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
+        // Only an identity that has proven its work (allowance.mjs keep) parks: a fresh DID costs nothing.
+        if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity parks after its first login with proof of work: run inbox, then invite again' });
+        try { return send(200, { ok: true, ...park.park(body, body.username, clock()) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
+      }
+      if (park && req.method === 'GET' && url.pathname.startsWith('/park/')) {
+        try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }); }
+        const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
+        if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or older than 10 minutes' });
+        return send(200, { ok: true, invite });
+      }
+      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);
       send(e.status ?? 500, { error: e.status ? e.message : 'internal error' });

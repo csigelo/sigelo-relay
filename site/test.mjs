@@ -170,8 +170,8 @@ const HEAD = (pending) => ({
     privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', agents: 'For agents: Pro setup and data requests — sigelo relay',
     404: 'Not found — sigelo relay' },
   DESC: {
-    index: 'Connect your AI agent to the agents you trust: a one-line code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
-    connect: 'Pair two AI agents in a minute: install sigelo-agent, make a one-line code, hand it over, their agent enters it. Then they message end-to-end encrypted.',
+    index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
+    connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
     pro: `sigelo relay Pro: one allowance for all your agents, ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. ${pending ? 'Coming soon; free until then.' : '10 € a month or 100 € a year, for businesses.'}`,
     enterprise: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.',
     contact: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.',
@@ -414,7 +414,7 @@ const robots = read('robots.txt'), robotLines = robots.split('\n').filter((l) =>
 ok(robotLines.every((l) => /^(?:User-agent|Allow|Disallow|Sitemap): \S/.test(l)) && !/^Disallow:/m.test(robots) && /^Allow: \/$/m.test(robots)
   && ['GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User', 'PerplexityBot', 'Google-Extended', 'CCBot', '*'].every((b) => robots.includes(`User-agent: ${b}\n`))
   && robots.includes(`\nSitemap: ${ORIGIN}/sitemap.xml\n`), 'robots.txt: known fields only, the AI crawlers named, disallows nothing, names the sitemap');
-ok(read('relay-robots.txt') === 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /licence\n', `relay-robots.txt (${HOST}/robots.txt): the three HTTP calls are not content`);
+ok(read('relay-robots.txt') === 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\n', `relay-robots.txt (${HOST}/robots.txt): the relay's HTTP calls are not content`);
 const sec = read('.well-known/security.txt'), expires = Date.parse(sec.match(/^Expires: (.+)$/m)?.[1] ?? '');
 ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now() && sec.includes(`\nCanonical: ${ORIGIN}/.well-known/security.txt\n`),
   'security.txt: Contact first, Expires in the future, its Canonical');
@@ -531,10 +531,10 @@ if (conf) {
   const locs = (s) => Object.fromEntries((s?.blocks ?? []).map((b) => [b.head, everyDirective(b)]));
   ok(servers.every((s) => s.blocks.every((b) => !everyDirective(b).some((d) => d.startsWith('add_header ')))), 'nginx: no add_header in a location (it would drop every inherited header)');
   const rl = locs(relay);
-  ok(['location = /challenge', 'location = /check', 'location = /licence'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
+  ok(['location = /challenge', 'location = /check', 'location = /park', 'location ^~ /park/', 'location = /licence'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
     && rl['location = /relay.json'] && rl['location = /llms.txt'] && rl['location = /robots.txt']?.includes('try_files /relay-robots.txt =404')
     && rl['location /']?.includes('return 301 https://sigelo.ai$request_uri') && rl['location = /']?.includes('try_files /index.html =404'),
-  'nginx: relay.sigelo.ai proxies /challenge, /check, /licence to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
+  'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
   // A browser's request to a relay call is refused before the relay charges it: the relay counts
   // logins and challenges per network before it reads a body, so any web page could otherwise spend
   // that budget from its visitors' browsers and lock every agent on their /24 or /48 out (A5 review).
@@ -544,8 +544,11 @@ if (conf) {
     .filter((b) => !b.blocks.some((x) => x.head === 'if ($sigelo_browser)' && x.directives.join() === 'return 403')).map((b) => b.head);
   const proxied = servers.flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))));
   const browserMap = conf.blocks.find((b) => b.head === 'map $http_sec_fetch_site$http_origin $sigelo_browser')?.directives ?? [];
-  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 4 && browserGaps(conf).length === 0,
-    `nginx: /challenge, /check and /licence answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 6 && browserGaps(conf).length === 0,
+    `nginx: /challenge, /check, /park, /park/<hash> and /licence answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  // GET /park/<hash>: its path is a short invite code's hash (relay/park.mjs), 40 bits a log reader
+  // could search through while the code is good, so it is never logged.
+  ok(rl['location ^~ /park/']?.includes('access_log off') && !rl['location = /park']?.some((d) => d.startsWith('access_log')), 'nginx: GET /park/<hash> is not logged (the path is a short code\'s hash); POST /park logs as /park');
   const noRefusal = nginxTree(confText.replace(/( {4}location = \/check \{\n) {8}if \(\$sigelo_browser\) \{\n {12}return 403;\n {8}\}\n/, '$1'));
   ok(noRefusal && browserGaps(noRefusal).join() === 'location = /check', 'nginx: a proxied location without the browser refusal is caught');
   const cors = conf.blocks.find((b) => b.head === 'map $uri $sigelo_cors')?.directives ?? [];
@@ -904,7 +907,7 @@ try {
 // The install line is the sidecar package that carries the contact verbs from release 0.1.2. On
 // /connect each step's lines sit in its own code block, under the step, framed as what you tell your
 // agent; quickStart() reads them back in order.
-const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name bob', 'sigelo-agent accept <code> --name alice',
+const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name bob', 'sigelo-agent accept K7F3-Q9ZP --name alice',
   'sigelo-agent inbox', 'sigelo-agent send bob "hello"'];
 const steps4 = [...src.connect.matchAll(/^(\d)\. \*\*([^*]+)\*\*/gm)].map((m) => `${m[1]} ${m[2]}`);
 ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps4.join() === '1 Install, once on each side.,2 Make a code.,3 They enter it.,4 Talk.'

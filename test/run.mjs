@@ -21,7 +21,7 @@ import { createHash, randomBytes, X509Certificate } from 'node:crypto';
 import { connect as tcpConnect } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { connect } from 'mqtt';
-import { attest, bind, canonicalize, challenge as challengeSig, keygen, rotate, sign, verify } from 'sigelo';
+import { attest, bind, canonicalize, challenge as challengeSig, keygen, multibase, rotate, sign, verify } from 'sigelo';
 import { MAX_EARLY, startRelay } from '../server.mjs';
 import { ACCOUNT_ROW, CLAIM_ROW, DID_ROW, accountOf, clientIdOf, openDb } from '../db.mjs';
 import { CHECKS, MAX_BODY, MAX_OPERATOR, OPERATOR_CTX } from '../auth.mjs';
@@ -1404,6 +1404,113 @@ function walStates(r, name, tag = name) {
   db.release('c1', [T1]);
   ok(db.raw.prepare('SELECT count(*) AS n FROM messages').get().n === 1 && db.raw.prepare("SELECT count(*) AS n FROM pragma_foreign_key_check").get().n === 0, 'and giving a claim up still deletes its messages (the foreign key survived)');
   db.close();
+}
+
+// ================================================================ short invite codes: POST /park, GET /park/<hash> (park.mjs)
+{
+  // A relay of its own, so the park brakes and cap below count nothing else; at most 3 parked.
+  const pr = await startRelay({ ...cfg, db: join(dir, 'park.db'), park: { max: 3 } });
+  const from = lines.length;
+  const H = (b) => createHash('sha256').update(b).digest();
+  // A long code (contact/invite.mjs, spelled out here): version 1 | DID digest | secret | exp | relay length | relay | checksum.
+  const longCode = (id, { relay = 'relay.test', exp = now + DAY, flip = false } = {}) => {
+    const host = Buffer.from(relay), e = Buffer.alloc(4);
+    e.writeUInt32BE(exp);
+    const body = Buffer.concat([Buffer.from([1]), H(canonicalize(id.genesis)), randomBytes(32), e, Buffer.from([host.length]), host]), sum = H(body).subarray(0, 4);
+    if (flip) sum[0] ^= 1;
+    return 'sgl1' + multibase(Buffer.concat([body, sum])).slice(1);
+  };
+  const hashOf = (code) => H(`sigelo-park/0${code}`).toString('hex');
+  // Each park from a /24 of its own unless one is named: the park brake (10 an hour) is tested apart.
+  let net = 0;
+  const park = async (id, fields, ip = `10.${Math.floor(++net / 256)}.${net % 256}.7`) => {
+    const { challenge } = await getChallenge(id.did, pr, ip);
+    const res = await fetch(`${base(pr)}/park`, { method: 'POST', headers: realIp(ip), body: JSON.stringify({ username: id.did, client_id: clientId(id), password: password(id, challenge), ...fields }) });
+    return { status: res.status, json: await res.json() };
+  };
+  const fetchPark = async (h, ip = '203.0.113.9') => { const res = await fetch(`${base(pr)}/park/${h}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json() }; };
+  const inv = longCode(alice), h = hashOf('K7F3Q9ZP');
+  let r = await park(alice, { code_hash: h, invite: inv, exp: now + 600 });
+  ok(r.status === 200 && r.json.ok === true && r.json.exp === now + 600 && pr.park.size() === 1, `POST /park: alice parks her long code under a short code's hash (${JSON.stringify(r.json)})`);
+  r = await fetchPark(h);
+  ok(r.status === 200 && r.json.ok === true && r.json.invite === inv, 'GET /park/<hash>: the long code, as parked');
+  const again = await fetchPark(h), unknown = await fetchPark(hashOf('00000000')), malformed = await fetchPark('K7F3-Q9ZP');
+  ok([again, unknown, malformed].every((x) => x.status === 404 && x.json.check === 'park_unknown') && JSON.stringify(again.json) === JSON.stringify(unknown.json) && JSON.stringify(unknown.json) === JSON.stringify(malformed.json),
+    'one use: the second fetch is park_unknown (404), word for word as a hash nobody parked and a malformed one');
+  r = await park(alice, { code_hash: h, invite: longCode(alice), exp: now + 600 });
+  const late = await (async () => { now += 600; const x = await fetchPark(h); now -= 600; return x; })();
+  ok(r.json.ok === true && late.status === 404 && late.json.check === 'park_unknown' && pr.park.size() === 0, 'expiry: parked, then fetched 10 minutes later: park_unknown, and gone');
+  // What may be parked: an invite to its parker, at this relay, for at most 10 minutes and within its own life.
+  const refusal = async (id, fields, what) => {
+    const x = await park(id, { code_hash: hashOf('ZZZZZZZZ'), invite: longCode(id), exp: now + 600, ...fields });
+    ok(x.status === 200 && x.json.ok === false && x.json.check === 'park', `POST /park refuses ${what} (park: ${x.json.detail})`);
+  };
+  await refusal(alice, { invite: longCode(bob) }, 'a code whose inviter is not the DID that logged in');
+  await refusal(alice, { invite: longCode(alice, { relay: 'relay.other' }) }, 'a code naming another relay');
+  await refusal(alice, { invite: longCode(alice, { flip: true }) }, 'a code with a bad checksum');
+  await refusal(alice, { invite: 'sgl1' + '2'.repeat(300) }, 'a code past 188 digits');
+  await refusal(alice, { exp: now + 901 }, 'an exp past 10 minutes and the 5 minutes an inviter\'s clock may run ahead');
+  // An inviter's clock ahead of the relay's: parked, for 10 minutes by the relay's clock.
+  r = await park(alice, { code_hash: hashOf('ZZZZZZZY'), invite: longCode(alice), exp: now + 630 });
+  ok(r.json.ok === true && r.json.exp === now + 600 && pr.park.fetch(hashOf('ZZZZZZZY')) !== null, `POST /park: an exp 30 s past 10 minutes (the inviter's clock ahead) parks until 10 minutes from now (${JSON.stringify(r.json)})`);
+  await refusal(alice, { exp: now }, 'an exp already passed');
+  await refusal(alice, { invite: longCode(alice, { exp: now + 300 }) }, 'an exp after the code\'s own');
+  await refusal(alice, { code_hash: 'K7F3Q9ZP' }, 'a code_hash that is not 64 hex digits (the code itself)');
+  r = await park(alice, { code_hash: hashOf('11111111'), invite: longCode(alice), exp: now + 600 });
+  const taken = await park(bob, { code_hash: hashOf('11111111'), invite: longCode(bob), exp: now + 600 });
+  ok(r.json.ok === true && taken.json.check === 'park_taken', 'a hash already parked: park_taken, the first kept');
+  const { challenge: ch } = await getChallenge(alice.did, pr);
+  const forged = await fetch(`${base(pr)}/park`, { method: 'POST', body: JSON.stringify({ username: alice.did, client_id: clientId(alice), password: password(bob, ch), code_hash: hashOf('22222222'), invite: longCode(alice), exp: now + 600 }) }).then((x) => x.json());
+  ok(forged.ok === false && ['bundle', 'sig'].includes(forged.check) && pr.park.size() === 1, `a login signed by another key parks nothing (${forged.check})`);
+  const junk = await fetch(`${base(pr)}/park`, { method: 'POST', headers: realIp('198.18.5.200'), body: JSON.stringify({ code_hash: h }) });
+  ok(junk.status === 400, 'a body without the login fields: 400');
+  // The cap: 3 at once; a fourth is park_full until the sweep purges expired ones.
+  r = await park(bob, { code_hash: hashOf('33333333'), invite: longCode(bob), exp: now + 600 }, '198.51.100.8');
+  const r3 = await park(carol, { code_hash: hashOf('44444444'), invite: longCode(carol), exp: now + 60 }, '198.51.100.9');
+  const full = await park(hana, { code_hash: hashOf('55555555'), invite: longCode(hana), exp: now + 600 }, '198.51.100.10');
+  ok(r.json.ok && r3.json.ok && full.json.check === 'park_full' && pr.park.size() === 3, `the global cap: a fourth parked code is park_full (${full.json.check})`);
+  now += 61;
+  pr.sweep();
+  const after = await park(hana, { code_hash: hashOf('55555555'), invite: longCode(hana), exp: now + 600 }, '198.51.100.10');
+  ok(pr.park.size() === 3 && after.json.ok === true, 'the sweep purges an expired code; then the fourth parks');
+  // Brakes per /24: 20 lookups per 10 minutes, a hit or a miss; 10 parks an hour, before the login.
+  const looks = [];
+  for (let i = 0; i < 21; i++) looks.push((await fetchPark(hashOf('66666666'), '192.0.2.50')).status);
+  const other = await fetchPark(hashOf('66666666'), '192.0.2.51'), elsewhere = await fetchPark(hashOf('66666666'), '198.18.0.1');
+  ok(looks.slice(0, 20).every((s) => s === 404) && looks[20] === 429 && other.status === 429 && elsewhere.status === 404, 'lookups: 20 per 10 minutes per /24, the 21st rate (429), the same /24 too, another network not');
+  now += 600;
+  ok((await fetchPark(hashOf('66666666'), '192.0.2.50')).status === 404, 'lookups: the next 10 minutes count afresh');
+  const parks = [];
+  for (let i = 0; i < 11; i++) parks.push((await fetch(`${base(pr)}/park`, { method: 'POST', headers: realIp('192.0.2.77'), body: '{}' })).status);
+  const parkRate = await park(alice, { code_hash: hashOf('77777777'), invite: longCode(alice), exp: now + 600 }, '192.0.2.78');
+  ok(parks.slice(0, 10).every((s) => s === 400) && parks[10] === 429 && parkRate.status === 429 && parkRate.json.check === 'rate', `parks: 10 an hour per /24, counted before the body and the login: the 11th rate (429) (${parks.join()}; ${parkRate.status} ${JSON.stringify(parkRate.json)})`);
+  // Nothing of a code in the log or on disk: the hashes, the long codes, the short codes.
+  const said = lines.slice(from).join('\n');
+  const disk = ['park.db', 'park.db-wal'].filter((f) => existsSync(join(dir, f))).map((f) => readFileSync(join(dir, f)).toString('latin1')).join('');
+  ok(![h, hashOf('11111111'), hashOf('33333333'), 'K7F3Q9ZP', inv.slice(0, 40)].some((x) => said.includes(x) || disk.includes(x)), 'the relay\'s log and database hold no code hash, short code or long code (memory only)');
+  // A relay restart drops what is parked.
+  await pr.close();
+  const pr2 = await startRelay({ ...cfg, db: join(dir, 'park.db') });
+  ok(pr2.park.size() === 0, 'a restart drops the parked codes (memory only)');
+  await pr2.close();
+  // An identity with no proof of work yet (allowance.mjs keep says no) parks nothing: a fresh DID costs nothing.
+  const pr3 = await startRelay({ ...cfg, db: join(dir, 'park-new.db'), policy: { keep: () => false } });
+  const { challenge: c3 } = await getChallenge(ivan.did, pr3);
+  const fresh = await fetch(`${base(pr3)}/park`, { method: 'POST', body: JSON.stringify({ username: ivan.did, client_id: clientId(ivan), password: password(ivan, c3), code_hash: hashOf('88888888'), invite: longCode(ivan), exp: now + 600 }) }).then((x) => x.json());
+  ok(fresh.ok === false && fresh.check === 'pow' && pr3.park.size() === 0, `a new identity that has proven no work parks nothing (${fresh.check})`);
+  await pr3.close();
+  // The relay-wide brake: LOOKUPS_ALL across every network (here 3), the same 429 rate as a network's own.
+  const pr4 = await startRelay({ ...cfg, db: join(dir, 'park-all.db'), park: { lookupsAll: { n: 3, window: 600 } } });
+  const look4 = async (ip) => { const res = await fetch(`${base(pr4)}/park/${hashOf('99999999')}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json() }; };
+  const spread = [];
+  for (let i = 0; i < 4; i++) spread.push(await look4(`100.64.${i}.1`));
+  ok(spread.slice(0, 3).every((x) => x.status === 404 && x.json.check === 'park_unknown') && spread[3].status === 429 && spread[3].json.check === 'rate' && /on this relay/.test(spread[3].json.detail),
+    `lookups: at most LOOKUPS_ALL per 10 minutes across all networks, the next rate (429) from a network of its own (${spread.map((x) => x.status).join()}; ${spread[3].json.detail})`);
+  now += 600;
+  ok((await look4('100.64.9.1')).status === 404, 'lookups: the relay-wide count starts afresh the next 10 minutes');
+  now -= 600;
+  await pr4.close();
+  now -= 661;
 }
 
 await relay.close();

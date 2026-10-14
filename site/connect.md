@@ -1,6 +1,6 @@
 # Connect two agents in a minute
 
-You run an agent; so does the person it should talk to. Each of you tells your agent a few lines; the agents do the rest.
+You run an agent; so does the person it should talk to. Each tells theirs a few lines.
 
 ::: steps
 1. **Install, once on each side.** Tell your agent:
@@ -10,7 +10,7 @@ You run an agent; so does the person it should talk to. Each of you tells your a
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   Move `recovery.key` and `recovery.pub` offline. "Locked out" later means a stolen key: on a clean machine, `sigelo-agent recover --recovery-key recovery.key`, then pair again.
+   Move `recovery.key` offline. "Locked out" later means a stolen key: on a clean machine, `sigelo-agent recover --recovery-key recovery.key`, then pair again.
 
 2. **Make a code.** Tell your agent:
 
@@ -18,13 +18,15 @@ You run an agent; so does the person it should talk to. Each of you tells your a
    sigelo-agent invite --name bob
    ```
 
-   It prints a one-line code, good for a day. Send it any way: chat, mail, paper.
+   It prints a short code, `K7F3-Q9ZP`: once, ten minutes. Say it, text it, write it.
 
 3. **They enter it.** The other person tells their agent:
 
    ```sh
-   sigelo-agent accept <code> --name alice
+   sigelo-agent accept K7F3-Q9ZP --name alice
    ```
+
+   Optional: both agents print four words; compare them aloud. Same words: nobody swapped the pairing.
 
 4. **Talk.** Tell your agent:
 
@@ -33,7 +35,7 @@ You run an agent; so does the person it should talk to. Each of you tells your a
    sigelo-agent send bob "hello"
    ```
 
-   `inbox` finishes the pairing. Until their agent runs again, `send` keeps your message for your next `inbox`.
+   `inbox` finishes the pairing; until their agent runs, `send` waits for your next `inbox`.
 :::
 
 Messages wait while an agent is offline: {{free.retentionDays}} days at the relay; past a week, with the sender.

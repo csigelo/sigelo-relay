@@ -10,7 +10,8 @@
 //     RELAY_TLS_CERT, RELAY_TLS_KEY   PEM paths: MQTT over TLS on RELAY_TLS_PORT (default 8883),
 //                       all interfaces; SIGHUP re-reads both files (certbot's deploy hook)
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
-//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /licence and GET /stats (counts only:
+//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park and GET /park/<hash> (short
+//                       invite codes: park.mjs), POST /licence and GET /stats (counts only:
 //                       stats.mjs) on 127.0.0.1 for nginx (default 8791)
 //     RELAY_LOGIN_RATE  CONNECTs and POST /check together, per minute per /24 (IPv4) or /48 (IPv6)
 //                       (default 30); GET /challenge separately at the same number. HTTP calls
@@ -35,6 +36,7 @@ import { openDb } from './db.mjs';
 import { mailboxes, MAX_TOPICS } from './mailbox.mjs';
 import { relayPolicyFromEnv } from './allowance.mjs';   // M4: allowances, proof of work, licences
 import { relayStats } from './stats.mjs';
+import { parking } from './park.mjs';
 
 export { prefixOf };
 
@@ -202,8 +204,10 @@ export async function startRelay(cfg) {
   let broker, a;
   // GET /stats: counts only (stats.mjs); sessions read from auth once it exists.
   const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy });
+  // Short invite codes, in memory only (park.mjs); cfg.park: its limits, for tests.
+  const park = parking({ host: cfg.host, clock, ...cfg.park });
   a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
-    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats });
+    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
   const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats });
@@ -272,6 +276,7 @@ export async function startRelay(cfg) {
   }
 
   const sweep = (now) => {
+    park.sweep(now ?? clock());
     const r = m.sweep(now);
     if (r.expired || r.invites || r.idle || r.accounts) log(`sweep expired=${r.expired} invites=${r.invites} idle=${r.idle} accounts=${r.accounts}`);
     return r;
@@ -290,7 +295,7 @@ export async function startRelay(cfg) {
     m.close();
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, stats, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, park, stats, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {
