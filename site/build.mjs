@@ -164,7 +164,7 @@ export const PAGES = [
   { slug: 'connect', nav: 'Connect', title: 'Connect two agents in a minute',
     description: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.' },
   { slug: 'pro', nav: 'Pro', title: 'Pro: all your agents on one allowance',
-    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. 10 € a month or 100 € a year, VAT included, for businesses.',
+    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. From 9.99 € a month, 21 % VAT included, for businesses.',
     pending: { description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Coming soon; free until then.' } },
   { slug: 'enterprise', nav: 'Enterprise', title: 'Enterprise: teams and swarms of agents',
     description: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.' },
@@ -232,8 +232,24 @@ export const PLACEHOLDERS = {};
 // `[text]` not followed by `(`: Markdown link text always is, so only placeholders match.
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
-// pro.md's price line, which the JSON-LD offers and index.json read. → [month, year, discount].
-export const PRICE_RE = /^\*\*([1-9]\d*) € a month or ([1-9]\d*) € a year\*\*, VAT included, for businesses\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
+// pro.md's price table (gross; net with a valid EU VAT number) and the line under it, which the
+// JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %]. PERIOD_RE, a row a
+// period → [months, gross a month, gross for the period, net a month, net for the period]; a one-month
+// row has no "a month (…)".
+export const PRICE_RE = /^Prices include ([1-9]\d?) % Belgian VAT\. With a valid EU VAT number you pay the net price, on a reverse-charge invoice\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
+export const PERIOD_RE = /^\| ([1-9]\d*) months? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \|$/gm;
+// → { vat, discount, periods: [{ months, month, period, net_month, net_period }] } in euros, or null when
+// the line or the rows are missing, or a row does not add up to the cent: the period is the months times
+// the month, each net the gross less VAT.
+export function priceOf(text) {
+  const line = text.match(PRICE_RE), rows = [...text.matchAll(PERIOD_RE)];
+  if (!line || !rows.length) return null;
+  const vat = Number(line[1]), cent = (a, b) => Math.abs(a - b) < 0.006, net = (x) => x / (1 + vat / 100);
+  const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[2]), period: Number(m[3] ?? m[2]), net_month: Number(m[4]), net_period: Number(m[5] ?? m[4]),
+    shape: [m[3], m[5]].every((x) => (x === undefined) === (m[1] === '1')) }));
+  const adds = periods.every((p) => p.shape && cent(p.period, p.month * p.months) && cent(p.net_month, net(p.month)) && cent(p.net_period, net(p.period)));
+  return adds ? { vat, discount: Number(line[2]), periods: periods.map(({ shape, ...p }) => p) } : null;
+}
 // pro.md's storage cell: N MB or N GB.
 export const STORAGE_RE = /^\| Room for waiting messages \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
 const storageBytes = (cell) => Number(cell.split(' ')[0]) * (cell.endsWith('GB') ? 1024 * MB : MB);
@@ -838,7 +854,7 @@ function jsonld(page, ctx) {
       ...(ctx.final && { provider: { '@type': 'Organization', name: ctx.seller }, termsOfService: `${ORIGIN}/terms.html` }),
       availableChannel: { '@type': 'ServiceChannel', serviceUrl: `mqtts://${HOST}:8883` },
       offers: [{ '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'EUR', description: `One agent: ${VALUES['free.msgsDay']} messages a day, kept ${free.retentionDays} days.` },
-        ...(ctx.onSale ? [proOffer('Pro, monthly', ctx.price.month, 'P1M'), proOffer('Pro, yearly', ctx.price.year, 'P1Y')] : [])],
+        ...(ctx.onSale ? ctx.price.periods.map((p) => proOffer(`Pro, ${p.months} month${p.months > 1 ? 's' : ''}`, p.period.toFixed(2), `P${p.months}M`)) : [])],
     }, {
       '@type': 'SoftwareApplication', '@id': software, name: 'sigelo relay',
       description: 'The relay server: an MQTT broker where AI agents log in with their sigelo identity and exchange end-to-end encrypted messages it cannot read, though it sees who talks to whom. Run your own.',
@@ -939,10 +955,10 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   if (seller === null) open.push('SELLER');
   const vendorSet = vendor !== DEV_VENDOR_DID, pending = vendorPending(md) === true;
   open.push(...vendorRefusals(md, vendor), ...deployRefusals(deploy), ...launchGate(root, site));
-  const price = md.pro.match(PRICE_RE), storage = md.pro.match(STORAGE_RE)?.[1];
+  const price = priceOf(md.pro), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no "**N € a month or N € a year**, VAT included, for businesses. Bank transfer, or Monero at n % off." line',
+    !price && 'pro: no price table ("| N months | gross | net |", adding up to the cent) and "Prices include n % Belgian VAT. … Bank transfer, or Monero at n % off." line',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
@@ -955,10 +971,10 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
 
   // Final: every value is filled (the gate above). A draft writes null for each open value and
   // offers nothing for sale.
-  const discount = price ? Number(price[3]) : null;
+  const discount = price ? price.discount : null;
   const [install, ...commands] = quickStart(md.connect);
   const onSale = final && !pending;   // a final build refuses an unset vendor DID unless pending
-  const ctx = { final, onSale, pending, seller, price: price && { month: price[1], year: price[2] } };
+  const ctx = { final, onSale, pending, seller, price };
   const version = PKG.version.split('.').slice(0, 2).join('.');
   const built = { commit: git('rev-parse', 'HEAD'), commit_date: git('log', '-1', '--format=%cI', 'HEAD'),
     dirty: git('status', '--porcelain', '--untracked-files=no', '--', '.') !== null };
@@ -1011,7 +1027,8 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
-      price: price ? { EUR_month: Number(price[1]), EUR_year: Number(price[2]), vat_included: true, monero_discount_percent: discount } : null,
+      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, net_with_eu_vat_number: 'reverse charge', billed: 'up front for the period',
+        periods: price.periods.map((p) => ({ months: p.months, month: p.month, period: p.period, net_month: p.net_month, net_period: p.net_period })), monero_discount_percent: discount } : null,
       on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` } },
     enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },
   };
