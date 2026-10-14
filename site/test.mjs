@@ -74,7 +74,7 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
 const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110 };
-const FILE_BUDGET = { index: 210, connect: 200, pro: 300, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, 404: 40 };
+const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -329,8 +329,8 @@ const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
   `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Gross prices, 21 % Belgian VAT included; the net price on a reverse-charge invoice with a valid EU VAT
-// number; billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
+// Gross prices, 21 % Belgian VAT included (pro.md shows no net amount); the net price on a reverse-charge
+// invoice with a valid EU VAT number (terms); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
 // the payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (the Owner, 2026-10-14).
 ok(priceLineM && src.terms.includes('billed up front for the period. They include 21 % Belgian VAT; a Buyer with a valid EU VAT number is invoiced the net price under reverse charge. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
   && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[2]} % off)`)
@@ -470,8 +470,10 @@ ok(index.motto === MOTTO && index.disclosure === DISCLOSURE && same(index.pages.
 ok(body.agents.includes(index.tiers.pro.client_env) && index.tiers.pro.client_env === `SIGELO_RELAY_RETENTION_DAYS=${allowance?.TIERS.pro.retentionDays}`, 'index.json: tiers.pro.client_env is in agents.md\'s Pro steps, at TIERS.pro\'s retention');
 const priceLine = src.pro.match(PRICE_RE), proPrice = priceOf(src.pro);
 ok(priceLine && proPrice && same(index.tiers.pro.price.periods, proPrice.periods) && index.tiers.pro.price.vat_percent === proPrice.vat
-  && same(proPrice.periods.map((p) => [p.months, p.month, p.period, p.net_month, p.net_period]), [[1, 14.99, 14.99, 12.39, 12.39], [6, 11.99, 71.94, 9.91, 59.45], [12, 9.99, 119.88, 8.26, 99.07]]),
-'index.json: the price is pro.md\'s; pro.md\'s table is the Owner\'s (2026-10-14): 1, 6, 12 months, gross and net, adding up');
+  && same(proPrice.periods.map((p) => [p.months, p.month, p.period]), [[1, 14.99, 14.99], [6, 11.99, 71.94], [12, 9.99, 119.88]])
+  && !/12\.39|9\.91|59\.45|8\.26|99\.07/.test(PAGES.map((p) => src[p.slug]).join('\n') + read('index.json') + read('relay.json') + read('llms-full.txt'))
+  && !PAGES.some((p) => p.slug !== 'terms' && /\bnet\b/i.test(src[p.slug])),
+'index.json: the price is pro.md\'s; pro.md\'s table is the Owner\'s (2026-10-14): 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
 // relay_sees names what each row of privacy.md's table keeps (A14).
 const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Web access log': 'web access log of sigelo.ai and relay.sigelo.ai, for visit counts', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
   Backups: 'encrypted nightly backup, each copy kept 7 days' };
@@ -738,7 +740,7 @@ try {
   ok(/\[law and courts\]/.test(finalWith(set('terms', "The law and courts of the Seller's registered seat in the European Union.", '[law and courts].')) ?? '')
     && /DRAFT/.test(finalWith(set('terms', '# Terms\n', '# Terms\n\n> **DRAFT for review.**\n')) ?? ''),
   '--final: refuses a placeholder that is not listed (unknown placeholders fail too), and the terms\' DRAFT mark');
-  ok(/no price table/.test(finalWith(set('pro', '21 % Belgian VAT', '21 % VAT')) ?? '') && /no price table/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? '')
+  ok(/no price table/.test(finalWith(set('pro', '21 % VAT', '21 % Belgian VAT')) ?? '') && /no price table/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? '')
     && /no price table/.test(finalWith(set('pro', '| 6 months | 11.99 €', '| 6 months | 12.99 €')) ?? ''),
     '--final: refuses a pro.md whose price line it cannot read, whose discount is a placeholder again, or whose table does not add up');
   ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/^ {4}access_log \/var\/log\/nginx\/sigelo\/access(?:-self)?\.log .*\n/gm, '') }) ?? ''),

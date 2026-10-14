@@ -232,22 +232,19 @@ export const PLACEHOLDERS = {};
 // `[text]` not followed by `(`: Markdown link text always is, so only placeholders match.
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
-// pro.md's price table (gross; net with a valid EU VAT number) and the line under it, which the
-// JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %]. PERIOD_RE, a row a
-// period → [months, gross a month, gross for the period, net a month, net for the period]; a one-month
-// row has no "a month (…)".
-export const PRICE_RE = /^Prices include ([1-9]\d?) % Belgian VAT\. With a valid EU VAT number you pay the net price, on a reverse-charge invoice\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
-export const PERIOD_RE = /^\| ([1-9]\d*) months? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \|$/gm;
-// → { vat, discount, periods: [{ months, month, period, net_month, net_period }] } in euros, or null when
-// the line or the rows are missing, or a row does not add up to the cent: the period is the months times
-// the month, each net the gross less VAT.
+// pro.md's price table (gross prices only: no net amount on the pages, the Owner 2026-10-14) and the
+// line under it, which the JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %].
+// PERIOD_RE, a row a period → [months, a month, for the period]; a one-month row has no "a month (…)".
+export const PRICE_RE = /^Prices include ([1-9]\d?) % VAT\. EU business with a VAT number: give it with your order and the invoice is issued under reverse charge\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
+export const PERIOD_RE = /^\| ([1-9]\d*) months? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \|$/gm;
+// → { vat, discount, periods: [{ months, month, period }] } in euros, or null when the line or the rows
+// are missing, or a row does not add up to the cent: the period is the months times the month.
 export function priceOf(text) {
   const line = text.match(PRICE_RE), rows = [...text.matchAll(PERIOD_RE)];
   if (!line || !rows.length) return null;
-  const vat = Number(line[1]), cent = (a, b) => Math.abs(a - b) < 0.006, net = (x) => x / (1 + vat / 100);
-  const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[2]), period: Number(m[3] ?? m[2]), net_month: Number(m[4]), net_period: Number(m[5] ?? m[4]),
-    shape: [m[3], m[5]].every((x) => (x === undefined) === (m[1] === '1')) }));
-  const adds = periods.every((p) => p.shape && cent(p.period, p.month * p.months) && cent(p.net_month, net(p.month)) && cent(p.net_period, net(p.period)));
+  const vat = Number(line[1]), cent = (a, b) => Math.abs(a - b) < 0.006;
+  const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[2]), period: Number(m[3] ?? m[2]), shape: (m[3] === undefined) === (m[1] === '1') }));
+  const adds = periods.every((p) => p.shape && cent(p.period, p.month * p.months));
   return adds ? { vat, discount: Number(line[2]), periods: periods.map(({ shape, ...p }) => p) } : null;
 }
 // pro.md's storage cell: N MB or N GB.
@@ -958,7 +955,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const price = priceOf(md.pro), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no price table ("| N months | gross | net |", adding up to the cent) and "Prices include n % Belgian VAT. … Bank transfer, or Monero at n % off." line',
+    !price && 'pro: no price table ("| N months | price |", adding up to the cent) and "Prices include n % VAT. … Bank transfer, or Monero at n % off." line',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
@@ -1027,8 +1024,8 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
-      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, net_with_eu_vat_number: 'reverse charge', billed: 'up front for the period',
-        periods: price.periods.map((p) => ({ months: p.months, month: p.month, period: p.period, net_month: p.net_month, net_period: p.net_period })), monero_discount_percent: discount } : null,
+      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, eu_business_with_vat_number: 'reverse charge', billed: 'up front for the period',
+        periods: price.periods.map((p) => ({ months: p.months, month: p.month, period: p.period })), monero_discount_percent: discount } : null,
       on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` } },
     enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },
   };

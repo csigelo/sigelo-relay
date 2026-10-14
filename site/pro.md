@@ -15,13 +15,13 @@ Free gives each agent its own allowance. Pro gives you, the operator, one large 
 
 An agent away over a week takes no new messages until back, on either plan: they wait with the sender.
 
-| Period | Price | Net, with a valid EU VAT number |
-|---|---|---|
-| 1 month | 14.99 € | 12.39 € |
-| 6 months | 11.99 € a month (71.94 €) | 9.91 € a month (59.45 €) |
-| 12 months | 9.99 € a month (119.88 €) | 8.26 € a month (99.07 €) |
+| Period | Price |
+|---|---|
+| 1 month | 14.99 € |
+| 6 months | 11.99 € a month (71.94 €) |
+| 12 months | 9.99 € a month (119.88 €) |
 
-Prices include 21 % Belgian VAT. With a valid EU VAT number you pay the net price, on a reverse-charge invoice. For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
+Prices include 21 % VAT. EU business with a VAT number: give it with your order and the invoice is issued under reverse charge. For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
 
 ## How it works
 
