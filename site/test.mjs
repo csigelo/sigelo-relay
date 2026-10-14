@@ -16,7 +16,7 @@
 // while one is open, and refusing a copy with a Monero address or a payment link on a page (an address
 // comes only with an invoice), a seller the pages do not name, an unset vendor DID once the pages no
 // longer say Pro is not on sale yet, or an nginx config that logs what privacy.md says it never logs;
-// Monero the only payment; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
+// bank transfer or Monero, no card; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
 // against the pages and the relay's own code; the numbers, fields and steps the pages promise against
 // the relay's behaviour. In the private tree it also compares the official names with sigelo.io's
 // and relay/licence.ts with spend/licence.ts, and runs the internal runbook's self-test
@@ -172,7 +172,7 @@ const HEAD = (pending) => ({
   DESC: {
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
     connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
-    pro: `sigelo relay Pro: one allowance for all your agents, ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. ${pending ? 'Coming soon; free until then.' : '10 € a month or 100 € a year, for businesses.'}`,
+    pro: `sigelo relay Pro: one allowance for all your agents, ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. ${pending ? 'Coming soon; free until then.' : '10 € a month or 100 € a year, VAT included, for businesses.'}`,
     enterprise: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.',
     contact: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.',
     privacy: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.',
@@ -200,7 +200,7 @@ PAGES.forEach((p, i) => {
 });
 ok(new Set(titles).size === titles.length && new Set(descs).size === descs.length, 'titles and descriptions: each unique');
 ok(descs.every((d) => !/\bkept up to\b|\bretention\b/i.test(d)), 'descriptions: none promises a retention (a reader away over a week takes no new messages, whatever the tier)');
-// Monero is the only payment, so a discount on it is no saving: no head offers one (runbook §7 Q5).
+// No head offers the Monero discount (runbook §7 Q5).
 // While Pro is coming soon, the pro and terms descriptions say so; no head names a date (the Owner).
 const SALE_HEADS = ['pro', 'terms'].map((slug) => PAGES.findIndex((p) => p.slug === slug));
 ok(![...titles, ...descs].some((t) => /discount|not on sale|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(t))
@@ -321,19 +321,22 @@ ok(PAYMENT_PLACES.join() === [`${ORIGIN}/contact.html`, `${REPO}/blob/main/site/
   && PAYMENT_WORDS.replace(/`/g, '') === narrow && src.contact.includes(`\n\n${PAYMENT_WORDS}\n`) && plainText(html.contact).includes(narrow) && twin.contact.includes(PAYMENT_WORDS)
   && PAGES.every((p) => p.slug === 'contact' || !/how to pay is published/i.test(plainText(html[p.slug]) + twin[p.slug])),
 'contact: how to pay is published only there and in its file on the relay repository\'s main branch, as PAYMENT_PLACES says; no other page says where');
-// Monero only: card payment is not offered, so no page (as a reader reads it), agent file or nav names
+// No card: card payment is not offered, so no page (as a reader reads it), agent file or nav names
 // a card, Stripe or a card page, and no page is a pay page of its own.
 const CARD = /\bstripe\b|\bcards?\b|pay-card/i;
 const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.map((p) => [`${p.slug}.html`, plainText(html[p.slug].replace(SCRIPT, ''))]),
   ...['llms.txt', 'llms-full.txt', 'index.json', 'relay.json', 'sitemap.xml'].map((f) => [f, read(f)])].filter(([, t]) => CARD.test(t)).map(([f]) => f);
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
-  `Monero only: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
+  `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Monero only, quoted on request (the Owner, 2026-10-14: no euro invoice paid in Monero), as enterprise.md.
-ok(priceLineM && src.terms.includes('excluding VAT, less the stated discount; Monero only. [Contact us for a quote](/contact.html) and pay it within 24 hours.')
-  && src.agents.includes('pay in Monero only, within 24 hours') && src.pro.includes('[Contact us for a quote](/contact.html)') && src.enterprise.includes('Contact us for a quote.')
-  && !/invoiced in EUR|Ask us for an invoice|Ask for an invoice/.test(src.terms + src.pro + src.agents),
-'terms, agents, pro: pro.md\'s discount, Monero only, "Contact us for a quote" as on enterprise, paid within 24 hours; no euro invoice');
+// VAT included; an invoice paid by bank transfer, or in Monero at the discount; the licence once the
+// payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (the Owner, 2026-10-14).
+ok(priceLineM && src.terms.includes('VAT included (none on a reverse-charge invoice). [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
+  && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[3]} % off)`)
+  && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Contact us for a quote.')
+  && src.privacy.includes('Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet.')
+  && !/Monero only|24 hours|excluding VAT/.test(src.terms + src.pro + src.agents + src.privacy + src.index),
+'terms, agents, pro, privacy: VAT included, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
 // No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact'];
@@ -446,7 +449,7 @@ ok(index.tiers.pro.on_sale === false && relayInfo.fees.on_sale === false && null
 // llms.txt. The Owner's words: "coming soon", no date.
 ok(VENDOR_PENDING_PAGES.join() === 'pro' && VENDOR_PENDING === 'Pro is coming soon. Every agent runs free until then.' && HOME_PENDING === 'Coming soon.'
   && (r.pending ? body.pro.startsWith(`# ${H1.pro}\n\n${VENDOR_PENDING}\n\n`) && /\(https:\/\/sigelo\.ai\/pro\.md\): [^\n]*; coming soon\n/.test(read('llms.txt'))
-      && /<p><strong>10 € a month · 100 € a year<\/strong><\/p>\n<p>Coming soon\.<\/p>/.test(html.index)
+      && /<p><strong>10 € a month · 100 € a year<\/strong>, VAT included<\/p>\n<p>Coming soon\.<\/p>/.test(html.index)
     : !/coming soon/i.test(read('llms.txt')) && !src.index.includes(HOME_PENDING) && src.index.includes(`\n\n${HOME_ON_SALE}\n\n`)),
   `pro, index, llms.txt: ${r.pending ? 'pro says, first, that Pro is coming soon and every agent runs free until then; the home page\'s Pro card says "Coming soon." under the price; llms.txt\'s Pro line says so' : 'Pro is on sale: none says otherwise'}`);
 ok(index.relay.a2a === false && /not post-quantum/.test(index.crypto.signatures) && index.relay.mqtt.version === '3.1.1' && index.relay.host === HOST,
@@ -673,9 +676,9 @@ try {
       '--final, on sale: the JSON-LD names the seller as provider (an Organization), the terms, and the two Pro offers at pro.md\'s prices');
       ok(fIndex.tiers.pro.on_sale === true && fIndex.tiers.pro.not_yet_on_sale === false && info.fees.on_sale === true && info.fees.not_yet_on_sale === false
         && fIndex.tiers.pro.storage_bytes === allowance?.TIERS.pro.storage && fIndex.tiers.pro.price.monero_discount_percent === Number(priceLine[3])
-        && fIndex.client.install === 'npm i -g sigelo-agent' && fIndex.official.seller === SELLER && fIndex.official.vendor_did === vendor && same(fIndex.tiers.pro.pay, { monero: `${ORIGIN}/contact.html` }),
-      `--final, on sale: index.json on sale, with the storage (TIERS.pro's ${allowance ? allowance.TIERS.pro.storage / allowance.MB : '?'} MB), discount, install line, seller, vendor DID and the one payment place, Monero`);
-      ok(/<p><strong>10 € a month · 100 € a year<\/strong><\/p>\n<p>Available now\.<\/p>/.test(readFileSync(join(d, 'index.html'), 'utf8'))
+        && fIndex.client.install === 'npm i -g sigelo-agent' && fIndex.official.seller === SELLER && fIndex.official.vendor_did === vendor && fIndex.tiers.pro.price.vat_included === true && same(fIndex.tiers.pro.pay, { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` }),
+      `--final, on sale: index.json on sale, with the storage (TIERS.pro's ${allowance ? allowance.TIERS.pro.storage / allowance.MB : '?'} MB), discount, VAT included, install line, seller, vendor DID and the one payment place, for bank transfer and Monero`);
+      ok(/<p><strong>10 € a month · 100 € a year<\/strong>, VAT included<\/p>\n<p>Available now\.<\/p>/.test(readFileSync(join(d, 'index.html'), 'utf8'))
         && !readFileSync(join(d, 'pro.md'), 'utf8').includes(VENDOR_PENDING), '--final, on sale: the home page\'s Pro card says "Available now."; pro.md no longer says "coming soon"');
       const sale = HEAD(false), heads = PAGES.map((p) => headOf(readFileSync(join(d, `${p.slug}.html`), 'utf8')));
       const llmsSold = readFileSync(join(d, 'llms.txt'), 'utf8');
@@ -732,7 +735,7 @@ try {
   ok(/\[law and courts\]/.test(finalWith(set('terms', "The law and courts of the Seller's registered seat in the European Union.", '[law and courts].')) ?? '')
     && /DRAFT/.test(finalWith(set('terms', '# Terms\n', '# Terms\n\n> **DRAFT for review.**\n')) ?? ''),
   '--final: refuses a placeholder that is not listed (unknown placeholders fail too), and the terms\' DRAFT mark');
-  ok(/N € a month or N € a year/.test(finalWith(set('pro', 'excluding VAT', 'VAT excluded')) ?? '') && /N € a month or N € a year/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? ''),
+  ok(/N € a month or N € a year/.test(finalWith(set('pro', 'VAT included', 'VAT excluded')) ?? '') && /N € a month or N € a year/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? ''),
     '--final: refuses a pro.md whose price line it cannot read, or whose discount is a placeholder again');
   ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/^ {4}access_log \/var\/log\/nginx\/sigelo\/access(?:-self)?\.log .*\n/gm, '') }) ?? ''),
     '--final: refuses while a server block keeps nginx\'s default access log, naming the block');
@@ -986,7 +989,7 @@ if (sigelo && operator && auth && db) {
   const steps = Object.fromEntries([...body.agents.matchAll(/^(\d)\. (.*)$/gm)].map((m) => [m[1], m[2]]));
   // The relay pools only attestations whose iss is the operator's current key (operator.mjs): after a
   // rotation every agent's attestation must be signed again, or the pool drops to free (A5 review).
-  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^\[Contact us for a quote\]\(\/contact\.md\), naming that DID; pay in Monero only, within 24 hours; renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
+  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^\[Contact us\]\(\/contact\.md\), naming that DID; pay by bank transfer or in Monero \(10 % off\); renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
     'pro: log in with the operator identity (step 2), and after each rotation again and sign the agents\' attestations anew (step 5), before paying (3, renewal the same) and uploading (4)');
   ok(/prints the operator DID \(later: the first of its `chain`\)/.test(body.agents), 'agents step 1: a licence names the operator\'s original DID, the first of its chain');
   ok(src.agents.includes('The relay takes a licence only for an operator it has seen log in (step 2).'), 'agents: log in with the operator identity before paying (step 2 before 3)');
@@ -1081,8 +1084,8 @@ ok(src.terms.includes('never receives or holds a seed, private key or other mean
   && src.terms.includes('nothing renews or charges by itself') && src.terms.includes('Software and service are provided as is.')
   && src.terms.includes('Liability is limited to what the Buyer paid in the 12 months before the claim; none for lost messages, keys, funds or profits.')
   && src.terms.includes('The Seller may refuse a DID used for them and end its licence without refund; messages already delivered are not erased.')
-  && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('excluding VAT, less the stated discount; Monero only.'),
-  'terms: paid in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
+  && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('pay it by bank transfer, or in Monero less the stated discount.'),
+  'terms: paid by bank transfer or in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
 // The nightly backup (deploy/backup.sh: licences and licensed operators' rows, 7 archives kept) is a
 // copy the table names; an identity without a recovery key is erased by disuse only (A5 review).
 const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
@@ -1094,7 +1097,7 @@ ok(erasure.includes('Sooner, or to see the data, if the identity has a **recover
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
 ok(src.privacy.includes('No accounts. This site sets no cookies and runs no scripts or trackers.'), 'privacy: no accounts, no cookies, no scripts or trackers (so no consent banner)');
-ok(/, excluding VAT, for businesses\. /.test(src.pro) && src.terms.includes('the Seller does not sell to consumers'), 'pro, terms: businesses only');
+ok(/, VAT included, for businesses\. /.test(src.pro) && src.terms.includes('the Seller does not sell to consumers'), 'pro, terms: businesses only');
 ok(src.contact.includes('`site/contact.md`') && existsSync(join(RELAY, 'site', 'contact.md')), 'contact: names its copy in the relay\'s public repository (site/contact.md)');
 ok(PAGES.every((p) => !XMR_RE.test(src[p.slug])) && paymentDetailRefusals(src).length === 0, 'no page carries a Monero address (one is made per invoice)');
 ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a payment link (a monero: request or a checkout URL)');

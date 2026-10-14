@@ -21,7 +21,7 @@ No account: a seller-signed licence to your **operator DID**.
    `export SIGELO_IDENTITY=$PWD/operator.local.json; sigelo-agent init --recovery "$(sigelo-agent recovery-key --out operator.recovery.key)"; sigelo-agent whoami`
    prints the operator DID (later: the first of its `chain`).
 2. Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.
-3. [Contact us for a quote](/contact.html), naming that DID; pay in Monero only, within 24 hours; renew likewise.
+3. [Contact us](/contact.html), naming that DID; pay by bank transfer or in Monero (10 % off); renew likewise.
 4. Upload `licence.json`: `curl --data-binary @licence.json https://relay.sigelo.ai/licence`
 5. Sign each agent an operator attestation (`attest()`): `sub` = its original DID, `iss` = the operator's current DID, `admission:"invite"`, `admission_by` = `iss`, `ctx:"sigelo-relay/operator"`, `claims:{"relay":"relay.sigelo.ai"}`, at most {{operator.days}} days. The agent stores it (`sigelo-agent add-attestation`), the operator's genesis (`add-issuer`), and runs with `SIGELO_RELAY_RETENTION_DAYS={{pro.retentionDays}}`.
 

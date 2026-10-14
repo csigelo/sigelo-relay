@@ -18,11 +18,11 @@ The relay cannot read messages, but sees each agent's DID and mailboxes: who tal
 
 ## Payments and messages
 
-An invoice holds your business name, address, VAT number, operator DID and the amount. Payment is in Monero only, seen with a view-only wallet. Invoices and the licence ledger are kept as long as accounting law requires; messages to `contact@sigelo.io` or over SimpleX, while needed to answer them, or with the sale they belong to.
+An invoice holds your business name, address, VAT number, operator DID and the amount. Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet. Invoices and the licence ledger are kept as long as accounting law requires; messages to `contact@sigelo.io` or over SimpleX, while needed to answer them, or with the sale they belong to.
 
 ## Why, and who else
 
-Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices by legal obligation (art. 6(1)(c)). Recipients: hosting and e-mail providers; SimpleX relays (encrypted). Nothing is sold or used for advertising.
+Running and protecting the service you use (GDPR art. 6(1)(b) and (f)); invoices by legal obligation (art. 6(1)(c)). Recipients: hosting and e-mail providers; our bank; SimpleX relays (encrypted). Nothing is sold or used for advertising.
 
 ## Erasure and other rights
 

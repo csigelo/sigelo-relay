@@ -88,7 +88,7 @@ than the ones staged gets the release rolled back.
 
 ## nginx
 
-`relay/deploy/nginx.conf`: sigelo.ai serves the site (`relay/site/`, built `--final`; Monero is the only payment, and
+`relay/deploy/nginx.conf`: sigelo.ai serves the site (`relay/site/`, built `--final`; no card payment, and
 `--final` takes the placeholder vendor DID only while pro.md says Pro is coming soon, and wants
 `site/launch.json` naming the sigelo-agent and sigelo-contact npm served when it was written), www.sigelo.ai
 and http:// redirect to it, and relay.sigelo.ai serves the front page, `/relay.json`, `/llms.txt`,

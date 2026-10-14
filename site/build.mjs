@@ -25,7 +25,7 @@
 // that check, or one that does not name the sigelo-agent npm served: launchGate). Wrong: a Monero
 // address or a payment link on any page (an address comes only with an invoice), a seller the pages
 // do not name, an unreadable price line, or a Pro storage above what the relay grants. Payment is
-// Monero only. Node >= 22.18 (it imports ../licence.ts, as the relay does).
+// by bank transfer or in Monero, never by card. Node >= 22.18 (it imports ../licence.ts, as the relay does).
 // The Markdown renderer and the stylesheet are copied from sigelo's site/build.mjs and
 // site/src/style.css (MIT, same authors), not imported: relay/ is published alone, without site/.
 import { execFileSync } from 'node:child_process';
@@ -133,7 +133,7 @@ export const POSITIONING = [
 export const ISSUER_DID = 'did:sigelo:zEqNZjQDBiiufPs4NHrLw1kJD8rBitbFPyoQJoKuJFTM7';
 // sigelo.io's official-channels statement.
 export const STATEMENT = 'https://sigelo.io/security.html#official-channels';
-// Where how to pay is published: the contact page (Monero only, by invoice over SimpleX), and on the
+// Where how to pay is published: the contact page (by invoice over SimpleX), and on the
 // relay repository's main branch its one file, not the repository as a whole (anyone can put text
 // under its URL: an issue, a pull request, a fork's commit, which GitHub serves under the parent's
 // URL). The address itself is on neither: it comes with an invoice (NOBODY). index.json says so (as
@@ -164,7 +164,7 @@ export const PAGES = [
   { slug: 'connect', nav: 'Connect', title: 'Connect two agents in a minute',
     description: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.' },
   { slug: 'pro', nav: 'Pro', title: 'Pro: all your agents on one allowance',
-    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. 10 € a month or 100 € a year, for businesses.',
+    description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. 10 € a month or 100 € a year, VAT included, for businesses.',
     pending: { description: 'sigelo relay Pro: one allowance for all your agents, {{pro.msgsDay}} messages a day, up to {{pro.maxMessage}} each. Coming soon; free until then.' } },
   { slug: 'enterprise', nav: 'Enterprise', title: 'Enterprise: teams and swarms of agents',
     description: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.' },
@@ -233,7 +233,7 @@ export const PLACEHOLDERS = {};
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
 // pro.md's price line, which the JSON-LD offers and index.json read. → [month, year, discount].
-export const PRICE_RE = /^\*\*([1-9]\d*) € a month or ([1-9]\d*) € a year\*\*, excluding VAT, for businesses\. You pay in Monero, at ([1-9]\d?) % off\.$/m;
+export const PRICE_RE = /^\*\*([1-9]\d*) € a month or ([1-9]\d*) € a year\*\*, VAT included, for businesses\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
 // pro.md's storage cell: N MB or N GB.
 export const STORAGE_RE = /^\| Room for waiting messages \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
 const storageBytes = (cell) => Number(cell.split(' ')[0]) * (cell.endsWith('GB') ? 1024 * MB : MB);
@@ -249,7 +249,7 @@ export function proStorageCap(v = process.env.RELAY_PRO_STORAGE_MB) {
 // A payment address is made per invoice (a Monero subaddress for that invoice alone) and sent only in
 // the buyer's own SimpleX conversation (NOBODY). So no page carries a Monero address, of any network,
 // standard, sub- or integrated, nor a payment link: a monero: payment request, or a processor's hosted
-// checkout URL (Monero is the only payment). One there would be stale, or not ours. → [why …].
+// checkout URL (no card payment). One there would be stale, or not ours. → [why …].
 // The processor's host is spelled s[t]ripe: the same match, and the launch check that greps the site
 // for that name, which must print nothing, finds none in this guard.
 export const XMR_RE = /(?<![1-9A-HJ-NP-Za-km-z])[4-9AB][1-9A-HJ-NP-Za-km-z]{94}(?:[1-9A-HJ-NP-Za-km-z]{11})?(?![1-9A-HJ-NP-Za-km-z])/;
@@ -830,7 +830,7 @@ function jsonld(page, ctx) {
   if (page.slug === 'index') {
     const free = TIERS.free;
     const proOffer = (name, price, duration) => ({ '@type': 'Offer', name, url: `${ORIGIN}/pro.html`, eligibleCustomerType: 'http://purl.org/goodrelations/v1#Business',
-      priceSpecification: { '@type': 'UnitPriceSpecification', price, priceCurrency: 'EUR', valueAddedTaxIncluded: false, billingDuration: duration } });
+      priceSpecification: { '@type': 'UnitPriceSpecification', price, priceCurrency: 'EUR', valueAddedTaxIncluded: true, billingDuration: duration } });
     graph.push({
       '@type': 'Service', '@id': service, name: 'sigelo relay (hosted)', serviceType: 'End-to-end encrypted message relay for AI agents',
       description: `MQTT 3.1.1 over TLS at ${HOST}:8883. Agents log in with a sigelo identity; no accounts. Messages are held until read, at most ${free.retentionDays} days on the free tier.`,
@@ -942,7 +942,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const price = md.pro.match(PRICE_RE), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no "**N € a month or N € a year**, excluding VAT, for businesses. You pay in Monero, at n % off." line',
+    !price && 'pro: no "**N € a month or N € a year**, VAT included, for businesses. Bank transfer, or Monero at n % off." line',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
@@ -1011,8 +1011,8 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
-      price: price ? { EUR_month: Number(price[1]), EUR_year: Number(price[2]), vat_included: false, monero_discount_percent: discount } : null,
-      on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { monero: `${ORIGIN}/contact.html` } },
+      price: price ? { EUR_month: Number(price[1]), EUR_year: Number(price[2]), vat_included: true, monero_discount_percent: discount } : null,
+      on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` } },
     enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },
   };
   const redirects = (live) => Object.fromEntries(DOMAINS.filter((d) => d.role === 'redirect' && d.live === live).map((d) => [d.name, `https://${d.to}/`]));
