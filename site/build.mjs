@@ -232,20 +232,24 @@ export const PLACEHOLDERS = {};
 // `[text]` not followed by `(`: Markdown link text always is, so only placeholders match.
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
-// pro.md's price table (gross prices only: no net amount on the pages, the Owner 2026-10-14) and the
-// line under it, which the JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %].
-// PERIOD_RE, a row a period → [months, a month, for the period]; a one-month row has no "a month (…)".
-export const PRICE_RE = /^Prices include ([1-9]\d?) % VAT\. EU business with a VAT number: give it with your order and the invoice is issued under reverse charge\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
-export const PERIOD_RE = /^\| ([1-9]\d*) months? \| (\d+\.\d\d) €(?: a month \((\d+\.\d\d) €\))? \|$/gm;
-// → { vat, discount, periods: [{ months, month, period }] } in euros, or null when the line or the rows
-// are missing, or a row does not add up to the cent: the period is the months times the month.
+// pro.md's plans (gross prices only: no net amount on the pages, the Owner 2026-10-14) and the lines
+// under them, which the JSON-LD offers and index.json read. PRICE_RE → [VAT %, Monero discount %].
+// PLAN_RE, a plan a period → [months, save %, a month, for the period]; the one-month plan has no
+// "save" badge and no period total, the others have both.
+export const PRICE_RE = /^Prices include ([1-9]\d?) % VAT\. EU businesses outside Belgium with a VAT number: give it with your order and the invoice is issued under reverse charge\.\n\nFor businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
+export const PLAN_RE = /^### ([1-9]\d*) months?(?: \*save ([1-9]\d?) %\*)?\n\n\*\*(\d+\.\d\d) €\*\* a month\n\n(?:(\d+\.\d\d) € for \1 months\n\n)?\[Get Pro\]\(\/contact\.html\)$/gm;
+// → { vat, discount, periods: [{ months, month, period }] } in euros, or null when the line or the plans
+// are missing, or a plan does not add up to the cent: the period is the months times the month, and
+// the badge saves what the month saves on the one-month plan's, rounded to the whole per cent.
 export function priceOf(text) {
-  const line = text.match(PRICE_RE), rows = [...text.matchAll(PERIOD_RE)];
+  const line = text.match(PRICE_RE), rows = [...text.matchAll(PLAN_RE)];
   if (!line || !rows.length) return null;
   const vat = Number(line[1]), cent = (a, b) => Math.abs(a - b) < 0.006;
-  const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[2]), period: Number(m[3] ?? m[2]), shape: (m[3] === undefined) === (m[1] === '1') }));
-  const adds = periods.every((p) => p.shape && cent(p.period, p.month * p.months));
-  return adds ? { vat, discount: Number(line[2]), periods: periods.map(({ shape, ...p }) => p) } : null;
+  const periods = rows.map((m) => ({ months: Number(m[1]), month: Number(m[3]), period: Number(m[4] ?? m[3]), save: m[2] && Number(m[2]),
+    shape: [m[2], m[4]].every((x) => (x === undefined) === (m[1] === '1')) }));
+  const base = periods.find((p) => p.months === 1)?.month;
+  const adds = base && periods.every((p) => p.shape && cent(p.period, p.month * p.months) && (p.months === 1 || p.save === Math.round(100 * (1 - p.month / base))));
+  return adds ? { vat, discount: Number(line[2]), periods: periods.map(({ months, month, period }) => ({ months, month, period })) } : null;
 }
 // pro.md's storage cell: N MB or N GB.
 export const STORAGE_RE = /^\| Room for waiting messages \| [^|]+ \| ([1-9]\d* [MG]B) \|$/m;
@@ -809,6 +813,26 @@ td:first-child, th:first-child { padding-left: 0; }
 .card p:last-child a { font-weight: 600; }
 .card.pro p:nth-of-type(3) { color: var(--link); font-weight: 650; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; }
 
+/* pro: the plans, side by side, stacked on a phone; the best one in the accent */
+main > .plans { max-width: 62rem; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1.6rem 1.1rem; margin: 2.4rem auto 1.6rem; }
+.plan { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem 1.4rem 1.3rem; display: flex; flex-direction: column; }
+.plan.best { border: 2px solid var(--accent); box-shadow: 0 8px 24px rgba(155, 34, 38, .12); }
+.plan > p:first-child { position: absolute; top: -.75rem; left: 1.2rem; margin: 0; padding: .3rem .7rem; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent); font: 650 .75rem/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+.plan h3 { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+.plan h3 em { font: 650 .72rem/1 var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--link);
+  border: 1px solid currentColor; border-radius: 999px; padding: .28rem .55rem; }
+.plan h3 + p { color: var(--muted); margin: .7rem 0 .2rem; }
+.plan h3 + p strong { display: block; color: var(--fg); font: 700 2.5rem/1.1 var(--serif); letter-spacing: -.01em; }
+.plan h3 + p + p:not(:last-child) { color: var(--muted); font-size: .88rem; margin: 0; }
+.plan > p:last-child { margin: auto 0 0; padding-top: 1.2rem; }
+.plan > p:last-child a { display: block; text-align: center; font-weight: 650; text-decoration: none; padding: .75rem 1rem;
+  border-radius: 10px; border: 1px solid var(--link); color: var(--link); }
+.plan > p:last-child a:hover, .plan.best > p:last-child a { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.plan.best > p:last-child a:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.plans + p, .plans + p + p { color: var(--muted); font-size: .92rem; margin-bottom: .5rem; }
+
 /* connect: the numbered steps */
 .steps ol { list-style: none; counter-reset: step; padding: 0; margin: 2rem 0; }
 .steps li { counter-increment: step; position: relative; margin: 0 0 0 1.1rem; padding: 0 0 1.5rem 2.1rem; border-left: 1px solid var(--line); }
@@ -955,7 +979,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const price = priceOf(md.pro), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
     ...paymentDetailRefusals(md),
-    !price && 'pro: no price table ("| N months | price |", adding up to the cent) and "Prices include n % VAT. … Bank transfer, or Monero at n % off." line',
+    !price && 'pro: no price table (a "### N months *save n %*" plan a period: "**x €** a month", "y € for N months", "[Get Pro](/contact.html)", adding up to the cent) and "Prices include n % VAT. … Bank transfer, or Monero at n % off." lines',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
       : storage && storageBytes(storage) > proStorage
@@ -1024,7 +1048,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,
-      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, eu_business_with_vat_number: 'reverse charge', billed: 'up front for the period',
+      price: price ? { currency: 'EUR', vat_included: true, vat_percent: price.vat, eu_business_outside_belgium_with_vat_number: 'reverse charge', billed: 'up front for the period',
         periods: price.periods.map((p) => ({ months: p.months, month: p.month, period: p.period })), monero_discount_percent: discount } : null,
       on_sale: onSale, not_yet_on_sale: pending, page: `${ORIGIN}/pro.html`, pay: { bank_transfer: `${ORIGIN}/contact.html`, monero: `${ORIGIN}/contact.html` } },
     enterprise: { per: 'contract', price: null, quote: `${ORIGIN}/contact.html`, page: `${ORIGIN}/enterprise.html` },

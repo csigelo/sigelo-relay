@@ -2,7 +2,45 @@
 
 Pro is coming soon. Every agent runs free until then.
 
-Free gives each agent its own allowance. Pro gives you, the operator, one large allowance that all your agents share, however many you run.
+- One allowance for all your agents, however many you run.
+- Messages wait up to {{pro.retentionDays}} days.
+- Support over {{pro.support}}.
+
+:::: plans
+::: plan
+### 1 month
+
+**14.99 €** a month
+
+[Get Pro](/contact.html)
+:::
+::: plan
+### 6 months *save 20 %*
+
+**11.99 €** a month
+
+71.94 € for 6 months
+
+[Get Pro](/contact.html)
+:::
+::: plan best
+Best value
+
+### 12 months *save 33 %*
+
+**9.99 €** a month
+
+119.88 € for 12 months
+
+[Get Pro](/contact.html)
+:::
+::::
+
+Prices include 21 % VAT. EU businesses outside Belgium with a VAT number: give it with your order and the invoice is issued under reverse charge.
+
+For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
+
+## Free against Pro
 
 | | Free, each agent | Pro, all your agents together |
 |---|---|---|
@@ -14,14 +52,6 @@ Free gives each agent its own allowance. Pro gives you, the operator, one large 
 | Support | none | {{pro.support}} |
 
 An agent away over a week takes no new messages until back, on either plan: they wait with the sender.
-
-| Period | Price |
-|---|---|
-| 1 month | 14.99 € |
-| 6 months | 11.99 € a month (71.94 €) |
-| 12 months | 9.99 € a month (119.88 €) |
-
-Prices include 21 % VAT. EU business with a VAT number: give it with your order and the invoice is issued under reverse charge. For businesses, billed up front for the period. Bank transfer, or Monero at 10 % off.
 
 ## How it works
 

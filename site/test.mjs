@@ -74,14 +74,14 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
 const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110 };
-const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, 404: 40 };
+const FILE_BUDGET = { index: 210, connect: 200, pro: 300, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
 const proseBudget = (slug) => PROSE_BUDGET[slug] + extra(slug);
-// The prose of a page source: fenced code (indented or not), table rows, the cards container and
+// The prose of a page source: fenced code (indented or not), table rows, the cards and plans containers and
 // every container line dropped.
-const prose = (md) => md.replace(/^( *)```[^\n]*\n[\s\S]*?\n\1```$/gm, '').replace(/^(:{4,}) *cards\n[\s\S]*?\n\1 *$/gm, '')
+const prose = (md) => md.replace(/^( *)```[^\n]*\n[\s\S]*?\n\1```$/gm, '').replace(/^(:{4,}) *(?:cards|plans)\n[\s\S]*?\n\1 *$/gm, '')
   .split('\n').filter((l) => !/^\s*\|/.test(l) && !/^:{3,}/.test(l)).join('\n');
 for (const p of PAGES) {
   const n = words(fill(src[p.slug], p.slug));
@@ -91,8 +91,8 @@ for (const p of PAGES) {
     ok(m <= proseBudget(p.slug), `budget, prose: ${p.slug}.md ${m} words ≤ ${proseBudget(p.slug)} (no table, card or code block)`);
   }
 }
-ok(PAGES.every((p) => FILE_BUDGET[p.slug]) && words(prose('a b\n\n```sh\nx y z\n```\n\n| c | d |\n\n:::: cards\n::: card\nq r s\n:::\n::::\n\n::: cta\nt\n:::\n')) === 3,
-  'budget: every page has one; prose drops code blocks, tables, the cards and container lines, and keeps what is inside other containers');
+ok(PAGES.every((p) => FILE_BUDGET[p.slug]) && words(prose('a b\n\n```sh\nx y z\n```\n\n| c | d |\n\n:::: cards\n::: card\nq r s\n:::\n::::\n\n:::: plans\n::: plan\nu v\n:::\n::::\n\n::: cta\nt\n:::\n')) === 3,
+  'budget: every page has one; prose drops code blocks, tables, the cards, the plans and container lines, and keeps what is inside other containers');
 ok(words(fill('{{free.storage}} {{pro.maxMessage}}', 'test')) === 4, 'budget: a size value counts as the two words it renders as ("50 MB"), not as one');
 const budgetsFile = join(ROOT, 'docs-test', 'budgets.json');
 if (existsSync(budgetsFile)) {
@@ -312,6 +312,16 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.join(), 'footer: build.mjs FOO
   ok(/::: cta\n\[Contact us →\]\(\/contact\.html\)\n:::\n?$/.test(src.enterprise) && src.enterprise.includes('Contact us for a quote.'),
     'enterprise: ends with the Contact button; "Contact us for a quote."');
 }
+// pro: the three plans side by side (the Owner, 2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
+// /contact; the 12-month one highlighted, "Best value"; the VAT line, then the businesses line, under them.
+{
+  const plans = [...html.pro.matchAll(/<div class="plan( best)?">\n(?:<p>([^<]+)<\/p>\n)?<h3 id="[^"]+">(\d+ months?)(?: <em>([^<]+)<\/em>)?<\/h3>\n<p><strong>([^<]+)<\/strong> a month<\/p>\n(?:<p>([^<]+)<\/p>\n)?<p><a href="\/contact\.html">Get Pro<\/a><\/p>\n<\/div>/g)]
+    .map((m) => [m[1] ? 'best' : '', m[2] ?? '', m[3], m[4] ?? '', m[5], m[6] ?? ''].join('|'));
+  ok(plans.join('\n') === ['||1 month||14.99 €|', '||6 months|save 20 %|11.99 €|71.94 € for 6 months', 'best|Best value|12 months|save 33 %|9.99 €|119.88 € for 12 months'].join('\n')
+    && /<\/div>\n<\/div>\n<p>Prices include 21 % VAT\. EU businesses outside Belgium with a VAT number: [^<]+<\/p>\n<p>For businesses, billed up front for the period\./.test(html.pro)
+    && html.pro.indexOf(VENDOR_PENDING) < html.pro.indexOf('<div class="plans">') && html.pro.indexOf('<div class="plans">') < html.pro.indexOf('<h2 id="free-against-pro">Free against Pro</h2>'),
+  `pro: three plans, 1, 6 and 12 months, the 12-month one "Best value", each "Get Pro" to /contact; the VAT line under them; "coming soon" above, "Free against Pro" below${plans.length === 3 ? '' : ` (${plans.length} plans read)`}`);
+}
 // Where how to pay is published: one place, the contact page (and its twin), and its file on the relay
 // repository's main branch (PAYMENT_PLACES), said in words there and nowhere else. The file and the
 // branch, never the repository as a whole: GitHub serves a fork's commit, an issue or a pull request
@@ -329,15 +339,15 @@ const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
   `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Gross prices, 21 % Belgian VAT included (pro.md shows no net amount); the net price on a reverse-charge
-// invoice with a valid EU VAT number (terms); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
+// Gross prices, 21 % Belgian VAT included (pro.md shows no net amount); a reverse-charge invoice for a
+// business in another EU member state with a valid VAT number (terms; a Belgian one pays Belgian VAT); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
 // the payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (the Owner, 2026-10-14).
-ok(priceLineM && src.terms.includes('billed up front for the period. They include 21 % Belgian VAT; a Buyer with a valid EU VAT number is invoiced the net price under reverse charge. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
+ok(priceLineM && src.terms.includes('billed up front for the period. They include 21 % Belgian VAT; a Buyer established in another EU member state with a valid VAT number is invoiced under reverse charge. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
   && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[2]} % off)`)
   && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Contact us for a quote.')
   && src.privacy.includes('Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet.')
-  && !/Monero only|24 hours|excluding VAT|none on a reverse-charge|100 € a year|a month or a year/.test(src.terms + src.pro + src.agents + src.privacy + src.index + src.contact),
-'terms, agents, pro, privacy, contact: 21 % Belgian VAT included, net under reverse charge, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
+  && !/Monero only|24 hours|excluding VAT|none on a reverse-charge|100 € a year|a month or a year|EU business with a VAT number|valid EU VAT number/.test(src.terms + src.pro + src.agents + src.privacy + src.index + src.contact),
+'terms, agents, pro, privacy, contact: 21 % Belgian VAT included, reverse charge only outside Belgium, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
 // No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact'];
@@ -741,8 +751,8 @@ try {
     && /DRAFT/.test(finalWith(set('terms', '# Terms\n', '# Terms\n\n> **DRAFT for review.**\n')) ?? ''),
   '--final: refuses a placeholder that is not listed (unknown placeholders fail too), and the terms\' DRAFT mark');
   ok(/no price table/.test(finalWith(set('pro', '21 % VAT', '21 % Belgian VAT')) ?? '') && /no price table/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? '')
-    && /no price table/.test(finalWith(set('pro', '| 6 months | 11.99 €', '| 6 months | 12.99 €')) ?? ''),
-    '--final: refuses a pro.md whose price line it cannot read, whose discount is a placeholder again, or whose table does not add up');
+    && /no price table/.test(finalWith(set('pro', '**11.99 €** a month', '**12.99 €** a month')) ?? '') && /no price table/.test(finalWith(set('pro', '*save 33 %*', '*save 40 %*')) ?? ''),
+    '--final: refuses a pro.md whose price line it cannot read, whose discount is a placeholder again, or whose plans or badges do not add up');
   ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/^ {4}access_log \/var\/log\/nginx\/sigelo\/access(?:-self)?\.log .*\n/gm, '') }) ?? ''),
     '--final: refuses while a server block keeps nginx\'s default access log, naming the block');
   ok(/lacks "error_log <file> crit;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name relay\.sigelo\.ai;\n[\s\S]*?) {4}error_log \S+ crit;\n/, '$1') }) ?? ''),
@@ -1103,7 +1113,7 @@ ok(erasure.includes('Sooner, or to see the data, if the identity has a **recover
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
 ok(src.privacy.includes('No accounts. This site sets no cookies and runs no scripts or trackers.'), 'privacy: no accounts, no cookies, no scripts or trackers (so no consent banner)');
-ok(/ For businesses, billed up front for the period\. /.test(src.pro) && src.terms.includes('the Seller does not sell to consumers'), 'pro, terms: businesses only');
+ok(/^For businesses, billed up front for the period\. /m.test(src.pro) && src.terms.includes('the Seller does not sell to consumers'), 'pro, terms: businesses only');
 ok(src.contact.includes('`site/contact.md`') && existsSync(join(RELAY, 'site', 'contact.md')), 'contact: names its copy in the relay\'s public repository (site/contact.md)');
 ok(PAGES.every((p) => !XMR_RE.test(src[p.slug])) && paymentDetailRefusals(src).length === 0, 'no page carries a Monero address (one is made per invoice)');
 ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a payment link (a monero: request or a checkout URL)');
