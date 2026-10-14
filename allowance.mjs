@@ -659,6 +659,7 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
 
     tierOf,
     freeQueue,
+    freeUsed,   // GET /stats (stats.mjs): the free tier's ceiling used
   };
 }
 

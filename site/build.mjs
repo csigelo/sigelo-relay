@@ -269,15 +269,27 @@ export function sellerRefusal(seller, md) {
 
 // What the pages promise about the server, as relay/deploy/nginx.conf ships it. nginx's defaults log
 // the full address and the request line (/challenge?did=…): the access log for every request, the
-// error log for each refusal by limit_req and each failed proxy call. privacy.md says the site keeps
-// no access log and no full address but in a rare error line, and pro.md step 4 uploads to /licence.
-// So every server block turns both logs down at its own level, and nothing inside it turns them up
-// again; one block proxies /licence; and every block that proxies to the relay sets X-Real-IP to the
+// error log for each refusal by limit_req and each failed proxy call. privacy.md says the web
+// access log keeps the address cut to /24 or /48 and no full address but in a rare error line, and
+// pro.md step 4 uploads to /licence. So every server block sets its access log at its own level,
+// off or to the format sigelo_anon only (ANON_LOG), and inside it a location may only turn it off;
+// the format and the maps it reads are exactly sigelo.io's (ANON: the address cut, the path
+// without its query, the referrer's host); the error log is down to crit at its own level and
+// nothing turns it up; the statistics' root is served behind basic auth, unlogged; one block
+// proxies /licence; and every block that proxies to the relay sets X-Real-IP to the
 // client's address at its own level, with no proxy_set_header in any location. nginx inherits
 // proxy_set_header into a location only while the location sets none of its own; one that sets any
 // other header passes the client's own X-Real-IP, which the relay believes from loopback, so a client
 // could name a new network for every request and pass every per-network limit.
 // → [why …].
+const ANON_LOG = /^access_log \/var\/log\/nginx\/sigelo\/[a-z-]+\.log sigelo_anon(?: if=\$sigelo_(?:self|outside))?$/;
+export const ANON = {
+  'log_format sigelo_anon': `'$sigelo_net - - [$time_local] "$request_method $sigelo_path $server_protocol" $status $body_bytes_sent "$sigelo_ref" "$http_user_agent" "$http_accept" $request_time'`,
+  'map $remote_addr $sigelo_net': 'default "0.0.0.0"|"~^(?<sigelo_n4>\\d+\\.\\d+\\.\\d+)\\.\\d+$" "$sigelo_n4.0"|"~*^(?<sigelo_n6>[0-9a-f]+:[0-9a-f]+:[0-9a-f]+):" "$sigelo_n6::"|"~*^(?<sigelo_n6b>[0-9a-f]+:[0-9a-f]+)::" "$sigelo_n6b::"|"~*^(?<sigelo_n6c>[0-9a-f]+)::" "$sigelo_n6c::"',
+  'map $request_uri $sigelo_path': 'default "-"|"~^(?<sigelo_p>/[^?]*)" "$sigelo_p"',
+  'map $http_referer $sigelo_ref': 'default "-"|"~*^(?<sigelo_rs>https?)://(?<sigelo_rh>[^/:?#]+)" "$sigelo_rs://$sigelo_rh/"',
+};
+export const STATS_ROOT = 'root /var/www/sigelo.ai/stats';
 export function deployRefusals(file = DEPLOY) {
   const name = 'relay/deploy/nginx.conf';
   if (!existsSync(file)) return [`${name}: not found (the nginx config the pages rely on)`];
@@ -290,9 +302,17 @@ export function deployRefusals(file = DEPLOY) {
   servers.forEach((s, i) => {
     const named = s.directives.find((d) => d.startsWith('server_name '));
     const label = `server block ${i + 1}${named ? ` (${named.slice('server_name '.length)})` : ''}`;
-    const inside = everyDirective(s);
-    if (!s.directives.includes('access_log off') || inside.some((d) => /^access_log\b/.test(d) && d !== 'access_log off')) {
-      why.push(`${name}: ${label} lacks "access_log off;" at its own level, or turns the access log on inside it (privacy.md: no access log, no DID in any log)`);
+    const inside = everyDirective(s), own = s.directives.filter((d) => /^access_log\b/.test(d));
+    const ownOk = own.length > 0 && (own.join() === 'access_log off' || own.every((d) => ANON_LOG.test(d)));
+    if (!ownOk || s.blocks.flatMap(everyDirective).some((d) => /^access_log\b/.test(d) && d !== 'access_log off')) {
+      why.push(`${name}: ${label} lacks "access_log off;" or access logs in the format sigelo_anon only at its own level, or turns the access log on inside it (privacy.md: addresses cut to /24 or /48, no query string, no DID in any log)`);
+    }
+    if (inside.some((d) => /^log_format\b/.test(d))) why.push(`${name}: ${label} defines a log format (only the one sigelo_anon at the top)`);
+    for (const b of s.blocks.filter((x) => everyDirective(x).includes(STATS_ROOT))) {
+      const d = everyDirective(b);
+      if (!d.includes('access_log off') || !d.some((x) => /^auth_basic "/.test(x)) || !d.includes('auth_basic_user_file /etc/nginx/sigelo-stats.htpasswd')) {
+        why.push(`${name}: ${label} serves the statistics (${b.head}) without basic auth, or logs them`);
+      }
     }
     if (!s.directives.some((d) => QUIET.test(d)) || inside.some((d) => /^error_log\b/.test(d) && !QUIET.test(d))) {
       why.push(`${name}: ${label} lacks "error_log <file> crit;" at its own level, or logs errors below crit inside it (limit_req refusals log the full address and the DID at "error")`);
@@ -305,6 +325,18 @@ export function deployRefusals(file = DEPLOY) {
     }
   });
   if (!servers.some((s) => s.blocks.some((b) => /^location ?= ?\/licence$/.test(b.head)))) why.push(`${name}: no server block has "location = /licence" (pro.md step 4)`);
+  // The format and the maps it reads: sigelo.io's, exactly. Any other would keep more (a full
+  // address, a query string naming a DID, a referrer's path).
+  if (servers.some((s) => s.directives.some((d) => ANON_LOG.test(d)))) {
+    const formats = tree.directives.filter((d) => /^log_format\b/.test(d));
+    if (formats.length !== 1 || formats[0] !== `log_format sigelo_anon ${ANON['log_format sigelo_anon']}`) why.push(`${name}: log_format sigelo_anon is not sigelo.io's format (the address cut, no query string), or a second format is defined`);
+    for (const [head, want] of Object.entries(ANON).filter(([h]) => h.startsWith('map '))) {
+      const maps = tree.blocks.filter((b) => b.head === head);
+      if (maps.length !== 1 || maps[0].directives.join('|') !== want) why.push(`${name}: "${head}" is not sigelo.io's (the access log keeps what it gives)`);
+      const out = head.split(' ').at(-1);
+      if (tree.blocks.some((b) => b.head.startsWith('map ') && b.head !== head && b.head.split(' ').at(-1) === out)) why.push(`${name}: ${out} is set by a second map`);
+    }
+  }
   return why;
 }
 // nginx text → { head, directives, blocks } trees: comments dropped, quotes kept as written (a ; or
@@ -1007,6 +1039,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
       key_agreement: 'X-Wing (ML-KEM-768 + X25519), hybrid post-quantum', payload: 'XChaCha20-Poly1305', signatures: 'Ed25519 (not post-quantum)',
       relay_reads_content: false,
       relay_sees: ['network address: full in memory; cut to /24 or /48 in the relay log, kept 7 days; rarely full in a web server error line, with the request, which may name a DID, kept 7 days',
+        'web access log of sigelo.ai and relay.sigelo.ai, for visit counts: network address cut to /24 or /48, time, path without query, user agent, Accept, referring site; kept 7 days',
         'each identity\'s DID and its key rotations', 'operator pool membership and licences (Pro)',
         'licences and licensed operators\' identity rows, also in an encrypted nightly backup, each copy kept 7 days (deploy/backup.sh)', 'topics read and written, so who talks to whom', 'times',
         'sizes, rounded to 256 bytes'],

@@ -8,7 +8,7 @@ For companies whose agents talk to their customers' agents, to their partners' a
 - **Priority support** with a named contact.
 - **Under the same contract:** keeper licences for agents that hold money, and the offline recovery ceremony for identities that must never be lost.
 
-Invoiced in euros, paid in Monero. Contact us for a quote.
+Contact us for a quote.
 
 ::: cta
 [Contact us →](/contact.html)

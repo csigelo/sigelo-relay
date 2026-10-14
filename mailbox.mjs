@@ -75,7 +75,7 @@ const live = (c, now) => c !== undefined && !c.dead && (c.expires === null || c.
 // kept; idle mailboxes go retention + 7 days after their last use, never sooner than 14 days),
 // tidy (its own retention, run inside the sweep's transaction: db.mjs sweep) and accountKept
 // (an idle account the sweep keeps).
-export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {} }) {
+export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null }) {
   // The row each queued message is stored in, by its payload Buffer. Aedes wraps a publish in new
   // packet objects on its way to the reader but always passes the payload Buffer along by
   // reference, and the payload is all the relay knows a message by; a weak key frees with it.
@@ -119,6 +119,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {} 
   // the refused request is acknowledged only then (the header). id: the refused PUBLISH's packet id.
   const notify = (client, code, detail, done = () => {}, id = undefined) => {
     const n = id === undefined ? { code, detail } : { code, detail, id };
+    stats?.count('refused', code);
     client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify(n)), qos: 0, retain: false }, () => done());
   };
 
@@ -160,7 +161,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {} 
       rowOf.set(packet.payload, id);
       return null;
     });
-    if (r === null) db.countSent(session.account, now, senderPool);
+    if (r === null) { db.countSent(session.account, now, senderPool); stats?.count('stored'); }
     return r;
   }
 
@@ -268,6 +269,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {} 
     if (!Number.isInteger(messageId)) return undefined;   // Aedes passes undefined for a delivery it skipped
     const topic = db.take(clientId, messageId);
     if (topic === undefined) return undefined;
+    stats?.count('delivered');
     if (INVITE.test(topic)) db.killInvite(topic);
     return { cmd: 'publish', topic, qos: 1, messageId };
   }
@@ -400,7 +402,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {} 
   const sweep = (now = clock()) => {
     const r = db.sweep(now, {
       minIdle: RETENTION + IDLE_GRACE, idleAfter: (account) => (policy.retention?.(account) ?? RETENTION) + IDLE_GRACE, accountAfter: ACCOUNT_KEEP, online,
-      tidy: (t) => policy.tidy?.(t), kept: (account, t) => policy.accountKept?.(account, t) ?? false,
+      tidy: (t) => { stats?.flush(t); policy.tidy?.(t); }, kept: (account, t) => policy.accountKept?.(account, t) ?? false,
     });
     reapSoon();
     return r;

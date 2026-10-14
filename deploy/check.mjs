@@ -7,7 +7,8 @@
 //   node deploy/check.mjs --origin URL --relay HOST [--mqtt HOST:PORT]
 //
 // Checks: the front page (200, HTML) and its headers (HSTS, nosniff, a Content-Security-Policy, a
-// Referrer-Policy, no cookie); /pay-monero.html (301 to /pro.html); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
+// Referrer-Policy, no cookie); /pay-monero.html (301 to /pro.html); https://<relay>/stats (200, the
+// relay's counts, CORS open, cached a minute, no DID or hash); /_stats/ (401 without its password); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
 // open, cached an hour, the plan's first fields: design/relay-plan.md §11 "Relay info");
 // https://<relay>/challenge?did=… (200, a relay-login body naming this relay, a whole pow_bits);
 // MQTT over TLS on <relay>:8883 answering a CONNECT without credentials with CONNACK 4 (check
@@ -82,6 +83,21 @@ await check('relay.json', `https://${RELAY}/relay.json`, (r, b) => {
   const missing = ['name', 'software', 'version', 'source', 'limits'].filter((k) => j[k] === undefined);
   return missing.length ? `missing ${missing.join(', ')}` : '';
 });
+await check('/stats (counts only)', `https://${RELAY}/stats`, (r, b) => {
+  if (!type(r).startsWith('application/json')) return `content-type ${type(r)}`;
+  if (r.headers.get('access-control-allow-origin') !== '*') return 'Access-Control-Allow-Origin is not *';
+  if (!/max-age=60\b/.test(r.headers.get('cache-control') ?? '')) return 'Cache-Control lacks max-age=60';
+  const j = JSON.parse(b);
+  if (j.v !== 'sigelo-relay-stats/0' || !Number.isSafeInteger(j.identities?.total)) return 'not the relay\'s counts (v sigelo-relay-stats/0)';
+  return /did:sigelo:|[0-9a-f]{24}/.test(b) ? 'names a DID or a hash' : '';
+});
+// The visit statistics are behind basic auth: 401 without credentials, and nothing of them shown.
+{
+  const { r, body, err } = await get(`${ORIGIN}/_stats/`), name = '/_stats/ 401 without a password (basic auth)';
+  if (err) fail(name, err);
+  else if (r.status !== 401 || !/^Basic /i.test(r.headers.get('www-authenticate') ?? '') || /goaccess|sigelo relay: counts/i.test(body)) fail(name, `status ${r.status}, WWW-Authenticate ${r.headers.get('www-authenticate')}`);
+  else pass(name);
+}
 await check('/challenge', `https://${RELAY}/challenge?did=${PROBE_DID}`, (r, b) => {
   const j = JSON.parse(b), c = j.challenge ?? {};
   if (c.typ !== 'relay-login') return `challenge.typ ${JSON.stringify(c.typ)}, want "relay-login"`;

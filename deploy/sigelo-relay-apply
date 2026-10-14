@@ -36,9 +36,12 @@
 # files, included files, certificates, modules, temp paths, unix sockets). The config comes from
 # the deploy user's upload, so without a filter the deploy key could point error_log at
 # /etc/cron.d, `include` any file or load a module: root. Every statement must be on its own line,
-# start with an allowlisted directive, and use the fixed values below: the web roots, the error
-# log, the sigelo.ai certificate, the relay's loopback upstream (http://127.0.0.1:8791), the one
-# proxy header X-Real-IP $remote_addr, ports 80 and 443. The check reads the root-owned copy in
+# start with an allowlisted directive, and use the fixed values below: the web roots (the site, the
+# ACME webroot, the statistics), the error log, the access logs in the one format sigelo_anon whose
+# string is fixed here too (LOGFMT: no full address, no query string; the maps it reads are the
+# deploy gate's, relay/site/build.mjs), the stats password file, the sigelo.ai certificate, the
+# relay's loopback upstream (http://127.0.0.1:8791), the one proxy header X-Real-IP $remote_addr,
+# ports 80 and 443. The check reads the root-owned copy in
 # /opt/sigelo-relay/app, the file that is installed. What a stolen deploy key can still do: run its
 # own code as sigelo-relay and change the site's content, headers and redirects. The filter is the
 # one site/deploy/sigelo-nginx-apply uses for sigelo.io, reviewed, not audited.
@@ -59,6 +62,9 @@ DST=/opt/sigelo-relay
 WEB=/var/www/sigelo.ai/dist
 CONF=/etc/nginx/conf.d/sigelo-relay.conf
 UNIT=sigelo-relay.service
+# The one access log format nginx.conf may define (site/deploy/nginx.conf's, sigelo.io): the
+# address cut to /24 or /48, the path without its query, the referrer's host.
+LOGFMT='$sigelo_net - - [$time_local] "$request_method $sigelo_path $server_protocol" $status $body_bytes_sent "$sigelo_ref" "$http_user_agent" "$http_accept" $request_time'
 
 say() { echo "[sigelo-relay-apply] $*"; }
 die() { echo "[sigelo-relay-apply] $*" >&2; exit 1; }
@@ -70,7 +76,7 @@ check_conf() { # $1 = file; prints every offending line, returns 1 if any
   # inside a token, text after the terminator, strings spanning lines, and `${`: nginx keeps a {
   # that follows an unescaped $ inside the token, so its statement would go on where this reader
   # sees a block open.
-  awk '
+  awk -v logfmt="$LOGFMT" '
     function bad(msg) { printf "  line %d: %s: %s\n", NR, msg, raw; err = 1; return 0 }
     function tokenize(l,    i, j, c, q, L) {   # fills tok[1..ntok] and term; 0 if malformed
       ntok = 0; term = ""; L = length(l); i = 1
@@ -110,7 +116,7 @@ check_conf() { # $1 = file; prints every offending line, returns 1 if any
         "ssl_reject_handshake http2 root index log_not_found types default_type charset " \
         "charset_types gzip gzip_vary gzip_min_length gzip_types add_header location if rewrite " \
         "try_files error_page internal limit_req limit_req_status client_max_body_size proxy_pass " \
-        "proxy_set_header", a, " ")
+        "proxy_set_header log_format auth_basic auth_basic_user_file", a, " ")
       for (i = 1; i <= n; i++) allowed[a[i]] = 1
       depth = 0; block = ""; blockdepth = 0
     }
@@ -148,8 +154,11 @@ check_conf() { # $1 = file; prints every offending line, returns 1 if any
         next
       }
       v = (ntok == 2) ? tok[2] : ""
-      if (d == "root" && v != "/var/www/sigelo.ai/dist" && v != "/var/www/acme") bad("root must be /var/www/sigelo.ai/dist or /var/www/acme")
-      if (d == "access_log" && v != "off") bad("access_log must be off (relay/site/privacy.md: no access log)")
+      if (d == "root" && v != "/var/www/sigelo.ai/dist" && v != "/var/www/sigelo.ai/stats" && v != "/var/www/acme") bad("root must be /var/www/sigelo.ai/dist, /var/www/sigelo.ai/stats or /var/www/acme")
+      if (d == "access_log" && !(ntok == 2 && v == "off") && !((ntok == 3 || ntok == 4) && tok[2] ~ /^\/var\/log\/nginx\/sigelo\/(access|relay-access|access-self)\.log$/ && tok[3] == "sigelo_anon" && (ntok == 3 || tok[4] ~ /^if=\$sigelo_(self|outside)$/))) bad("access_log must be off or /var/log/nginx/sigelo/access.log|relay-access.log|access-self.log sigelo_anon [if=$sigelo_self|$sigelo_outside] (relay/site/privacy.md)")
+      if (d == "log_format" && !(ntok == 3 && tok[2] == "sigelo_anon" && tok[3] == logfmt)) bad("only log_format sigelo_anon, with the format string LOGFMT (no full address, no query string)")
+      if (d == "auth_basic" && ntok != 2) bad("auth_basic takes one realm")
+      if (d == "auth_basic_user_file" && v != "/etc/nginx/sigelo-stats.htpasswd") bad("auth_basic_user_file must be /etc/nginx/sigelo-stats.htpasswd")
       if (d == "error_log" && !(ntok == 3 && tok[2] == "/var/log/nginx/sigelo/error.log" && tok[3] ~ /^(crit|alert|emerg)$/)) bad("error_log must be /var/log/nginx/sigelo/error.log crit|alert|emerg")
       if (d == "ssl_certificate" && v != "/etc/letsencrypt/live/sigelo.ai/fullchain.pem") bad("ssl_certificate must be /etc/letsencrypt/live/sigelo.ai/fullchain.pem")
       if (d == "ssl_certificate_key" && v != "/etc/letsencrypt/live/sigelo.ai/privkey.pem") bad("ssl_certificate_key must be /etc/letsencrypt/live/sigelo.ai/privkey.pem")
@@ -197,7 +206,17 @@ error_log /var/log/nginx/sigelo/../../../../etc/cron.d/x crit;
 error_log /var/log/nginx/sigelo/error.log debug;
 error_log stderr crit;
 access_log /var/log/nginx/sigelo/access.log;
+access_log /var/log/nginx/sigelo/access.log combined;
+access_log /var/log/nginx/sigelo/access.log sigelo_anon if=$remote_addr;
+access_log /etc/cron.d/x sigelo_anon;
+access_log /var/log/nginx/sigelo/../../../../etc/cron.d/x sigelo_anon;
+access_log syslog:server=unix:/dev/log sigelo_anon;
 access_log /etc/cron.d/x;
+log_format sigelo_anon '$remote_addr $request';
+log_format combined '$sigelo_net';
+log_format sigelo_anon '$sigelo_net - - [$time_local] "$request_method $request_uri $server_protocol" $status $body_bytes_sent "$sigelo_ref" "$http_user_agent" "$http_accept" $request_time';
+root /var/www/sigelo.ai/stats/../../../../etc;
+auth_basic_user_file /var/lib/sigelo/htpasswd;
 ssl_certificate /etc/shadow;
 ssl_certificate_key /etc/ssh/ssh_host_ed25519_key;
 ssl_password_file /etc/shadow;

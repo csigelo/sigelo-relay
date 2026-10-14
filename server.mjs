@@ -10,7 +10,8 @@
 //     RELAY_TLS_CERT, RELAY_TLS_KEY   PEM paths: MQTT over TLS on RELAY_TLS_PORT (default 8883),
 //                       all interfaces; SIGHUP re-reads both files (certbot's deploy hook)
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
-//     RELAY_HTTP_PORT   GET /challenge, POST /check and POST /licence on 127.0.0.1 for nginx (default 8791)
+//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /licence and GET /stats (counts only:
+//                       stats.mjs) on 127.0.0.1 for nginx (default 8791)
 //     RELAY_LOGIN_RATE  CONNECTs and POST /check together, per minute per /24 (IPv4) or /48 (IPv6)
 //                       (default 30); GET /challenge separately at the same number. HTTP calls
 //                       are counted by nginx's X-Real-IP
@@ -33,6 +34,7 @@ import { auth, MAX_BODY, MAX_PER_PREFIX, MAX_SESSIONS, UNPROVEN_SECONDS, prefixO
 import { openDb } from './db.mjs';
 import { mailboxes, MAX_TOPICS } from './mailbox.mjs';
 import { relayPolicyFromEnv } from './allowance.mjs';   // M4: allowances, proof of work, licences
+import { relayStats } from './stats.mjs';
 
 export { prefixOf };
 
@@ -197,12 +199,14 @@ export async function startRelay(cfg) {
   const diskUsed = cfg.diskUsed ?? diskUsage(dirname(cfg.db), log);
   const diskFull = () => diskUsed() >= FULL;
   const policy = typeof cfg.policy === 'function' ? cfg.policy({ db, host: cfg.host, clock, log }) : cfg.policy ?? {};   // M4: a factory gets the db
-  let broker;
-  const a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
-    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log });
+  let broker, a;
+  // GET /stats: counts only (stats.mjs); sessions read from auth once it exists.
+  const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy });
+  a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
+    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -286,7 +290,7 @@ export async function startRelay(cfg) {
     m.close();
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, stats, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {

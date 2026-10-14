@@ -12,7 +12,8 @@
 #      that hash, and step 3 installs what root then runs), runs `npm test` and
 #      `node test/allowance.mjs` (allowances, proof of work, operators, licences), the helper's
 #      allowlist self-test and its check of deploy/nginx.conf (the host would refuse a config that
-#      fails it), builds the front page with `node site/build.mjs --final` (refused while a
+#      fails it), the stats chart's self-test (deploy/stats-chart.mjs: R16 of server-setup.sh
+#      --relay installs it), builds the front page with `node site/build.mjs --final` (refused while a
 #      placeholder is open) and runs `node site/test.mjs`: any failure and nothing is uploaded;
 #   2. stages the tracked files of HEAD plus site/dist, installs the dependencies in the stage
 #      here (npm ci --omit=dev --ignore-scripts --no-bin-links: each package checked against
@@ -106,6 +107,7 @@ run sh -c "cd '$root' && npm test"
 run sh -c "cd '$root' && node test/allowance.mjs"
 run sh "$root/deploy/sigelo-relay-apply" --self-test
 run sh "$root/deploy/sigelo-relay-apply" --check "$root/deploy/nginx.conf"
+run node "$root/deploy/stats-chart.mjs" --self-test
 run node "$root/site/build.mjs" --final
 run node "$root/site/test.mjs"
 

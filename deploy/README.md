@@ -19,7 +19,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_DB` | `/var/lib/sigelo-relay/relay.db` | SQLite, WAL |
 | `RELAY_TLS_CERT`, `RELAY_TLS_KEY` | none | PEM files; MQTT over TLS on `RELAY_TLS_PORT` (8883), all interfaces; SIGHUP re-reads them |
 | `RELAY_TCP_PORT` | off | plain MQTT on 127.0.0.1, for tests |
-| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check` and `/licence` on 127.0.0.1, for nginx |
+| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/licence` and `/stats` on 127.0.0.1, for nginx |
 | `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together, and separately GET /challenge |
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
@@ -107,12 +107,17 @@ counts and logs it cut to /24 or /48, never in full. Without the header every cl
 and the relay soon refuses everyone. It is set at server level, and no location sets any
 `proxy_set_header`: one that did would drop it there, and nginx would pass the client's own
 `X-Real-IP`, a new network for every request. nginx's own limit, per /24 or /48, is a first brake.
-No server block keeps an access log: relay.sigelo.ai's would hold every client's full address with
-`GET /challenge?did=<DID>`, and the site keeps none either (privacy.md). The error log is at `crit`,
+sigelo.ai and relay.sigelo.ai over TLS keep an access log for visit counts, in sigelo.io's format
+`sigelo_anon`: the address cut to /24 or /48, the path without its query (`GET /challenge?did=<DID>`
+is logged as `/challenge`), the referrer's host only, the user agent and Accept (privacy.md). The
+site goes to `access.log`, relay.sigelo.ai to `relay-access.log`, the project's own requests (user
+agent `sigelo-selfcheck/`) to `access-self.log`; port 80, www, the default servers and `/_stats/`
+keep none. `sigelo-relay-apply` allows that one format string and those three files only, and
+`build.mjs --final` refuses a format or map that keeps more. The error log is at `crit`,
 because a `limit_req` refusal is logged at `error` with both; a crit line may still hold a full
 address and the request line, which may name a DID, so it is kept 7 days. `relay/site/build.mjs
 --final` refuses a config that logs more, lacks `/licence`, proxies without `X-Real-IP` at server
-level, or sets `proxy_set_header` in a location.
+level, sets `proxy_set_header` in a location, or serves `/_stats/` without basic auth.
 
 `relay/deploy/deploy.sh` installs it with each release, through `sigelo-relay-apply`, as
 `/etc/nginx/conf.d/sigelo-relay.conf`, after `nginx -t`; the site's root `/var/www/sigelo.ai/dist`
@@ -133,6 +138,37 @@ install -m 0644 relay/deploy/nginx.conf /etc/nginx/conf.d/sigelo-relay.conf && n
 fixes sigelo.io's web root, certificate and upstream (the world on 8790) and allows neither
 `proxy_set_header` nor `error_page`. With those three swapped for sigelo.ai's, only the two
 directives remain.
+
+## Statistics
+
+Counts only, server-side: no script, cookie or tracker on the public pages.
+
+- **`GET https://relay.sigelo.ai/stats`** (`stats.mjs`; CORS open, cached a minute, computed at
+  most once a minute): `identities` {total, new_today}, `logins_today`, `logins_refused_today`
+  {check: n}, `sessions` {now, peak_today}, `mailboxes_claimed`, `messages` {queued, stored_today,
+  delivered_today, refused_today {code: n}}, `pow_solved_today`, `free_queue_used_pct`,
+  `pro_licences_active`, and `days`: the last 30 UTC days of daily totals. Never a DID, account,
+  client id, topic or address (`test/run.mjs` pins the shape and looks for every identifier of its
+  run). The day's counts are kept in memory and written by the sweep each minute to `stats_days`
+  (one row a day, numbers only, 90 days); a restart loses a minute of them at most. On a small
+  relay `sessions.now` moves when one agent connects: anyone polling it learns when someone does,
+  not who.
+- **`https://sigelo.ai/_stats/`**, basic auth, user `owner`: `index.html` (GoAccess over the site's
+  log, 7 days), `api.html` (the same over relay.sigelo.ai's), `relay.html` (the counts above as
+  30-day charts), `summary.txt` and `daily.log` (visits a day, AI agents, programmatic clients and
+  crawlers against browsers, top pages, the relay's counts; `daily.log` gets one block per finished
+  day). `site/deploy/server-setup.sh --relay` (R16) installs goaccess, `deploy/stats.sh` and
+  `deploy/stats-chart.mjs` as `/usr/local/sbin/sigelo-relay-stats{,-chart.mjs}` and
+  `sigelo-relay-stats.timer` (root, every 10 minutes, network to localhost only), and makes the
+  password once: its SHA-512 crypt hash in `/etc/nginx/sigelo-stats.htpasswd`, the password in
+  `/root/sigelo-stats.pw` (root, 0600). Read it, then keep it beside sigelo.io's on the phone:
+
+  ```sh
+  ssh -t csigelo@<relay host> sudo cat /root/sigelo-stats.pw
+  ssh csigelo@<relay host> cat /var/www/sigelo.ai/stats/daily.log   # the text, without the password
+  ```
+
+  To change it: delete both files as root and rerun R16 (`server-setup.sh --relay`).
 
 ## The protocol in one screen
 
@@ -241,6 +277,7 @@ knows the original DID can read them, and the account key confirms that DID anyw
 for logins without a bundle (current DID → account, key) is memory only. The log has logins,
 refusals by check name, disconnects and errors, each with the address cut to /24 or /48: no DID,
 client id, topic or payload (`test/run.mjs` checks the file, its WAL and the log), kept 7 days.
+`stats_days` holds the relay's daily totals (numbers only, 90 days: Statistics).
 Acknowledged messages are overwritten in the file (`secure_delete`), and the sweep truncates the
 WAL every minute. Accounts go 30 days after their last login once they hold no claim, no licence and
 no operator attestation still running that they presented; idle mailboxes after their retention plus

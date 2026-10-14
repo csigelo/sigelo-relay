@@ -1759,6 +1759,16 @@ ok(totalsMatch(relay), 'the queue totals of the main relay equal its queue summe
   ok(stamps.length > 0 && stamps.every((t) => t % DAY === 0), `pow_proofs.at is the start of a UTC day (${stamps.length} values); a licence keeps no day of use`);
 }
 
+// GET /stats (stats.mjs) reads M4's numbers from its tables: proofs of work today, licences
+// running, the free tier's ceiling used.
+{
+  const s = await (await fetch(`${base()}/stats?x=${now}`)).json(), raw = relay.db.raw, day = Math.floor(now / DAY) * DAY;
+  const pow = raw.prepare('SELECT count(*) AS n FROM pow_proofs WHERE at = ?').get(day).n, lic = raw.prepare('SELECT count(*) AS n FROM licences WHERE exp > ?').get(now).n;
+  const pct = Math.round((pol.freeUsed() / pol.freeQueue) * 1000) / 10;
+  ok(s.pow_solved_today === pow && s.pro_licences_active === lic && s.free_queue_used_pct === pct && typeof pct === 'number',
+    `GET /stats: pow solved today ${s.pow_solved_today}, Pro licences active ${s.pro_licences_active}, free queue used ${s.free_queue_used_pct} %, as the tables hold them`);
+}
+
 await relay.close();
 rmSync(dir, { recursive: true, force: true });
 console.log(failed === 0 ? `ALL PASS (${n})` : `${failed} FAILED of ${n}`);

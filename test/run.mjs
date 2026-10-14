@@ -963,6 +963,83 @@ const X = topic('i'), Y = topic('i');
   b = (await login(bob)).client;
 }
 
+// ================================================================ GET /stats: counts, no identifier
+// stats.mjs: whole numbers of the relay as a whole; never a DID, account, client id, topic or
+// address. The shape is pinned key by key, so a field added later is a decision, not a leak.
+const STATS_KEYS = 'at,day,days,free_queue_used_pct,identities,logins_refused_today,logins_today,mailboxes_claimed,messages,pow_solved_today,pro_licences_active,sessions,v';
+const DAY_KEYS = 'day,delivered,identities,login_refused,logins,new_identities,pow_solved,refused,sessions_peak,stored';
+const whole = (v) => Number.isSafeInteger(v) && v >= 0;
+const named = (o) => o !== null && typeof o === 'object' && !Array.isArray(o) && Object.entries(o).every(([k, v]) => /^[a-z][a-z_]{0,31}$/.test(k) && whole(v) && v > 0);
+const statsShape = (s) => {
+  const why = [];
+  if (Object.keys(s).sort().join() !== STATS_KEYS) why.push(`keys ${Object.keys(s).sort().join()}`);
+  if (s.v !== 'sigelo-relay-stats/0' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(s.at) || !/^\d{4}-\d\d-\d\d$/.test(s.day)) why.push('v, at or day');
+  if (Object.keys(s.identities ?? {}).sort().join() !== 'new_today,total' || !Object.values(s.identities).every(whole)) why.push('identities');
+  if (Object.keys(s.sessions ?? {}).sort().join() !== 'now,peak_today' || !Object.values(s.sessions).every(whole)) why.push('sessions');
+  if (Object.keys(s.messages ?? {}).sort().join() !== 'delivered_today,queued,refused_today,stored_today' || ![s.messages.queued, s.messages.stored_today, s.messages.delivered_today].every(whole) || !named(s.messages.refused_today)) why.push('messages');
+  if (![s.logins_today, s.mailboxes_claimed, s.pow_solved_today, s.pro_licences_active].every(whole) || !named(s.logins_refused_today)) why.push('counts');
+  if (!(s.free_queue_used_pct === null || (typeof s.free_queue_used_pct === 'number' && s.free_queue_used_pct >= 0))) why.push('free_queue_used_pct');
+  if (!Array.isArray(s.days) || s.days.length < 1 || s.days.length > 30 || s.days.some((d) => Object.keys(d).sort().join() !== DAY_KEYS || !/^\d{4}-\d\d-\d\d$/.test(d.day) || !Object.entries(d).every(([k, v]) => k === 'day' || whole(v)))
+    || s.days.at(-1).day !== s.day) why.push('days');
+  return why;
+};
+const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stats`); return { status: res.status, type: res.headers.get('content-type'), text: await res.text() }; };
+{
+  const got = await getStats(), s = JSON.parse(got.text), why = statsShape(s);
+  ok(got.status === 200 && got.type === 'application/json' && why.length === 0, `GET /stats: 200, JSON, exactly the counts of stats.mjs, whole numbers${why.length ? ` (wrong: ${why.join(', ')})` : ''}`);
+  ok(s.identities.total === count('SELECT count(*) AS n FROM accounts') && s.mailboxes_claimed === count('SELECT count(*) AS n FROM claims WHERE dead = 0 AND expires IS NULL')
+    && s.messages.queued === count('SELECT count(*) AS n FROM messages') && s.sessions.now === relay.auth.sessions(),
+  `GET /stats: identities, mailboxes, messages queued and sessions as the tables and auth.mjs hold them (${s.identities.total}, ${s.mailboxes_claimed}, ${s.messages.queued}, ${s.sessions.now})`);
+  ok(s.logins_today > 0 && s.messages.delivered_today > 0 && s.sessions.peak_today >= s.sessions.now && Object.keys(s.logins_refused_today).every((c) => [...CHECKS, 'internal'].includes(c)),
+  `GET /stats: today's logins and deliveries counted, refusals by the check's name (${s.logins_today} logins, ${s.messages.stored_today} stored, ${s.messages.delivered_today} delivered, refused ${JSON.stringify(s.messages.refused_today)})`);
+  // No identifier of this run in it: every DID (whole and its key part), account, client id,
+  // topic held, and no address or prefix.
+  const ids = [...new Set(everyone.flatMap((id) => [id.did, id.original, id.did.slice(11), accountOf(id.original), clientId(id)]))];
+  const held = rows('SELECT topic FROM claims').map((r) => r.topic.slice(2));
+  const leak = [...ids, ...held].filter((x) => got.text.includes(x));
+  ok(held.length > 0 && leak.length === 0 && !/did:|127\.0\.0|\/24|\/48|[0-9a-f]{24}/.test(got.text),
+    `GET /stats names no DID, account, client id, topic or address (${ids.length} identifiers and ${held.length} topics of this run looked for${leak.length ? `; found ${leak.length}` : ''})`);
+  const again = JSON.parse((await getStats()).text);
+  ok(again.at === s.at, 'GET /stats is computed at most once a minute (the same answer within it)');
+  ok((await fetch(`${base()}/stats`, { method: 'POST' })).status === 404, 'POST /stats: 404 (a GET only)');
+}
+{
+  // The day's counts survive a restart (written by the sweep), a new UTC day starts at zero with
+  // the day before kept as a row, and every row is numbers only, keyed by the start of its day.
+  let snow = now;
+  const S = await startRelay({ ...cfg, db: join(dir, 'stats.db'), clock: () => snow, log: () => {} });
+  const r1 = (await login(alice, {}, S)).client, r2 = (await login(bob, {}, S)).client, T = topic();
+  await subscribe(r1, T);
+  await publish(r2, T, payload(100));
+  await until(() => messages(r1, T).length === 1);
+  ok(await subscribe(r2, T) === 128, 'stats relay: a mailbox another identity holds is refused (mailbox_taken)');
+  await sleep(100);
+  await refused(carol, { bundle: false }, 'bundle', 'stats relay: an unknown identity without a bundle', S);
+  const before = (await getStats(S)).text, b1 = JSON.parse(before);
+  S.sweep(snow);
+  await end(r1); await end(r2);
+  await S.close();
+  const S2 = await startRelay({ ...cfg, db: join(dir, 'stats.db'), clock: () => snow, log: () => {} });
+  const b2 = JSON.parse((await getStats(S2)).text);
+  ok(b1.logins_today === 2 && b1.messages.stored_today === 1 && b1.messages.delivered_today === 1 && b1.logins_refused_today.bundle === 1 && b1.messages.refused_today.mailbox_taken === 1 && b1.identities.new_today === 2 && b1.sessions.peak_today === 2,
+    `GET /stats on a fresh relay: 2 logins, 1 stored, 1 delivered, 1 login refused (bundle), 1 notice (mailbox_taken), 2 new identities, peak 2 sessions (${before.trim()})`);
+  ok(b2.logins_today === 2 && b2.messages.delivered_today === 1 && b2.logins_refused_today.bundle === 1 && b2.sessions.now === 0,
+    'GET /stats after a restart: today\'s counts read back from stats_days, no session connected');
+  snow += DAY;
+  const r3 = (await login(alice, {}, S2)).client;
+  S2.sweep(snow);
+  const c = JSON.parse((await getStats(S2)).text);
+  ok(c.logins_today === 1 && c.messages.delivered_today === 0 && c.days.length === 2 && c.days[0].logins === 2 && c.days[0].delivered === 1 && c.days[0].refused === 1 && c.days[0].identities === 2 && c.days[1].logins === 1 && statsShape(c).length === 0,
+    `GET /stats on the next UTC day: today's counts from zero, yesterday kept in days (${JSON.stringify(c.days)})`);
+  const kept = S2.db.raw.prepare('SELECT day, counts FROM stats_days ORDER BY day').all();
+  ok(kept.length === 2 && kept.every((r) => r.day % DAY === 0 && /^[{}\[\]":,a-z_0-9]*$/.test(r.counts)), 'stats_days: one row a day, keyed by the start of the UTC day, numbers and names of checks only');
+  snow += 95 * DAY;
+  S2.sweep(snow);
+  ok(S2.db.raw.prepare('SELECT count(*) AS n FROM stats_days').get().n === 1, 'stats_days: rows older than 90 days go at the sweep');
+  await end(r3);
+  await S2.close();
+}
+
 // ================================================================ the broker-eye dump
 {
   // Leave messages queued so the dump holds payloads, then read everything the operator could.

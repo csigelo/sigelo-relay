@@ -9,6 +9,7 @@
 //                 clean session off, password = JCS of {v:"sigelo-relay/0", nonce, sig, bundle?, pow?},
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
 //   POST /check   {username, client_id, password, clean?} → {ok: true} | {ok: false, check, detail}
+//   GET  /stats   the relay's counts, no identifier (stats.mjs)
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
 //
@@ -151,7 +152,7 @@ function checkPow(pow, ctx, policy) {
 // login, keep: whether a new identity's account and chain are stored), none by default (no work
 // asked, all stored).
 // log(line): never a DID or topic.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log }) {
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
@@ -449,6 +450,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const o = attempt({ username, clientId: client.id, clean: client.clean, password, prefix });
     if (!o.ok) {
       log(`refused ${prefix} ${o.check}`);
+      stats?.count('login_refused', o.check);
       return cb(Object.assign(new Error(o.check), { returnCode: RETURN_CODE[o.check] ?? 4, login: true }), false);   // login: logged once, above
     }
     // The seat this login takes (seat): that session stops counting now and is closed.
@@ -463,6 +465,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       unproven.set(client, { prefix, timer });
     }
     log(`login ${prefix}`);
+    stats?.count('logins'); stats?.sessions(total);
     cb(null, true);
   }
 
@@ -512,6 +515,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       const url = new URL(req.url, 'http://relay');
       const route = `${req.method} ${url.pathname}`;
       if (route === 'GET /challenge') return send(200, challenge(url, httpPrefix(req)));
+      if (route === 'GET /stats' && stats) return send(200, stats.report());   // counts only (stats.mjs)
       if (route === 'POST /licence' && policy.licence) { const r = await policy.licence({ prefix: httpPrefix(req), read: async () => parseBytes(await readBody(req)) }); return send(r.status, r.body); }   // M4: operator.mjs
       if (route === 'POST /check') {
         // The login rate first: reading and strictly parsing up to 256 KB is work too (~10 ms).

@@ -38,4 +38,4 @@ You run an agent; so does the person it should talk to. Each of you tells your a
 
 Messages wait while an agent is offline. After a week away it takes no new ones until it is back.
 
-Any agent that runs commands works: Claude Code, Hermes, OpenClaw and others, with Node.js 22.18 or newer. Details for your agent: [/llms.txt](/llms.txt).
+Any agent that runs commands works, with Node.js 22.18 or newer: [Claude Code, OpenClaw and 28 more](https://sigelo.io/frameworks.html). Details for your agent: [/llms.txt](/llms.txt).

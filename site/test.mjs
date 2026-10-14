@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  build, deployRefusals, launchRefusals, nginxTree, serversIn, everyDirective, DEPLOY, ORIGIN, HOST, REPO, ROOT, PAGES, PLACEHOLDERS,
+  build, deployRefusals, launchRefusals, nginxTree, serversIn, everyDirective, ANON, STATS_ROOT, DEPLOY, ORIGIN, HOST, REPO, ROOT, PAGES, PLACEHOLDERS,
   PLACEHOLDER_RE, DRAFT_RE, PRICE_RE, XMR_RE, PAYMENT_LINK_RE, paymentDetailRefusals, sellerRefusal, SELLER, VALUES, NOBODY, MOTTO, DISCLOSURE, DOMAINS, HOSTS,
   REPOSITORIES, CONTENT_HOSTS, PAYMENT_PLACES, PAYMENT_WORDS, POSITIONING, ISSUER_DID, STATEMENT, QUEUE_NOTE, titleOf, pageUrl, isPrivateTree, proStorageCap, launchGate,
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
@@ -467,7 +467,7 @@ ok(body.agents.includes(index.tiers.pro.client_env) && index.tiers.pro.client_en
 const priceLine = src.pro.match(PRICE_RE);
 ok(priceLine && index.tiers.pro.price.EUR_month === Number(priceLine[1]) && index.tiers.pro.price.EUR_year === Number(priceLine[2]), 'index.json: the price is pro.md\'s');
 // relay_sees names what each row of privacy.md's table keeps (A14).
-const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
+const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Web access log': 'web access log of sigelo.ai and relay.sigelo.ai, for visit counts', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
   Backups: 'encrypted nightly backup, each copy kept 7 days' };
 const rows = [...src.privacy.matchAll(/^\| ([^|]+?) \| [^|]+ \|$/gm)].map((m) => m[1]).filter((x) => x !== 'What' && !/^-+$/.test(x));
 const sees = index.crypto.relay_sees.join('\n'), missing = rows.filter((x) => !Object.entries(SEES).some(([k, v]) => x.startsWith(k) && sees.includes(v)));
@@ -516,7 +516,7 @@ if (isPrivateTree()) {
 
 // ---- nginx: what the deploy promises (relay/deploy/nginx.conf) ---------------------------------
 const confText = readFileSync(DEPLOY, 'utf8'), conf = nginxTree(confText);
-ok(deployRefusals(DEPLOY).length === 0, `deploy gate: relay/deploy/nginx.conf passes (both logs down in every server block, /licence proxied, X-Real-IP)${deployRefusals(DEPLOY).length ? ` (${deployRefusals(DEPLOY).join('; ')})` : ''}`);
+ok(deployRefusals(DEPLOY).length === 0, `deploy gate: relay/deploy/nginx.conf passes (access logs off or cut to /24 or /48 in every server block, errors at crit, /_stats/ behind auth, /licence proxied, X-Real-IP)${deployRefusals(DEPLOY).length ? ` (${deployRefusals(DEPLOY).join('; ')})` : ''}`);
 if (conf) {
   const servers = serversIn(conf), named = (name, port) => servers.filter((s) => s.directives.includes(`server_name ${name}`) && s.directives.some((d) => d.startsWith(`listen ${port}`)));
   const [apex] = named('sigelo.ai', 443), [www] = named('www.sigelo.ai', 443), [relay] = named(HOST, 443);
@@ -538,17 +538,38 @@ if (conf) {
   // A browser's request to a relay call is refused before the relay charges it: the relay counts
   // logins and challenges per network before it reads a body, so any web page could otherwise spend
   // that budget from its visitors' browsers and lock every agent on their /24 or /48 out (A5 review).
-  const browserGaps = (t) => serversIn(t).flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))))
+  // GET /stats (counts only, relay/stats.mjs) charges no budget and is open to any page (CORS): the
+  // one proxied location without the refusal.
+  const browserGaps = (t) => serversIn(t).flatMap((s) => s.blocks.filter((b) => b.head !== 'location = /stats' && everyDirective(b).some((d) => d.startsWith('proxy_pass '))))
     .filter((b) => !b.blocks.some((x) => x.head === 'if ($sigelo_browser)' && x.directives.join() === 'return 403')).map((b) => b.head);
   const proxied = servers.flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))));
   const browserMap = conf.blocks.find((b) => b.head === 'map $http_sec_fetch_site$http_origin $sigelo_browser')?.directives ?? [];
-  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 3 && browserGaps(conf).length === 0,
+  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 4 && browserGaps(conf).length === 0,
     `nginx: /challenge, /check and /licence answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
   const noRefusal = nginxTree(confText.replace(/( {4}location = \/check \{\n) {8}if \(\$sigelo_browser\) \{\n {12}return 403;\n {8}\}\n/, '$1'));
   ok(noRefusal && browserGaps(noRefusal).join() === 'location = /check', 'nginx: a proxied location without the browser refusal is caught');
   const cors = conf.blocks.find((b) => b.head === 'map $uri $sigelo_cors')?.directives ?? [];
   ok(['"/index.json" "*"', '"/relay.json" "*"', '"/llms.txt" "*"'].every((x) => cors.includes(x)) && [apex, relay].every((s) => s.directives.includes('add_header Access-Control-Allow-Origin $sigelo_cors always')),
     'nginx: index.json, relay.json and llms.txt open to any origin (CORS)');
+  const relayCacheMap = conf.blocks.find((b) => b.head === 'map $uri $relay_cache')?.directives ?? [];
+  ok(rl['location = /stats']?.includes('proxy_pass http://127.0.0.1:8791') && rl['location = /stats'].some((d) => d.startsWith('limit_req zone=')) && cors.includes('"/stats" "*"')
+    && relayCacheMap.includes('"/stats" "public, max-age=60"'), 'nginx: relay.sigelo.ai/stats proxied to the relay under the rate limit, open to any origin (CORS), cached a minute');
+  const sl = locs(apex)['location ^~ /_stats/'] ?? [];
+  const statsMaps = ['map $document_root $sigelo_stats', 'map $sigelo_stats $sigelo_site_cache', 'map $sigelo_stats $sigelo_site_robots'].map((h) => conf.blocks.find((b) => b.head === h)?.directives.join('|'));
+  ok(sl.includes(STATS_ROOT) && sl.includes('access_log off') && sl.includes('auth_basic_user_file /etc/nginx/sigelo-stats.htpasswd') && sl.some((d) => /^auth_basic "/.test(d))
+    && statsMaps[0] === 'default ""|"/var/www/sigelo.ai/stats" "stats:"' && statsMaps[1] === 'default $sigelo_cache|"stats:" "no-store"' && /"stats:" "noindex/.test(statsMaps[2] ?? '')
+    && apex?.directives.includes('add_header Cache-Control $sigelo_site_cache always') && apex?.directives.includes('add_header X-Robots-Tag $sigelo_site_robots always'),
+  'nginx: sigelo.ai/_stats/ behind basic auth (/etc/nginx/sigelo-stats.htpasswd), not logged, no-store, noindex');
+  const logs = (s) => s?.directives.filter((d) => d.startsWith('access_log ')) ?? [];
+  ok(logs(apex).join('|') === 'access_log /var/log/nginx/sigelo/access.log sigelo_anon if=$sigelo_outside|access_log /var/log/nginx/sigelo/access-self.log sigelo_anon if=$sigelo_self'
+    && logs(relay).join('|') === 'access_log /var/log/nginx/sigelo/relay-access.log sigelo_anon if=$sigelo_outside|access_log /var/log/nginx/sigelo/access-self.log sigelo_anon if=$sigelo_self'
+    && servers.filter((x) => x !== apex && x !== relay).every((x) => logs(x).join() === 'access_log off')
+    && conf.directives.includes(`log_format sigelo_anon ${ANON['log_format sigelo_anon']}`),
+  'nginx: sigelo.ai and relay.sigelo.ai over TLS log in sigelo.io\'s format (address cut to /24 or /48, no query string), the project\'s own requests apart; every other server block logs nothing');
+  // No cookie and no script from the server either (the pages are checked above): nginx sets no
+  // Set-Cookie header and runs no module that would (userid).
+  ok(!/set-cookie|\buserid\b|\bsub_filter\b|\badd_before_body\b|\badd_after_body\b/i.test(confText.replace(/^\s*#.*$/gm, '')),
+    'nginx: no Set-Cookie header, no userid cookie, nothing injected into a page (sub_filter, addition): no cookie banner needed');
   ok(apex?.directives.includes('error_page 404 /404.html') && files.has('404.html'), 'nginx: a miss on sigelo.ai serves the not-found page');
   const al = locs(apex);
   ok(al['location = /pay-monero.html']?.join() === 'return 301 https://sigelo.ai/pro.html' && al['location = /pay-monero']?.join() === 'return 301 https://sigelo.ai/pro.html'
@@ -710,7 +731,7 @@ try {
   '--final: refuses a placeholder that is not listed (unknown placeholders fail too), and the terms\' DRAFT mark');
   ok(/N € a month or N € a year/.test(finalWith(set('pro', 'excluding VAT', 'VAT excluded')) ?? '') && /N € a month or N € a year/.test(finalWith(set('pro', 'at 10 % off', 'at [discount] % off')) ?? ''),
     '--final: refuses a pro.md whose price line it cannot read, or whose discount is a placeholder again');
-  ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name sigelo\.ai;\n[\s\S]*?) {4}access_log off;\n/, '$1') }) ?? ''),
+  ok(/server block \d+ \(sigelo\.ai\) lacks "access_log off;"/.test(finalWith(undefined, { deploy: confText.replace(/^ {4}access_log \/var\/log\/nginx\/sigelo\/access(?:-self)?\.log .*\n/gm, '') }) ?? ''),
     '--final: refuses while a server block keeps nginx\'s default access log, naming the block');
   ok(/lacks "error_log <file> crit;"/.test(finalWith(undefined, { deploy: confText.replace(/(server_name relay\.sigelo\.ai;\n[\s\S]*?) {4}error_log \S+ crit;\n/, '$1') }) ?? ''),
     '--final: refuses while a server block logs refusals at "error"');
@@ -739,6 +760,15 @@ try {
     'deploy gate: "access_log off;" inside a location only is refused');
   ok(said(gate(relayConf.replace('location = /licence {', 'location = /licence { access_log /var/log/nginx/licence.log;')), /turns the access log on inside it/),
     'deploy gate: an access log turned on inside a location is refused');
+  // The access log of the site: sigelo.io's format and maps, nothing else.
+  const anonTop = `log_format sigelo_anon ${ANON['log_format sigelo_anon']};\n` + Object.entries(ANON).filter(([h]) => h.startsWith('map ')).map(([h, d]) => `${h} {\n${d.split('|').map((x) => `    ${x};`).join('\n')}\n}\n`).join('');
+  const ANON_ON = '    access_log /var/log/nginx/sigelo/access.log sigelo_anon if=$sigelo_outside;\n    error_log /var/log/nginx/error.log crit;\n';
+  ok(gate(anonTop + relayConf + siteConf(ANON_ON)).length === 0, 'deploy gate: a server block logging in sigelo_anon, with sigelo.io\'s format and maps, opens nothing');
+  ok(said(gate(anonTop + relayConf + siteConf(ANON_ON.replace('sigelo_anon if=$sigelo_outside', 'combined'))), /lacks "access_log off;" or access logs in the format sigelo_anon/), 'deploy gate: an access log in another format (combined: the full address) is refused');
+  ok(said(gate(anonTop.replace('$sigelo_net - -', '$remote_addr - -') + relayConf + siteConf(ANON_ON)), /log_format sigelo_anon is not sigelo\.io's/), 'deploy gate: the format sigelo_anon with the full address is refused');
+  ok(said(gate(anonTop.replace('"~^(?<sigelo_p>/[^?]*)" "$sigelo_p"', '"~^(?<sigelo_p>/.*)" "$sigelo_p"') + relayConf + siteConf(ANON_ON)), /"map \$request_uri \$sigelo_path" is not sigelo\.io's/), 'deploy gate: a path map that keeps the query string (?did=…) is refused');
+  ok(said(gate(anonTop + 'map $remote_addr $sigelo_ref {\n    default $remote_addr;\n}\n' + relayConf + siteConf(ANON_ON)), /\$sigelo_ref is set by a second map/), 'deploy gate: a second map setting a variable the format reads is refused');
+  ok(said(gate(anonTop + relayConf + siteConf(ANON_ON + `    location ^~ /_stats/ {\n        ${STATS_ROOT};\n    }\n`)), /serves the statistics .* without basic auth/), 'deploy gate: the statistics served without basic auth are refused');
   ok(said(gate(relayConf.replace('location = /licence {', 'location = /licence { error_log /var/log/nginx/licence.log error;')), /logs errors below crit inside it/),
     'deploy gate: an error log below crit inside a location is refused');
   ok(said(gate(relayConf.replace(/\}\n$/, '')), /do not balance/) && said(gate(relayConf.replace('8791; }', '8791 }')), /do not balance/)
@@ -1030,8 +1060,11 @@ ok(src.privacy.includes('if the identity has a **recovery key**: your agent sign
   'privacy: erasure by disuse, or a recovery-key request whose steps are on /agents#erasure');
 ok(['**recovery key**', 'import { sign } from "sigelo"', 'ctx:"sigelo.ai/erase"', 'ctx:"sigelo.ai/access"', 'bindings:[],attestations:[],issuers:[]', 'Without asking: stop using the identity'].every((s) => erasure.includes(s))
   && !/sign-challenge/.test(erasure), 'privacy: erasure by disuse, or by a recovery-key request (never an identity-key challenge, which any world can obtain)');
-ok(['/24', '/48', '7 days', 'Never logged:', 'Seller and provider of the relay', 'keeps no access log', 'rarely, one holds a full address and the request, which may name a DID', 'DIDs only in such an error line', 'only in memory, while connected'].every((s) => src.privacy.includes(s)),
-  'privacy: /24 or /48 for 7 days, full addresses in memory only but in a rare error line, which may also name a DID (the request line), no access log, the never-list, the seller');
+ok(['/24', '/48', '7 days', 'Never logged:', 'Seller and provider of the relay', 'Web access log, for visit counts: address cut to /24 or /48, time, page without query', 'rarely, one holds a full address and the request, which may name a DID', 'DIDs only in such an error line', 'only in memory, while connected'].every((s) => src.privacy.includes(s)),
+  'privacy: /24 or /48 for 7 days, full addresses in memory only but in a rare error line, which may also name a DID (the request line), the web access log as nginx.conf keeps it (cut address, no query), the never-list, the seller');
+// What the access log row says, as nginx.conf logs it: the cut address, the path without its query, the user agent, the referring site only, 7 days.
+ok(/access_log \/var\/log\/nginx\/sigelo\/access\.log sigelo_anon/.test(confText) && /\$sigelo_net - - \[\$time_local\] "\$request_method \$sigelo_path [^']*\$sigelo_ref[^']*\$http_user_agent[^']*\$http_accept/.test(confText)
+  && src.privacy.includes('user agent, Accept header, referring site only | 7 days |') && !/keeps no access log/.test(src.privacy), 'privacy: the access log row names what nginx.conf\'s format keeps, and no page says there is none');
 ok(['No custody', 'No payment routing', 'No access to content', 'The attestation is the subscription', 'does not sell to consumers'].every((s) => src.terms.includes(s)),
   'terms: B2B, no custody, no payment routing, no access to content, the attestation is the subscription');
 // No custody: should a pay page ever ask for a transaction key, the clause must say it only proves a
@@ -1057,7 +1090,7 @@ ok(erasure.includes('Sooner, or to see the data, if the identity has a **recover
 // Where the servers are, as the Owner confirmed it (runbook §0): stated once, in the seller line.
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
-ok(src.privacy.includes('No accounts. This site sets no cookies, runs no scripts or trackers and keeps no access log.'), 'privacy: no accounts, no cookies, no scripts or trackers, no access log');
+ok(src.privacy.includes('No accounts. This site sets no cookies and runs no scripts or trackers.'), 'privacy: no accounts, no cookies, no scripts or trackers (so no consent banner)');
 ok(/, excluding VAT, for businesses\. /.test(src.pro) && src.terms.includes('the Seller does not sell to consumers'), 'pro, terms: businesses only');
 ok(src.contact.includes('`site/contact.md`') && existsSync(join(RELAY, 'site', 'contact.md')), 'contact: names its copy in the relay\'s public repository (site/contact.md)');
 ok(PAGES.every((p) => !XMR_RE.test(src[p.slug])) && paymentDetailRefusals(src).length === 0, 'no page carries a Monero address (one is made per invoice)');
