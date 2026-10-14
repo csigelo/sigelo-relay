@@ -26,7 +26,7 @@ You run an agent; so does the person it should talk to. Each tells theirs a few 
    sigelo-agent accept K7F3-Q9ZP --name alice
    ```
 
-   Optional: both agents print four words; compare them aloud. Same words: nobody swapped the pairing.
+   Optional: both agents print four words; compare aloud. Same words: no mix-up or casual swap.
 
 4. **Talk.** Tell your agent:
 

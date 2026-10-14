@@ -87,6 +87,8 @@ const NOBODY = keygen({ seed: new Uint8Array(32), recovery: 'sha256:' + '0'.repe
 
 export class LoginError extends Error { constructor(check, why) { super(`${check}: ${why}`); this.check = check; this.detail = why; } }
 const fail = (check, why) => { throw new LoginError(check, why); };
+// Seconds until fixed window w of `window` seconds ends: a 429's Retry-After (RFC 9110 §10.2.3).
+export const retryAfter = (w, window, now) => Math.max(1, Math.ceil((w + 1) * window - now));
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 // Address cut to /24 (IPv4, IPv4-mapped IPv6) or /48 (IPv6): all that is ever logged or counted.
@@ -189,7 +191,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       rates.set(k, r);
     }
     r.n += n;
-    if (r.n > limit) fail('rate', why);
+    if (r.n > limit) throw Object.assign(new LoginError('rate', why), { retryAfter: retryAfter(w, WINDOW, now) });
   }
   const verifyCost = (prefix, now, n) => charge('verify', prefix, now, n, verifyBudget, `bundles from this network cost more than ${verifyBudget} signature checks this minute: wait`);
   const chargeLogin = (prefix, now) => charge('login', prefix, now, 1, loginRate, `more than ${loginRate} logins a minute from this network: wait`);
@@ -483,7 +485,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const d = url.searchParams.get('did') ?? '';
     if (!DID_RE.test(d)) throw httpFail(400, 'did: want ?did=did:sigelo:z… (your current DID, in full)');
     const now = clock();
-    try { charge('challenge', prefix, now, 1, loginRate, `more than ${loginRate} challenges a minute from this network: wait`); } catch (e) { throw httpFail(429, e.message); }
+    try { charge('challenge', prefix, now, 1, loginRate, `more than ${loginRate} challenges a minute from this network: wait`); } catch (e) { throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
     // pow_bits: the difficulty a new identity must meet with this nonce (M4: by the network asking
     // and what it holds unredeemed, pow.mjs, which counts this one from now on); 0 = none asked. A
     // policy answering anything else is the relay's fault: 500.
@@ -512,7 +514,12 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     req.on('error', reject);
   });
   const http = createServer(async (req, res) => {
-    const send = (status, v) => { if (res.headersSent) return; res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(v) + '\n'); };
+    // after: a refusal's Retry-After, in seconds (charge, park.charge).
+    const send = (status, v, after) => {
+      if (res.headersSent) return;
+      res.writeHead(status, { 'content-type': 'application/json', ...(Number.isSafeInteger(after) && after > 0 && { 'retry-after': String(after) }) });
+      res.end(JSON.stringify(v) + '\n');
+    };
     try {
       const url = new URL(req.url, 'http://relay');
       const route = `${req.method} ${url.pathname}`;
@@ -531,7 +538,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       // Short invite codes (park.mjs). The park brake first, before the body or the login.
       if (park && route === 'POST /park') {
         const prefix = httpPrefix(req);
-        try { park.charge('park', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }); }
+        try { park.charge('park', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         let body;
         try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
         if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
@@ -546,7 +553,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         try { return send(200, { ok: true, ...park.park(body, body.username, clock()) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
       }
       if (park && req.method === 'GET' && url.pathname.startsWith('/park/')) {
-        try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }); }
+        try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or older than 10 minutes' });
         return send(200, { ok: true, invite });
@@ -554,7 +561,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);
-      send(e.status ?? 500, { error: e.status ? e.message : 'internal error' });
+      send(e.status ?? 500, { error: e.status ? e.message : 'internal error' }, e.retryAfter);
     }
   });
   // world/server.mjs's timeouts: a slow client must not hold a connection open.

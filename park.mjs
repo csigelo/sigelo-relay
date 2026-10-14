@@ -44,6 +44,8 @@ const B58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
 
 export class ParkError extends Error { constructor(check, why) { super(`${check}: ${why}`); this.check = check; this.detail = why; } }
 const fail = (check, why) => { throw new ParkError(check, why); };
+// A brake's refusal, with the seconds until its window ends (auth.mjs retryAfter): the 429's Retry-After.
+const rated = (w, window, now, why) => { throw Object.assign(new ParkError('rate', why), { retryAfter: Math.max(1, Math.ceil((w + 1) * window - now)) }); };
 
 // Only on a string of base58 digits whose length is bounded (decoding is quadratic).
 function b58decode(s) {
@@ -89,14 +91,14 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
       rates.set(k, r);
     }
     if (++r.n > rule.n) {
-      fail('rate', kind === 'lookup'
+      rated(w, rule.window, now, kind === 'lookup'
         ? `more than ${rule.n} short-code lookups from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`
         : `more than ${rule.n} short codes parked from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`);
     }
     if (kind !== 'lookup') return;
     const wa = Math.floor(now / lookupsAll.window);
     if (all.window !== wa) { all.window = wa; all.n = 0; }
-    if (++all.n > lookupsAll.n) fail('rate', `more than ${lookupsAll.n} short-code lookups on this relay in ${lookupsAll.window / 60} minutes: wait, or use the long code (invite --long)`);
+    if (++all.n > lookupsAll.n) rated(wa, lookupsAll.window, now, `more than ${lookupsAll.n} short-code lookups on this relay in ${lookupsAll.window / 60} minutes: wait, or use the long code (invite --long)`);
   }
 
   function sweep(now = clock()) {

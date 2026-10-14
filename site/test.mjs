@@ -329,11 +329,11 @@ const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
   `Monero only: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Kraken has dropped XMR in parts of the EEA: should it stop quoting XMR/EUR, the invoice names
-// another public rate, and the terms do not have to change before the next sale.
-ok(priceLineM && src.terms.includes("in Monero, less the stated discount, at the XMR/EUR rate the invoice names (Kraken's while it quotes one), within 24 hours.")
-  && src.agents.includes('pay it in Monero within 24 hours'),
-'terms, agents: pro.md\'s discount, Kraken\'s XMR/EUR rate when invoiced or another public rate the invoice names, paid within 24 hours');
+// Monero only, quoted on request (the Owner, 2026-10-14: no euro invoice paid in Monero), as enterprise.md.
+ok(priceLineM && src.terms.includes('excluding VAT, less the stated discount; Monero only. [Contact us for a quote](/contact.html) and pay it within 24 hours.')
+  && src.agents.includes('pay in Monero only, within 24 hours') && src.pro.includes('[Contact us for a quote](/contact.html)') && src.enterprise.includes('Contact us for a quote.')
+  && !/invoiced in EUR|Ask us for an invoice|Ask for an invoice/.test(src.terms + src.pro + src.agents),
+'terms, agents, pro: pro.md\'s discount, Monero only, "Contact us for a quote" as on enterprise, paid within 24 hours; no euro invoice');
 // No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact'];
@@ -986,7 +986,7 @@ if (sigelo && operator && auth && db) {
   const steps = Object.fromEntries([...body.agents.matchAll(/^(\d)\. (.*)$/gm)].map((m) => [m[1], m[2]]));
   // The relay pools only attestations whose iss is the operator's current key (operator.mjs): after a
   // rotation every agent's attestation must be signed again, or the pool drops to free (A5 review).
-  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^Ask for an invoice on \[Contact\]\(\/contact\.md\), naming that DID; pay it in Monero within 24 hours; renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
+  ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^\[Contact us for a quote\]\(\/contact\.md\), naming that DID; pay in Monero only, within 24 hours; renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
     'pro: log in with the operator identity (step 2), and after each rotation again and sign the agents\' attestations anew (step 5), before paying (3, renewal the same) and uploading (4)');
   ok(/prints the operator DID \(later: the first of its `chain`\)/.test(body.agents), 'agents step 1: a licence names the operator\'s original DID, the first of its chain');
   ok(src.agents.includes('The relay takes a licence only for an operator it has seen log in (step 2).'), 'agents: log in with the operator identity before paying (step 2 before 3)');
@@ -1081,7 +1081,7 @@ ok(src.terms.includes('never receives or holds a seed, private key or other mean
   && src.terms.includes('nothing renews or charges by itself') && src.terms.includes('Software and service are provided as is.')
   && src.terms.includes('Liability is limited to what the Buyer paid in the 12 months before the claim; none for lost messages, keys, funds or profits.')
   && src.terms.includes('The Seller may refuse a DID used for them and end its licence without refund; messages already delivered are not erased.')
-  && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('excluding VAT; paid in Monero, less the stated discount,'),
+  && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('excluding VAT, less the stated discount; Monero only.'),
   'terms: paid in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
 // The nightly backup (deploy/backup.sh: licences and licensed operators' rows, 7 archives kept) is a
 // copy the table names; an identity without a recovery key is erased by disuse only (A5 review).

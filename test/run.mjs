@@ -491,6 +491,9 @@ let a, b;
   const ask = (ip) => fetch(`${base(slow)}/challenge?did=${encodeURIComponent(carol.did)}`, { headers: realIp(ip) }).then((x) => x.status);
   const asked = [await ask('2001:db8:9::1'), await ask('2001:db8:9::2'), await ask('2001:db8:9:ffff::3'), await ask('2001:db8:a::1')];
   ok(asked.join() === '200,200,429,200', `GET /challenge: two a minute per /48 by X-Real-IP, the third 429, another /48 unaffected (${asked.join()})`);
+  const asked429 = await fetch(`${base(slow)}/challenge?did=${encodeURIComponent(carol.did)}`, { headers: realIp('2001:db8:9::4') });
+  ok(asked429.status === 429 && asked429.headers.get('retry-after') === String(60 - (now % 60)), `GET /challenge 429: Retry-After = the seconds left in the minute (${asked429.headers.get('retry-after')}, want ${60 - (now % 60)})`);
+  await asked429.body?.cancel();
   const freshCheck = async (challengeIp, ip) => {
     const { challenge } = await getChallenge(carol.did, slow, challengeIp);
     return (await postCheck({ username: carol.did, client_id: clientId(carol), password: password(carol, challenge) }, slow, ip)).json;
@@ -1426,9 +1429,9 @@ function walStates(r, name, tag = name) {
   const park = async (id, fields, ip = `10.${Math.floor(++net / 256)}.${net % 256}.7`) => {
     const { challenge } = await getChallenge(id.did, pr, ip);
     const res = await fetch(`${base(pr)}/park`, { method: 'POST', headers: realIp(ip), body: JSON.stringify({ username: id.did, client_id: clientId(id), password: password(id, challenge), ...fields }) });
-    return { status: res.status, json: await res.json() };
+    return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') };
   };
-  const fetchPark = async (h, ip = '203.0.113.9') => { const res = await fetch(`${base(pr)}/park/${h}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json() }; };
+  const fetchPark = async (h, ip = '203.0.113.9') => { const res = await fetch(`${base(pr)}/park/${h}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') }; };
   const inv = longCode(alice), h = hashOf('K7F3Q9ZP');
   let r = await park(alice, { code_hash: h, invite: inv, exp: now + 600 });
   ok(r.status === 200 && r.json.ok === true && r.json.exp === now + 600 && pr.park.size() === 1, `POST /park: alice parks her long code under a short code's hash (${JSON.stringify(r.json)})`);
@@ -1475,7 +1478,9 @@ function walStates(r, name, tag = name) {
   ok(pr.park.size() === 3 && after.json.ok === true, 'the sweep purges an expired code; then the fourth parks');
   // Brakes per /24: 20 lookups per 10 minutes, a hit or a miss; 10 parks an hour, before the login.
   const looks = [];
-  for (let i = 0; i < 21; i++) looks.push((await fetchPark(hashOf('66666666'), '192.0.2.50')).status);
+  let look21;
+  for (let i = 0; i < 21; i++) { look21 = await fetchPark(hashOf('66666666'), '192.0.2.50'); looks.push(look21.status); }
+  ok(look21.status === 429 && look21.after === String(600 - (now % 600)), `GET /park 429: Retry-After = the seconds left in the 10 minutes (${look21.after}, want ${600 - (now % 600)})`);
   const other = await fetchPark(hashOf('66666666'), '192.0.2.51'), elsewhere = await fetchPark(hashOf('66666666'), '198.18.0.1');
   ok(looks.slice(0, 20).every((s) => s === 404) && looks[20] === 429 && other.status === 429 && elsewhere.status === 404, 'lookups: 20 per 10 minutes per /24, the 21st rate (429), the same /24 too, another network not');
   now += 600;
@@ -1483,6 +1488,7 @@ function walStates(r, name, tag = name) {
   const parks = [];
   for (let i = 0; i < 11; i++) parks.push((await fetch(`${base(pr)}/park`, { method: 'POST', headers: realIp('192.0.2.77'), body: '{}' })).status);
   const parkRate = await park(alice, { code_hash: hashOf('77777777'), invite: longCode(alice), exp: now + 600 }, '192.0.2.78');
+  ok(parkRate.after === String(3600 - (now % 3600)), `POST /park 429: Retry-After = the seconds left in the hour (${parkRate.after}, want ${3600 - (now % 3600)})`);
   ok(parks.slice(0, 10).every((s) => s === 400) && parks[10] === 429 && parkRate.status === 429 && parkRate.json.check === 'rate', `parks: 10 an hour per /24, counted before the body and the login: the 11th rate (429) (${parks.join()}; ${parkRate.status} ${JSON.stringify(parkRate.json)})`);
   // Nothing of a code in the log or on disk: the hashes, the long codes, the short codes.
   const said = lines.slice(from).join('\n');
@@ -1501,11 +1507,12 @@ function walStates(r, name, tag = name) {
   await pr3.close();
   // The relay-wide brake: LOOKUPS_ALL across every network (here 3), the same 429 rate as a network's own.
   const pr4 = await startRelay({ ...cfg, db: join(dir, 'park-all.db'), park: { lookupsAll: { n: 3, window: 600 } } });
-  const look4 = async (ip) => { const res = await fetch(`${base(pr4)}/park/${hashOf('99999999')}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json() }; };
+  const look4 = async (ip) => { const res = await fetch(`${base(pr4)}/park/${hashOf('99999999')}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') }; };
   const spread = [];
   for (let i = 0; i < 4; i++) spread.push(await look4(`100.64.${i}.1`));
   ok(spread.slice(0, 3).every((x) => x.status === 404 && x.json.check === 'park_unknown') && spread[3].status === 429 && spread[3].json.check === 'rate' && /on this relay/.test(spread[3].json.detail),
     `lookups: at most LOOKUPS_ALL per 10 minutes across all networks, the next rate (429) from a network of its own (${spread.map((x) => x.status).join()}; ${spread[3].json.detail})`);
+  ok(spread[3].after === String(600 - (now % 600)) && spread.slice(0, 3).every((x) => x.after === null), `the relay-wide 429: Retry-After the seconds left in its 10 minutes, none on a 404 (${spread[3].after})`);
   now += 600;
   ok((await look4('100.64.9.1')).status === 404, 'lookups: the relay-wide count starts afresh the next 10 minutes');
   now -= 600;
