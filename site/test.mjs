@@ -283,8 +283,8 @@ if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8'))
 // ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; "For people" added 2026-10-15) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
-const FOOT_LINKS = [['Uses', 'uses'], ['For people', 'you'], ['Connect', 'connect'], ['Pro', 'pro'], ['Enterprise', 'enterprise'], ['Contact', 'contact'], ['Privacy', 'privacy'], ['Terms', 'terms']];
-const HEAD_N = 6; // the header: the first six; Privacy and Terms are footer-only
+const FOOT_LINKS = [['What it is', 'uses'], ['For people', 'you'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
+const HEAD_N = 5; // the header: the first five; Enterprise, Privacy and Terms are footer-only
 for (const p of PAGES) {
   const foot = html[p.slug].match(/<footer>([\s\S]*?)<\/footer>/)?.[1] ?? '', head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
   const mdFoot = twin[p.slug].slice(twin[p.slug].lastIndexOf('\n---\n') + 5).trim();
