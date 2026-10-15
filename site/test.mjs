@@ -430,7 +430,7 @@ const robots = read('robots.txt'), robotLines = robots.split('\n').filter((l) =>
 ok(robotLines.every((l) => /^(?:User-agent|Allow|Disallow|Sitemap): \S/.test(l)) && !/^Disallow:/m.test(robots) && /^Allow: \/$/m.test(robots)
   && ['GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User', 'PerplexityBot', 'Google-Extended', 'CCBot', '*'].every((b) => robots.includes(`User-agent: ${b}\n`))
   && robots.includes(`\nSitemap: ${ORIGIN}/sitemap.xml\n`), 'robots.txt: known fields only, the AI crawlers named, disallows nothing, names the sitemap');
-ok(read('relay-robots.txt') === 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\n', `relay-robots.txt (${HOST}/robots.txt): the relay's HTTP calls are not content`);
+ok(read('relay-robots.txt') === 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\nDisallow: /gift\n', `relay-robots.txt (${HOST}/robots.txt): the relay's HTTP calls are not content`);
 const sec = read('.well-known/security.txt'), expires = Date.parse(sec.match(/^Expires: (.+)$/m)?.[1] ?? '');
 ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now() && sec.includes(`\nCanonical: ${ORIGIN}/.well-known/security.txt\n`),
   'security.txt: Contact first, Expires in the future, its Canonical');
@@ -551,10 +551,10 @@ if (conf) {
   const locs = (s) => Object.fromEntries((s?.blocks ?? []).map((b) => [b.head, everyDirective(b)]));
   ok(servers.every((s) => s.blocks.every((b) => !everyDirective(b).some((d) => d.startsWith('add_header ')))), 'nginx: no add_header in a location (it would drop every inherited header)');
   const rl = locs(relay);
-  ok(['location = /challenge', 'location = /check', 'location = /park', 'location ^~ /park/', 'location = /licence'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
+  ok(['location = /challenge', 'location = /check', 'location = /park', 'location ^~ /park/', 'location = /licence', 'location = /gift'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
     && rl['location = /relay.json'] && rl['location = /llms.txt'] && rl['location = /robots.txt']?.includes('try_files /relay-robots.txt =404')
     && rl['location /']?.includes('return 301 https://sigelo.ai$request_uri') && rl['location = /']?.includes('try_files /index.html =404'),
-  'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
+  'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence, /gift to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
   // A browser's request to a relay call is refused before the relay charges it: the relay counts
   // logins and challenges per network before it reads a body, so any web page could otherwise spend
   // that budget from its visitors' browsers and lock every agent on their /24 or /48 out (A5 review).
@@ -564,8 +564,8 @@ if (conf) {
     .filter((b) => !b.blocks.some((x) => x.head === 'if ($sigelo_browser)' && x.directives.join() === 'return 403')).map((b) => b.head);
   const proxied = servers.flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))));
   const browserMap = conf.blocks.find((b) => b.head === 'map $http_sec_fetch_site$http_origin $sigelo_browser')?.directives ?? [];
-  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 6 && browserGaps(conf).length === 0,
-    `nginx: /challenge, /check, /park, /park/<hash> and /licence answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 7 && browserGaps(conf).length === 0,
+    `nginx: /challenge, /check, /park, /park/<hash>, /licence and /gift answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
   // GET /park/<hash>: its path is a short invite code's hash (relay/park.mjs), 40 bits a log reader
   // could search through while the code is good, so it is never logged.
   ok(rl['location ^~ /park/']?.includes('access_log off') && !rl['location = /park']?.some((d) => d.startsWith('access_log')), 'nginx: GET /park/<hash> is not logged (the path is a short code\'s hash); POST /park logs as /park');
@@ -1108,7 +1108,8 @@ ok(src.terms.includes('never receives or holds a seed, private key or other mean
 // copy the table names; an identity without a recovery key is erased by disuse only (A5 review).
 const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
 ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encrypted | 7 days more |") && /\| tail -n \+8 \| xargs -r rm -f/.test(backupSh)
-  && /^TABLES="licences operator_retired vendor_chain accounts chain_dids"$/m.test(backupSh),
+  // gifts and gift_campaigns: code hashes and counts, nothing of an identity (relay/gifts.mjs).
+  && /^TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"$/m.test(backupSh),
   'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
 ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key** (any site can obtain identity-key signatures), where the identity file and `recovery.key` are:'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
 // Where the servers are, as the Owner confirmed it (runbook §0): stated once, in the seller line.

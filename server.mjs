@@ -11,8 +11,9 @@
 //                       all interfaces; SIGHUP re-reads both files (certbot's deploy hook)
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
 //     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park and GET /park/<hash> (short
-//                       invite codes: park.mjs), POST /licence and GET /stats (counts only:
-//                       stats.mjs) on 127.0.0.1 for nginx (default 8791)
+//                       invite codes: park.mjs), POST /licence, POST /gift (gift codes:
+//                       gifts.mjs) and GET /stats (counts only: stats.mjs) on 127.0.0.1 for
+//                       nginx (default 8791)
 //     RELAY_LOGIN_RATE  CONNECTs and POST /check together, per minute per /24 (IPv4) or /48 (IPv6)
 //                       (default 30); GET /challenge separately at the same number. HTTP calls
 //                       are counted by nginx's X-Real-IP

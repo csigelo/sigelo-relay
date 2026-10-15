@@ -15,7 +15,9 @@
 # The relay keeps everything in one SQLite file, mailboxes included, so that file is never copied.
 # The extract holds what a paid licence needs: the tables licences, operator_retired and
 # vendor_chain whole, and each licensed operator's rows of accounts and chain_dids (its chain,
-# sealed as the relay keeps it, so a recovery from a stolen key stays in force after a restore).
+# sealed as the relay keeps it, so a recovery from a stolen key stays in force after a restore);
+# and the gift codes whole (gifts, gift_campaigns: hashes and counts, gifts.mjs), so a code used
+# before a restore stays used when its batch is loaded again.
 # Messages, claims, counters, proofs and pool rows are left out: agents pool again at their next
 # login with their operator attestation, and plan §6 lets counters be lost. The extract is read in
 # one transaction, so its tables agree with each other.
@@ -33,7 +35,7 @@ set -eu
 DB=${RELAY_DB:-/var/lib/sigelo-relay/relay.db}
 ADMIN=${ADMIN:-csigelo}
 RECIPIENT_FILE=/etc/sigelo-relay-backup.recipient
-TABLES="licences operator_retired vendor_chain accounts chain_dids"
+TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"
 
 die() { echo "backup.sh: $*" >&2; exit 1; }
 # setpriv, not su or runuser: no PAM session inside the backup's systemd unit
@@ -73,7 +75,7 @@ const copy = (table, where = '') => {
 };
 db.exec('BEGIN');   // one snapshot for every table
 x.exec('BEGIN');
-const n = [copy('licences'), copy('operator_retired'), copy('vendor_chain'), copy('accounts', OPERATORS), copy('chain_dids', OPERATORS)];
+const n = [copy('licences'), copy('operator_retired'), copy('vendor_chain'), copy('accounts', OPERATORS), copy('chain_dids', OPERATORS), copy('gifts'), copy('gift_campaigns')];
 x.exec('COMMIT');
 db.exec('COMMIT');
 console.log(`extract: ${n.join(', ')}`);
@@ -111,7 +113,7 @@ JS
 
 # --self-test: a database made by the relay's own code (openDb, relayPolicy: every table it has),
 # one licensed operator and one free agent with a claimed mailbox, a queued message, pool, proof and
-# daily rows; then extract() as the timer runs it. The extract must hold exactly the five tables,
+# daily rows; then extract() as the timer runs it. The extract must hold exactly the seven tables,
 # only the operator's rows of accounts and chain_dids, and no byte of the agent's: not its
 # account, its sealed chain, its topic or its message.
 self_test() {
@@ -144,6 +146,8 @@ run('INSERT INTO pool_members VALUES (?, ?, ?, ?)', agent, op, op, day + 86400);
 run('INSERT INTO pow_proofs VALUES (?, ?)', agent, day);
 run('INSERT INTO vouched VALUES (?, ?)', agent, day + 86400);
 run('INSERT INTO pool_sent VALUES (?, ?, 3)', op, 20454);
+run('INSERT INTO gifts (code_hash, campaign, months, expires, redeemed) VALUES (?, ?, 6, ?, 1)', hashHex('a gift code'), 'launch', day + 86400 * 30);
+run('INSERT INTO gift_campaigns VALUES (?, 1, 1)', 'launch');
 db.close();
 process.exit(0);
 JS
@@ -165,17 +169,17 @@ import { createHash } from 'node:crypto';
 const file = process.argv[2], x = new DatabaseSync(file, { readOnly: true }), bad = [];
 const h = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const tables = x.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((t) => t.name).join(' ');
-if (tables !== 'accounts chain_dids licences operator_retired vendor_chain') bad.push(`tables: ${tables}`);
+if (tables !== 'accounts chain_dids gift_campaigns gifts licences operator_retired vendor_chain') bad.push(`tables: ${tables}`);
 const rows = (sql) => x.prepare(sql).all().map((o) => Object.values(o).join('|')).join(',');
 if (rows('SELECT account FROM accounts') !== h('operator')) bad.push('accounts: not the operator\'s row alone');
 if (rows('SELECT did, account FROM chain_dids') !== `${h('operator did')}|${h('operator')}`) bad.push('chain_dids: not the operator\'s row alone');
-for (const t of ['licences', 'operator_retired', 'vendor_chain']) if (x.prepare(`SELECT count(*) AS n FROM ${t}`).get().n !== 1) bad.push(`${t}: not its one row`);
+for (const t of ['licences', 'operator_retired', 'vendor_chain', 'gifts', 'gift_campaigns']) if (x.prepare(`SELECT count(*) AS n FROM ${t}`).get().n !== 1) bad.push(`${t}: not its one row`);
 x.close();
 const bytes = readFileSync(file);
 for (const s of [h('agent'), h('agent did'), 'AGENT-CHAIN-SEALED', 'ab'.repeat(16), 'MAILBOX-PAYLOAD-BYTES']) if (bytes.includes(s)) bad.push(`the extract holds the agent's ${s.slice(0, 24)}`);
 if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
 JS
-  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the five tables, the licensed operator's rows only, nothing of a mailbox ($(cat "$t/out"))"
+  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the seven tables, the licensed operator's rows only, nothing of a mailbox ($(cat "$t/out"))"
 }
 
 case ${1:-} in

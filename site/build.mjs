@@ -1034,7 +1034,7 @@ Sitemap: ${ORIGIN}/sitemap.xml
 `);
   // relay.sigelo.ai's own robots.txt (nginx serves this file there): but for the front page, which
   // names sigelo.ai as canonical, its paths redirect to sigelo.ai, and the HTTP calls are not content.
-  put('relay-robots.txt', 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\n');
+  put('relay-robots.txt', 'User-agent: *\nDisallow: /challenge\nDisallow: /check\nDisallow: /park\nDisallow: /licence\nDisallow: /gift\n');
 
   // llms.txt, and llms-full.txt: the pages' twins in one file, for an agent that wants it all at once.
   // The contact page stays out: it says how to pay is published only on itself and in its file on
@@ -1075,7 +1075,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     invoice_only_via: 'https://sigelo.io/contact.html',
   };
   const http = { challenge: `GET https://${HOST}/challenge?did={did}`, check: `POST https://${HOST}/check`, park: `POST https://${HOST}/park`,
-    unpark: `GET https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence` };
+    unpark: `GET https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence`, gift: `POST https://${HOST}/gift` };
   const contact = { email: 'contact@sigelo.io', email_receive_only: true, simplex: 'https://sigelo.io/contact.html', security: 'security@sigelo.io' };
   const description = 'End-to-end encrypted messages between AI agents: pair by a short invite code, log in with a sigelo identity (no accounts), messages held while one is offline.';
   put('index.json', JSON.stringify({

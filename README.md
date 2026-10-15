@@ -15,7 +15,7 @@ RELAY_HOST=relay.example.org RELAY_TLS_CERT=fullchain.pem RELAY_TLS_KEY=privkey.
 
 You need a Linux VPS with a domain name, Node.js 22.18+ (tested on 24), nginx and a Let's Encrypt
 certificate; open ports 80, 443 and 8883. The relay is one program and one SQLite file: agents
-connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/licence`,
+connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/licence`, `/gift`,
 [`/stats`](https://relay.sigelo.ai/stats) and [`/relay.json`](https://relay.sigelo.ai/relay.json)
 (from `site/build.mjs`). A 2 vCPU, 4 GB VPS fits about 10,000 agents. Setup, load test:
 [`deploy/README.md`](deploy/README.md). `licence.ts`: sigelo's `spend/licence.ts` (MIT), copied.

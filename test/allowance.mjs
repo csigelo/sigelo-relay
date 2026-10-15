@@ -25,10 +25,12 @@
 // batches; a CONNECT restoring at most RESTORE_MAX claims.
 // design/relay-plan.md §1, §3, §5, §7 M4, §11. Prints "ALL PASS (n)".
 //   node relay/test/allowance.mjs
-import { mkdtempSync, readFileSync, rmSync, statfsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statfsSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { createHash, randomBytes } from 'node:crypto';
 import { connect as netConnect } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
@@ -40,6 +42,7 @@ import { RESTORE_MAX } from '../mailbox.mjs';
 import { OPERATOR_CTX } from '../auth.mjs';
 import { KB, MB, MESSAGE_FLOOR, MESSAGE_ROW, TIERS as DEFAULT_TIERS, chargeOf, freeQueueOf, relayPolicy, relayPolicyFromEnv, windowWeeks } from '../allowance.mjs';
 import { checkRelayLicence, LICENCE_CTX, LICENCE_KEEP, RELAY_ROTATIONS_MAX, operators } from '../operator.mjs';
+import { UNKNOWN as GIFT_UNKNOWN, addMonths, giftBrake } from '../gifts.mjs';
 import { CLOSED_BITS, DAY as POW_DAY, NETWORK_DAY, NETWORK_STEPS, leadingZeroBits, powCheck, powDigest, solve } from '../pow.mjs';
 import { CREATED, bundleOf, clientId, identity, password, rotated, seed } from './fixtures.mjs';
 
@@ -1732,6 +1735,156 @@ const fresh = (name, extra = {}) => {
     `${ACCOUNTS} idle accounts: at most ${Math.max(...s2.map((x) => x.gone))} rows a sweep (${s2.map((x) => x.accounts).join(', ')}); the account holding claims stays`);
   hc?.end(true);
   await R.close();
+}
+
+// ================================================================ gift codes (gifts.mjs, POST /gift, operator.mjs gift)
+// A relay of its own, with its own clock, so months can pass and it can restart. Codes are made
+// here as commercial/gift-codes.mjs makes them, and hashed as contact/short.mjs giftHash does,
+// spelled out (relay/ is published without contact/): SHA-256("sigelo-gift/0" ‖ 8 characters).
+{
+  const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const code = () => [...randomBytes(8)].map((b) => ALPHA[b & 31]).join('');
+  const hashOf = (c) => createHash('sha256').update(`sigelo-gift/0${c}`).digest('hex');
+  let gnow = Math.floor(Date.now() / 1000);
+  const glines = [];
+  let gpol;
+  const gcfg = { ...cfg, db: join(dir, 'gift.db'), clock: () => gnow, log: (l) => glines.push(l), policy: (ctx) => (gpol = relayPolicy(ctx, config)) };
+  let G = await startRelay(gcfg);
+  const gtier = (id) => gpol.tierOf(accountOf(id.original), gnow);
+  const day = (t) => Math.floor(t / DAY) * DAY, ceilDay = (t) => (t % DAY === 0 ? t : day(t) + DAY);
+  // POST /gift as `id`, after a login to G that stored it (pow), unless opts.fresh.
+  async function redeem(id, hash, opts = {}) {
+    const { challenge, pow_bits } = await getChallenge(id.did, G, opts.ip);
+    const pow = opts.pow ? { pow: solve(HOST, id.original, challenge.nonce, pow_bits) } : {};
+    const pw = password(id, challenge, { bundle: opts.bundle ?? true, extra: pow });
+    const res = await fetch(`${base(G)}/gift`, { method: 'POST', headers: opts.ip ? { 'x-real-ip': opts.ip } : {}, body: JSON.stringify({ username: id.did, client_id: clientId(id), password: pw, code_hash: hash }) });
+    return { status: res.status, after: res.headers.get('retry-after'), json: await res.json() };
+  }
+  const enter = async (id, opts = {}) => { const l = await login(id, opts, G); ok(l.client?.connected, `gift relay: ${id.label} logs in`); await end(l.client); };
+  // The loader, as the runbook runs it: node gifts.mjs load <file>, beside the running relay.
+  const loadFile = (lines) => {
+    const f = join(dir, `gifts-${randomBytes(4).toString('hex')}.jsonl`);
+    writeFileSync(f, lines.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n') + '\n');
+    return spawnSync(process.execPath, [fileURLToPath(new URL('../gifts.mjs', import.meta.url)), 'load', f], { env: { ...process.env, RELAY_DB: gcfg.db }, encoding: 'utf8' });
+  };
+  const exp1 = day(gnow) + 90 * DAY;
+  const codes = Array.from({ length: 12 }, code), soon = code();
+  const rec = (c, months, campaign = 'launch-26', expires = exp1) => ({ code_hash: hashOf(c), months, expires, campaign });
+  const batch = [rec(codes[0], 6), rec(codes[1], 1), rec(codes[2], 12), ...codes.slice(3, 8).map((c) => rec(c, 12)), ...codes.slice(8).map((c) => rec(c, 1)), rec(soon, 1, 'short-test', day(gnow) + DAY)];
+  const l1 = loadFile(batch);
+  ok(l1.status === 0 && /^gifts: 13 codes loaded, 0 here already/.test(l1.stdout), `gifts.mjs load: 13 codes into the running relay's database (${l1.stdout.trim()}${l1.stderr.trim()})`);
+  const l2 = loadFile(batch);
+  ok(l2.status === 0 && /^gifts: 0 codes loaded, 13 here already/.test(l2.stdout), 'the same file again: nothing loaded twice');
+  const bad = [
+    ['a malformed line', [rec(code(), 6), '{"code_hash": "x"}'], 'line 2: want exactly'],
+    ['months 3', [{ ...rec(code(), 6), months: 3 }], 'months: 1, 6, 12'],
+    ['an expiry already past', [rec(code(), 6, 'x', day(gnow))], 'expired already'],
+    ['a campaign label with spaces', [rec(code(), 6, 'Black Friday')], 'campaign:'],
+    ['a code twice', [rec(codes[0], 6), rec(codes[0], 6)], 'the same code_hash twice'],
+  ];
+  for (const [what, lines, why] of bad) {
+    const r = loadFile(lines);
+    ok(r.status === 1 && r.stderr.includes(why), `gifts.mjs load refuses a file with ${what}, naming it (${r.stderr.trim()})`);
+  }
+  ok(G.db.raw.prepare('SELECT count(*) AS n FROM gifts').get().n === 13, 'a refused file loads nothing: 13 codes held');
+
+  const gop = identity('gift operator'), gag = identity('gift agent'), gnew = identity('gift newcomer');
+  const OPA = accountOf(gop.original);
+  await enter(gop);
+  const r6 = await redeem(gop, hashOf(codes[0]));
+  const want6 = ceilDay(addMonths(gnow, 6));
+  ok(r6.status === 200 && r6.json.ok === true && r6.json.exp === want6 && r6.json.months === 6, `POST /gift by a logged-in identity: Pro for 6 months, to ${isoOf(want6)}, the start of a UTC day (${JSON.stringify(r6.json)})`);
+  const t6 = gtier(gop);
+  ok(t6.pool === OPA && t6.limits.msgsDay === TIERS.pro.msgsDay && t6.limits.retentionDays === TIERS.pro.retentionDays && t6.limits.storage === TIERS.pro.storage && t6.limits.support === 'email',
+    'its pool is Pro with the relay\'s Pro tier (no licence: no claims of its own)');
+  const row = G.db.raw.prepare('SELECT vendor_key, iat, exp, gift_exp FROM licences WHERE operator = ?').get(OPA);
+  ok(row?.vendor_key === '' && row.iat === 0 && row.exp === 0 && row.gift_exp === want6, 'kept on the licences row of its account: no licence (vendor_key empty), gift_exp');
+  // Unknown, used, malformed and expired: one answer.
+  const again = await redeem(gop, hashOf(codes[0])), unknown = await redeem(gop, hashOf(code())), junk = await redeem(gop, 'zz');
+  ok([again, unknown, junk].every((x) => x.status === 200 && JSON.stringify(x.json) === JSON.stringify(GIFT_UNKNOWN)) && GIFT_UNKNOWN.check === 'gift',
+    `a code used already, an unknown one and a malformed hash: the same refusal, "gift" (${GIFT_UNKNOWN.detail})`);
+  ok(G.db.raw.prepare('SELECT gift_exp FROM licences WHERE operator = ?').get(OPA).gift_exp === want6, 'one use: the second try granted nothing');
+  // An agent the gifted operator vouches for pools; it cannot redeem itself.
+  const lag = await login(gag, { bundle: withVouch(gag, gop, vouch(gop, gag, { iat: gnow - 60 })) }, G);
+  ok(lag.client?.connected && gtier(gag).pool === OPA, 'an agent carrying the gifted operator\'s attestation pools under it, as under a licensed one');
+  await end(lag.client);
+  const rm = await redeem(gag, hashOf(codes[1]), { bundle: withVouch(gag, gop, vouch(gop, gag, { iat: gnow - 60 })) });
+  ok(rm.json.ok === false && rm.json.check === 'gift_member', `an identity in an operator's pool: refused "gift_member", the code untouched (${rm.json.detail})`);
+  const rp = await redeem(gnew, hashOf(codes[1]));
+  ok(rp.json.ok === false && rp.json.check === 'pow', `an identity that has never proven work here: refused "pow" (${rp.json.detail})`);
+  const rb = await redeem(gop, hashOf(codes[1]), { bundle: false });
+  // Extends: from the end of the running term.
+  const want7 = ceilDay(addMonths(want6, 1));
+  ok(rb.json.ok === true && rb.json.exp === want7, `the operator redeems the 1-month code the agent could not: Pro runs on from ${isoOf(want6)} to ${isoOf(want7)}`);
+  // Coexistence with a licence: a gift redeemed under a running licence runs on from its exp; past
+  // the licence the gift holds with the Pro tier; a licence uploaded later leaves gift_exp alone.
+  const glo = identity('gift licensed operator'), GLO = accountOf(glo.original);
+  await enter(glo);
+  const lic = licence(glo, { iat: gnow - 60, exp: gnow + 30 * DAY });
+  const up = await upload(lic, G);
+  ok(up.ok === true, 'a licensed operator (30 days, the licence\'s claims: 5 messages a day, 20 days)');
+  const r12 = await redeem(glo, hashOf(codes[2]));
+  const want12 = ceilDay(addMonths(gnow + 30 * DAY, 12));
+  ok(r12.json.ok === true && r12.json.exp === want12, `…redeems 12 months: they run from the licence's expiry, to ${isoOf(want12)} (gift and licence add)`);
+  ok(gtier(glo).limits.msgsDay === relayClaims.msgs_day && gtier(glo).limits.retentionDays === relayClaims.retention_days, 'while the licence holds, its claims apply');
+  // Restart: the grant is in the database.
+  await G.close();
+  G = await startRelay(gcfg);
+  ok(gtier(gop).pool === OPA && gtier(glo).pool === GLO, 'after a restart both pools are still Pro (the grant is a row, not memory)');
+  gnow += 31 * DAY;
+  const tg = gtier(glo);
+  ok(tg.pool === GLO && tg.limits.msgsDay === TIERS.pro.msgsDay && tg.limits.retentionDays === TIERS.pro.retentionDays, 'past the licence\'s expiry the gift holds: Pro, with the relay\'s Pro tier');
+  const renew = await upload(licence(glo, { iat: gnow - 60, exp: gnow + 60 * DAY }), G);
+  const after = G.db.raw.prepare('SELECT exp, gift_exp FROM licences WHERE operator = ?').get(GLO);
+  ok(renew.ok === true && after.gift_exp === want12 && after.exp === gnow + 60 * DAY && gtier(glo).limits.msgsDay === relayClaims.msgs_day,
+    'a licence uploaded later replaces the licence and keeps gift_exp; its claims apply again while it holds');
+  // A code past its date: the same refusal; the sweep deletes it; the counts stay.
+  const late = await redeem(gop, hashOf(soon));
+  ok(JSON.stringify(late.json) === JSON.stringify(GIFT_UNKNOWN), 'a code past its expiry: the same "gift" refusal as an unknown one');
+  // 30 days without a login (and more): the sweep keeps the gifted operator's account and chain,
+  // as it keeps a licensed one's, and drops the expired code.
+  for (let i = 0; i < 3; i++) { G.sweep(gnow); gnow += 2 * 3600; }
+  ok(G.db.account(OPA) !== undefined && G.db.raw.prepare('SELECT count(*) AS n FROM gifts WHERE campaign = ?').get('short-test').n === 0,
+    '31 days without a login: the gifted operator\'s account is kept (the licences row), the expired code\'s row is swept');
+  // The term cap: Pro reaches at most 3 × 366 days ahead; the code is then not used.
+  const gcap = identity('gift collector'), CAP = accountOf(gcap.original);
+  await enter(gcap);
+  const caps = [];
+  for (const c of codes.slice(3, 7)) caps.push((await redeem(gcap, hashOf(c))).json);
+  ok(caps.slice(0, 3).every((x) => x.ok) && caps[3].ok === false && caps[3].check === 'gift_term' && G.db.raw.prepare('SELECT redeemed FROM gifts WHERE code_hash = ?').get(hashOf(codes[6])).redeemed === 0,
+    `three 12-month codes stack; a fourth would pass 3 × 366 days: "gift_term", the code not used (${caps[3].detail})`);
+  const other = await redeem(gop, hashOf(codes[6]));
+  ok(other.json.ok === true, '…and another operator can still redeem it');
+  // The brake: per network, before the login is checked; Retry-After.
+  const tries = [];
+  for (let i = 0; i < 11; i++) tries.push(await redeem(gop, hashOf(code()), { ip: '203.0.113.9' }));
+  ok(tries.slice(0, 10).every((x) => x.json.check === 'gift') && tries[10].status === 429 && tries[10].json.check === 'rate' && Number(tries[10].after) > 0,
+    `10 tries an hour from one network, then 429 "rate" with Retry-After (${tries[10].json.detail})`);
+  ok((await redeem(gop, hashOf(codes[7]), { ip: '203.0.113.9' })).status === 429 && (await redeem(gop, hashOf(code()), { ip: '198.51.100.9' })).json.check === 'gift',
+    'a good code from that network is refused too until the hour ends; another network is not touched');
+  const brake = giftBrake({ tries: { n: 100, window: 3600 }, triesAll: { n: 3, window: 3600 } });
+  const allRefused = (() => { for (let i = 0; i < 3; i++) brake(`net ${i}`, gnow); try { brake('net 9', gnow); return null; } catch (e) { return e; } })();
+  ok(allRefused?.check === 'rate' && /on this relay/.test(allRefused.detail), 'the brake across all networks refuses past its count, whatever the network');
+  // GET /stats: totals only, no campaign label; per campaign on the relay host (node gifts.mjs counts).
+  const st = await (await fetch(`${base(G)}/stats`)).json();
+  ok(JSON.stringify(st.gifts) === '{"issued":13,"redeemed":7}' && !JSON.stringify(st).includes('launch-26') && !JSON.stringify(st).includes('short-test'),
+    `GET /stats: gifts as totals, issued and redeemed, no campaign label (${JSON.stringify(st.gifts)})`);
+  const gc = spawnSync(process.execPath, [fileURLToPath(new URL('../gifts.mjs', import.meta.url)), 'counts'], { env: { ...process.env, RELAY_DB: gcfg.db }, encoding: 'utf8' });
+  ok(gc.status === 0 && gc.stdout.trim() === JSON.stringify({ 'launch-26': { issued: 12, redeemed: 7 }, 'short-test': { issued: 1, redeemed: 0 } }),
+    `node gifts.mjs counts beside the running relay: per campaign, issued and redeemed (${gc.stdout.trim()}${gc.stderr.trim()})`);
+  // Nothing of a code, its hash or a DID in a log line or the database's rows other than the hash.
+  const ids = [gop, gag, glo, gcap].flatMap((x) => [x.did, x.original, accountOf(x.original)]);
+  const secrets = [...codes, soon, ...codes.map(hashOf)];
+  ok(glines.every((l) => !secrets.some((x) => l.includes(x)) && !ids.some((x) => l.includes(x))), `the gift relay's ${glines.length} log lines name no code, no code hash, no DID`);
+  const dump = readFileSync(gcfg.db).toString('latin1') + (existsSync(`${gcfg.db}-wal`) ? readFileSync(`${gcfg.db}-wal`).toString('latin1') : '');
+  ok(![...codes, soon].some((c) => dump.includes(c)), 'the database holds no code, only hashes');
+  const cols = G.db.raw.prepare("SELECT group_concat(name) AS c FROM pragma_table_info('gifts')").get().c;
+  ok(cols === 'code_hash,campaign,months,expires,redeemed', `a gifts row holds no time of use and no account (${cols})`);
+  // Past the last term and LICENCE_KEEP, the row goes as a licence's does.
+  gnow = G.db.raw.prepare('SELECT gift_exp FROM licences WHERE operator = ?').get(OPA).gift_exp + LICENCE_KEEP + DAY;
+  for (let i = 0; i < 2; i++) { G.sweep(gnow); gnow += 2 * 3600; }
+  ok(G.db.raw.prepare('SELECT count(*) AS n FROM licences WHERE operator = ?').get(OPA).n === 0, 'LICENCE_KEEP after its gift months end, the gifted operator\'s row goes, as a lapsed licence\'s');
+  await G.close();
 }
 
 // ================================================================ what the docs state, against the code

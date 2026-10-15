@@ -13,6 +13,8 @@
 //   POST /park, GET /park/<hash>   short invite codes (park.mjs), when a parking is given
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
+//   POST /gift    {username, client_id, password, code_hash}: a gift code redeemed by the operator
+//                 identity → {ok: true, exp, months} | {ok: false, check, detail} (policy.gift: gifts.mjs)
 //
 // MQTT 3.1.1 can only say "bad user name or password", so the outcome of every CONNECT is kept for
 // 5 minutes under a hash of its credentials: POST /check with the same credentials names the
@@ -39,6 +41,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { canonicalize, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
 import { PARK_FIELDS, ParkError } from './park.mjs';
+import { GIFT_FIELDS } from './gifts.mjs';
 
 export const V = 'sigelo-relay/0';
 // The body a login signs: a type of its own, never a SPEC §5.2 challenge. An agent's general-purpose
@@ -552,13 +555,35 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity parks after its first login with proof of work: run inbox, then invite again' });
         try { return send(200, { ok: true, ...park.park(body, body.username, clock()) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
       }
+      // Gift codes (gifts.mjs): the brake first, before the body or the login, as /park. Neither the
+      // hash nor anything of the code is logged, nor quoted in a refusal.
+      if (route === 'POST /gift' && policy.gift) {
+        const prefix = httpPrefix(req);
+        try { policy.gift.charge(prefix, clock()); } catch (e) { if (e.check !== 'rate') throw e; return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
+        let body;
+        try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
+        if (!isObject(body) || Object.keys(body).length !== GIFT_FIELDS.length || !GIFT_FIELDS.every((k) => typeof body[k] === 'string')) {
+          throw httpFail(400, `want {${GIFT_FIELDS.join(', ')}}: POST /check's login fields, then the code's hash`);
+        }
+        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        if (o.check === 'internal') throw httpFail(503, o.detail);
+        if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
+        // An identity with no proof of work has no account here to be an operator's.
+        if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity redeems after its first login with proof of work: run inbox, then redeem again' });
+        let r;
+        try { r = policy.gift.redeem({ account: o.session.account, current: body.username, code_hash: body.code_hash }, clock()); } catch (e) {
+          log(`gift bug ${e.name}`);
+          throw httpFail(503, 'the relay failed: try again later');
+        }
+        return send(200, r);
+      }
       if (park && req.method === 'GET' && url.pathname.startsWith('/park/')) {
         try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or older than 10 minutes' });
         return send(200, { ok: true, invite });
       }
-      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
+      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);
       send(e.status ?? 500, { error: e.status ? e.message : 'internal error' }, e.retryAfter);

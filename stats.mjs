@@ -5,7 +5,8 @@
 // Every number is a count of the whole relay: no DID, account, client id, topic, address or prefix,
 // and no list of anything (deploy/README.md "Statistics"; test/run.mjs checks the shape and that no
 // identifier of the run reaches it). Read from the tables where they already hold the number
-// (identities, mailboxes, messages queued, proofs of work, licences, the free tier's ceiling);
+// (identities, mailboxes, messages queued, proofs of work, licences, the free tier's ceiling, gift
+// codes loaded and used over all campaigns, no label: gifts.mjs);
 // counted in memory where nothing else keeps it (logins, refusals by check or code, messages stored
 // and delivered, the most sessions at once), per UTC day.
 //
@@ -45,7 +46,7 @@ function counted(json) {
 }
 
 // db: db.mjs; clock() → unix seconds; sessions() → sessions connected now (auth.mjs);
-// policy: allowance.mjs's (freeQueue, freeUsed), or {} without M4.
+// policy: allowance.mjs's (freeQueue, freeUsed, giftTotals), or {} without M4.
 // → { count(kind, name?), sessions(n), flush(now), report(), close() }.
 export function relayStats({ db, clock, sessions = () => 0, policy = {} }) {
   const raw = db.raw;
@@ -130,6 +131,7 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {} }) {
         pow_solved_today: t.pow_solved,
         free_queue_used_pct: free,
         pro_licences_active: licences,
+        gifts: typeof policy.giftTotals === 'function' ? policy.giftTotals() : { issued: 0, redeemed: 0 },
         days: [...past.map(([d, c]) => row(d, c)), row(day, today)],
       };
       cache = { at: now, body };

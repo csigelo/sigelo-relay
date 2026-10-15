@@ -54,6 +54,7 @@ import { vendorDid } from './licence.ts';
 import { DID_RE } from './auth.mjs';
 import { ACCOUNT_ROW, CLAIM_ROW, DAY, DID_ROW, chainRowBytes, dayOf } from './db.mjs';
 import { LICENCE_RATE, SUPPORT, operators } from './operator.mjs';
+import { SCHEMA as GIFT_SCHEMA, UNKNOWN as GIFT_UNKNOWN, giftBrake, giftStore } from './gifts.mjs';
 import { C_RE, NETWORK_DAY, NETWORK_STEPS, POW_BITS, POW_LOAD_BITS, powCheck } from './pow.mjs';
 
 export const KB = 1024, MB = 1024 * KB;
@@ -262,7 +263,7 @@ function diskOf(db) {
 // ctx: what server.mjs passes a policy factory, { db, host, clock, log }. config: { vendor (the
 // pinned vendor genesis DID; default licence.ts's vendorDid()), tiers ({free, pro} as TIERS;
 // a key left out keeps TIERS's), pow ({bits, loadBits, loadPerHour, steps, perDay}, pow.mjs), licenceRate
-// (POST /licence per prefix and minute),
+// (POST /licence per prefix and minute), gifts ({tries, triesAll}: POST /gift's brakes, gifts.mjs),
 // rate (as RATE; a key left out keeps RATE's), freeQueue (bytes; default freeQueueOf the database's disk at start), freeShares
 // (as FREE_SHARES) }.
 // → the policy: M3's hooks, plus tierOf and freeQueue (for tests and reports).
@@ -275,6 +276,8 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
   if (!Number.isSafeInteger(freeShares) || freeShares < 1) throw new Error('freeShares: want a whole number, at least 1');
   const ops = operators({ db, host, clock, log, vendor: config.vendor ?? vendorDid(), rate: config.licenceRate ?? LICENCE_RATE });
   db.rebuild(SCHEMA, ['pool_members', 'pow_proofs', 'vouched']);
+  db.raw.exec(GIFT_SCHEMA);   // gift codes (gifts.mjs): granted on the operator's licence row (operator.mjs gift)
+  const gifts = giftStore(db.raw), giftCharge = giftBrake(config.gifts);
   db.tx(() => db.raw.exec(QUEUE));
   // Rebuilt in key order by the sweep (db.mjs keepSorted), and the queue's totals put back in key
   // order: copied, not summed afresh as at start, which cost the one thread the whole queue's
@@ -337,14 +340,15 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
     const free = tiers.free, pro = tiers.pro;
     if (!lic) return { pool: null, limits: { ...free, retention: free.retentionDays * DAY } };
     // The licence's number, at most pro's, and never below free's: a licence sold under the free
-    // tier must not leave a paying pool worse off than one free identity.
-    const sold = (n, k) => Math.max(free[k], Math.min(n, pro[k]));
+    // tier must not leave a paying pool worse off than one free identity. Gift months alone (no
+    // licence holds: operator.mjs licenceOf) give pro's numbers.
+    const sold = (n, k) => (lic.gift ? pro[k] : Math.max(free[k], Math.min(n, pro[k])));
     const retentionDays = sold(lic.retention_days, 'retentionDays');
     return {
       pool: lic.operator,
       limits: {
         storage: sold(lic.storage_mb * MB, 'storage'), msgsDay: sold(lic.msgs_day, 'msgsDay'), retentionDays, retention: retentionDays * DAY,
-        maxMessage: pro.maxMessage, mailboxes: pro.mailboxes, groups: Math.min(lic.groups, pro.groups), support: lic.support,
+        maxMessage: pro.maxMessage, mailboxes: pro.mailboxes, groups: lic.gift ? pro.groups : Math.min(lic.groups, pro.groups), support: lic.gift ? pro.support : lic.support,
       },
     };
   }
@@ -365,6 +369,7 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
     s.tidyMembers.run(now);
     s.tidyVouched.run(now);
     ops.tidy(now);
+    gifts.sweep(now);
   }
 
   // Bytes stored for free readers from `prefix` within the free retention (FREE_SHARES); older
@@ -644,6 +649,31 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
 
     // POST /licence (auth.mjs's HTTP server).
     licence: (req) => ops.http(req),
+
+    // POST /gift (auth.mjs's HTTP server, gifts.mjs): charge(prefix, now) first, before the body or
+    // the login (throws rate); then, once the login passed with proof of work, redeem. account: the
+    // identity's, which becomes the operator; current: the DID its login was signed by. An identity
+    // drawing on an operator's pool is refused before the code is looked at: a gift is the
+    // operator's, and redeemed by an agent it would take that agent out of its pool. → the body.
+    gift: {
+      charge: (prefix, now) => giftCharge(prefix, now),
+      redeem({ account, current, code_hash }, now) {
+        if (s.member.get(account, now)) {
+          return { ok: false, check: 'gift_member', detail: 'this identity draws on an operator\'s pool: a gift code is redeemed by the operator identity (SIGELO_IDENTITY=<the operator\'s file> sigelo-agent pro redeem <code>); the code is not used' };
+        }
+        // Settled: the commit names the operator's row (db.mjs's header).
+        return db.settle(() => db.tx(() => {
+          const g = gifts.peek(code_hash, now);
+          if (g === null) return GIFT_UNKNOWN;
+          const r = ops.gift(account, current, g.months, now);
+          if (!r.ok) return r;
+          gifts.take(code_hash, g.campaign);
+          return { ok: true, exp: r.exp, months: g.months };
+        }));
+      },
+    },
+    // GET /stats: codes loaded and used, over all campaigns (a label is never public).
+    giftTotals: () => gifts.totals(),
 
     // After the broker starts (server.mjs): an operator or licence notice goes to the client once
     // its session is up.

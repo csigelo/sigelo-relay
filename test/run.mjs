@@ -969,7 +969,7 @@ const X = topic('i'), Y = topic('i');
 // ================================================================ GET /stats: counts, no identifier
 // stats.mjs: whole numbers of the relay as a whole; never a DID, account, client id, topic or
 // address. The shape is pinned key by key, so a field added later is a decision, not a leak.
-const STATS_KEYS = 'at,day,days,free_queue_used_pct,identities,logins_refused_today,logins_today,mailboxes_claimed,messages,pow_solved_today,pro_licences_active,sessions,v';
+const STATS_KEYS = 'at,day,days,free_queue_used_pct,gifts,identities,logins_refused_today,logins_today,mailboxes_claimed,messages,pow_solved_today,pro_licences_active,sessions,v';
 const DAY_KEYS = 'day,delivered,identities,login_refused,logins,new_identities,pow_solved,refused,sessions_peak,stored';
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
 const named = (o) => o !== null && typeof o === 'object' && !Array.isArray(o) && Object.entries(o).every(([k, v]) => /^[a-z][a-z_]{0,31}$/.test(k) && whole(v) && v > 0);
@@ -981,6 +981,8 @@ const statsShape = (s) => {
   if (Object.keys(s.sessions ?? {}).sort().join() !== 'now,peak_today' || !Object.values(s.sessions).every(whole)) why.push('sessions');
   if (Object.keys(s.messages ?? {}).sort().join() !== 'delivered_today,queued,refused_today,stored_today' || ![s.messages.queued, s.messages.stored_today, s.messages.delivered_today].every(whole) || !named(s.messages.refused_today)) why.push('messages');
   if (![s.logins_today, s.mailboxes_claimed, s.pow_solved_today, s.pro_licences_active].every(whole) || !named(s.logins_refused_today)) why.push('counts');
+  // gifts: codes loaded and used over all campaigns, totals only (no campaign label); 0s without M4.
+  if (Object.keys(s.gifts ?? {}).sort().join() !== 'issued,redeemed' || !whole(s.gifts.issued) || !whole(s.gifts.redeemed) || s.gifts.redeemed > s.gifts.issued) why.push('gifts');
   if (!(s.free_queue_used_pct === null || (typeof s.free_queue_used_pct === 'number' && s.free_queue_used_pct >= 0))) why.push('free_queue_used_pct');
   if (!Array.isArray(s.days) || s.days.length < 1 || s.days.length > 30 || s.days.some((d) => Object.keys(d).sort().join() !== DAY_KEYS || !/^\d{4}-\d\d-\d\d$/.test(d.day) || !Object.entries(d).every(([k, v]) => k === 'day' || whole(v)))
     || s.days.at(-1).day !== s.day) why.push('days');

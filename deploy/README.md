@@ -19,7 +19,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_DB` | `/var/lib/sigelo-relay/relay.db` | SQLite, WAL |
 | `RELAY_TLS_CERT`, `RELAY_TLS_KEY` | none | PEM files; MQTT over TLS on `RELAY_TLS_PORT` (8883), all interfaces; SIGHUP re-reads them |
 | `RELAY_TCP_PORT` | off | plain MQTT on 127.0.0.1, for tests |
-| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/licence` and `/stats` on 127.0.0.1, for nginx |
+| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/park`, `/licence`, `/gift` and `/stats` on 127.0.0.1, for nginx |
 | `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together, and separately GET /challenge |
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
@@ -147,7 +147,8 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
   most once a minute): `identities` {total, new_today}, `logins_today`, `logins_refused_today`
   {check: n}, `sessions` {now, peak_today}, `mailboxes_claimed`, `messages` {queued, stored_today,
   delivered_today, refused_today {code: n}}, `pow_solved_today`, `free_queue_used_pct`,
-  `pro_licences_active`, and `days`: the last 30 UTC days of daily totals. Never a DID, account,
+  `pro_licences_active`, `gifts` {issued, redeemed} (gift codes loaded and used, totals; per
+  campaign only on the host: `node gifts.mjs counts`), and `days`: the last 30 UTC days of daily totals. Never a DID, account,
   client id, topic or address (`test/run.mjs` pins the shape and looks for every identifier of its
   run). The day's counts are kept in memory and written by the sweep each minute to `stats_days`
   (one row a day, numbers only, 90 days); a restart loses a minute of them at most. On a small
@@ -244,6 +245,11 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    `{ok: true, operator, exp, chain, claims}` or `{ok: false, check, detail}`. The operator logs in
    once with its bundle first, and again after each rotation of its key. 3 uploads a minute per
    /24 or /48.
+7. `POST /gift` `{username, client_id, password, code_hash}`: the login fields of step 3 for the
+   operator identity, then hex SHA-256("sigelo-gift/0" ‖ the code's 8 characters) → `{ok: true, exp,
+   months}`: its pool is Pro to `exp`, or `{ok: false, check, detail}`: `gift` (unknown, used or
+   expired, one answer), `gift_member` (an agent in a pool), `gift_term` (past 3 × 366 days ahead),
+   `pow`, or the login's check. 10 tries an hour per /24 or /48 (429 `rate`), 300 in all.
 
 ## What the relay keeps
 
@@ -278,6 +284,11 @@ for logins without a bundle (current DID → account, key) is memory only. The l
 refusals by check name, disconnects and errors, each with the address cut to /24 or /48: no DID,
 client id, topic or payload (`test/run.mjs` checks the file, its WAL and the log), kept 7 days.
 `stats_days` holds the relay's daily totals (numbers only, 90 days: Statistics).
+Gift codes (`gifts.mjs`, POST /gift): per code its SHA-256 under "sigelo-gift/0", months, last day,
+campaign and a used flag (no time, no account), until its last day; per campaign the counts. A
+redeemed code's months sit on the redeemer's licence row (`gift_exp`), kept as a licence is. Loaded
+with `node gifts.mjs load <file|->`, counted per campaign with `node gifts.mjs counts`, as the
+relay's user, beside the running relay.
 Acknowledged messages are overwritten in the file (`secure_delete`), and the sweep truncates the
 WAL every minute. Accounts go 30 days after their last login once they hold no claim, no licence and
 no operator attestation still running that they presented; idle mailboxes after their retention plus

@@ -40,12 +40,25 @@
 //
 // No DID is stored in the clear (db.mjs): a licence is kept as the hashes and numbers the relay
 // needs, not as the file. The vendor's chain is public and kept as it is.
+//
+// Gift codes (gifts.mjs, POST /gift): a redeemed code makes its redeemer an operator as a licence
+// does, on the same row: gift_exp, the end of the Pro its gifts give. An operator with no licence
+// gets a row with no licence in it (vendor_key '', iat and exp 0), so its key is followed, its
+// agents pool, its account and chain are kept, and the row goes LICENCE_KEEP after its last term
+// ends, exactly as for a licence. Pro holds while the licence holds or until gift_exp; while the
+// licence holds its claims apply, otherwise the relay's Pro tier (allowance.mjs tierOfLicence). A
+// gift adds: its months run from the end of the Pro the operator holds when it redeems (the
+// licence's exp while it holds, else a running gift's, else now), rounded up to a UTC day, and a
+// licence uploaded later replaces the licence and leaves gift_exp as it is. So a vendor renewing a
+// licence (issue-licence.mjs --extend-from) runs on from the old licence's exp, over any gift months
+// redeemed since: the runbook's renewal adds them. Pro is never extended past GIFT_TERM from now.
 import { canonicalize, parse } from 'sigelo';
 // licence.ts is sigelo's spend/licence.ts (MIT) byte for byte, copied because relay/ is published
 // alone; in sigelo's tree relay/site/test.mjs and release/publish.sh --relay refuse a copy that differs.
 import { checkVendorAttestation, LICENCE_SKEW, resolveVendorChain, vendorDid } from './licence.ts';
 import { DID_RE, OPERATOR_CTX } from './auth.mjs';
-import { DAY, hashHex } from './db.mjs';
+import { DAY, dayOf, hashHex } from './db.mjs';
+import { addMonths } from './gifts.mjs';
 
 export const LICENCE_CTX = 'sigelo-relay', OPERATOR_DAYS = 90;
 // Plan §1 "Tiers": support none / e-mail / priority.
@@ -58,6 +71,10 @@ export const LICENCE_KEEP = 30 * DAY;
 // own file; here anyone may upload, and each rotation costs a signature check, twice once a vendor
 // chain is kept (the licence's chain, then its union with the kept one). A vendor rotates rarely.
 export const RELAY_ROTATIONS_MAX = 16;
+// The furthest a gift extends an operator's Pro from now: a licence's longest term.
+export const GIFT_TERM = 3 * 366 * DAY;
+// vendor_key of a row that holds gift months and no licence.
+const NO_LICENCE = '';
 // POST /licence per address prefix and minute. An upload costs at most 2 × 16 signature checks
 // plus the kept chain (16 junk rotations: ~105 ms of the one thread, measured on a phone-class
 // CPU), so 3 a minute stay under the login verify budget per prefix (auth.mjs VERIFY_BUDGET,
@@ -82,7 +99,8 @@ CREATE TABLE IF NOT EXISTS licences (
   retention_days INTEGER NOT NULL,
   groups         INTEGER NOT NULL,  -- version 2: kept, not enforced yet
   support        TEXT NOT NULL,     -- none, email or priority: what the vendor owes; nothing the relay applies
-  replaced_exp   INTEGER NOT NULL DEFAULT 0  -- the latest exp of the licences this one replaced (0: none): the row is kept until LICENCE_KEEP after the later of the two, so a licence a reissue ended early cannot be uploaded again while it would still hold
+  replaced_exp   INTEGER NOT NULL DEFAULT 0, -- the latest exp of the licences this one replaced (0: none): the row is kept until LICENCE_KEEP after the later of the two, so a licence a reissue ended early cannot be uploaded again while it would still hold
+  gift_exp       INTEGER NOT NULL DEFAULT 0  -- the end of the Pro its gift codes give (gifts.mjs; 0: none), the start of a UTC day; vendor_key '' and iat, exp 0: gifts only, no licence
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS licences_current ON licences (current);
 CREATE TABLE IF NOT EXISTS operator_retired (
@@ -151,6 +169,8 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
   if (!column('support')) db.raw.exec("ALTER TABLE licences ADD COLUMN support TEXT NOT NULL DEFAULT 'email'");
   // Before licences were ordered by issue: none had replaced another.
   if (!column('replaced_exp')) db.raw.exec('ALTER TABLE licences ADD COLUMN replaced_exp INTEGER NOT NULL DEFAULT 0');
+  // Before gift codes: no row held any.
+  if (!column('gift_exp')) db.raw.exec('ALTER TABLE licences ADD COLUMN gift_exp INTEGER NOT NULL DEFAULT 0');
   db.keepSorted(SCHEMA, ['licences', 'operator_retired', 'vendor_chain']);
   const q = (sql) => db.raw.prepare(sql);
   const s = {
@@ -165,7 +185,11 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
     retire: q('INSERT OR IGNORE INTO operator_retired (key, operator) VALUES (?, ?)'),
     vendorGet: q('SELECT * FROM vendor_chain WHERE vendor = ?'),
     vendorSet: q('INSERT INTO vendor_chain (vendor, head, genesis, rotations) VALUES (?, ?, ?, ?) ON CONFLICT (vendor) DO UPDATE SET head = excluded.head, genesis = excluded.genesis, rotations = excluded.rotations'),
-    tidyLicences: q('DELETE FROM licences WHERE max(exp, replaced_exp) <= ?'),
+    tidyLicences: q('DELETE FROM licences WHERE max(exp, replaced_exp, gift_exp) <= ?'),
+    giftNew: q(`INSERT INTO licences (operator, current, vendor_key, iat, exp, storage_mb, msgs_day, retention_days, groups, support, replaced_exp, gift_exp)
+      VALUES (?, ?, '${NO_LICENCE}', 0, 0, 0, 0, 0, 0, 'email', 0, ?)`),
+    giftSet: q('UPDATE licences SET gift_exp = ? WHERE operator = ?'),
+    dids: q('SELECT did FROM chain_dids WHERE account = ?'),
     tidyRetired: q('DELETE FROM operator_retired WHERE operator NOT IN (SELECT operator FROM licences)'),
   };
   let head = s.vendorGet.get(vendor)?.head;   // the vendor's current key, as far as this relay has seen
@@ -176,13 +200,16 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
     return row ? resolveVendorChain(parse(row.genesis), parse(row.rotations), now) : undefined;
   };
 
-  // → undefined while the licence holds at `now`, else why not.
-  function licenceRefusal(lic, now) {
+  // → undefined while the licence the vendor signed holds at `now`, else why not.
+  function paidRefusal(lic, now) {
+    if (lic.vendor_key === NO_LICENCE) return `your operator's Pro from a gift code ended at ${iso(lic.gift_exp)}`;
     if (now >= lic.exp) return `your operator's licence expired at ${iso(lic.exp)}`;
     if (lic.iat > now + LICENCE_SKEW) return `your operator's licence is dated ${iso(lic.iat)}, ahead of this relay's clock`;
     if (lic.vendor_key !== head) return 'your operator\'s licence is signed by a vendor key the vendor has since rotated away from: the operator asks for a reissue';
     return undefined;
   }
+  // → undefined while the row gives Pro at `now`, its licence or its gift months, else why not.
+  const licenceRefusal = (lic, now) => (now < lic.gift_exp ? undefined : paidRefusal(lic, now));
 
   // Whether a chain may move the licence `lic` of `operator` to the chain's last key. dids: the
   // hashes of the chain's DIDs; rotations: the rotation on each edge of it. Yes when the chain passes
@@ -318,10 +345,30 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
 
   // The licence of `operator` while it holds at `now`, and, for an agent (key = the hash of its
   // attestation's iss), while that key is still the operator's current one. → the row, or null.
+  // gift: true when only gift months give it (allowance.mjs grants the relay's Pro tier then).
   function licenceOf(operator, key, now) {
     const lic = s.licence.get(operator);
     if (!lic || (key !== null && lic.current !== key) || licenceRefusal(lic, now) !== undefined) return null;
-    return lic;
+    return paidRefusal(lic, now) === undefined ? lic : { ...lic, gift: true };
+  }
+
+  // POST /gift's grant, inside the caller's transaction (allowance.mjs gift): `months` more of Pro
+  // for `operator` (an account that has proven its work, in no pool), from the end of the Pro it
+  // holds (the header). current: the DID its login was signed by, its current key. A new row
+  // follows that key and has rotated away from the chain's other DIDs (as upload's). → { ok: true,
+  // exp } | { ok: false, check: 'gift_term', detail }: nothing written.
+  function gift(operator, current, months, now) {
+    const lic = s.licence.get(operator);
+    const from = Math.max(now, lic && paidRefusal(lic, now) === undefined ? lic.exp : 0, lic?.gift_exp ?? 0);
+    const t = addMonths(from, months), exp = t % DAY === 0 ? t : dayOf(t) + DAY;
+    if (exp > now + GIFT_TERM) return { ok: false, check: 'gift_term', detail: `with ${months} more months this operator's Pro would run to ${iso(exp)}, past ${iso(now + GIFT_TERM)} (3 × 366 days from now), the furthest a gift code takes it: the code is not used; redeem it later` };
+    if (lic) s.giftSet.run(exp, operator);
+    else {
+      const currentKey = hashHex(current);
+      s.giftNew.run(operator, currentKey, exp);
+      follow(operator, undefined, currentKey, s.dids.all(operator).map((r) => r.did));
+    }
+    return { ok: true, exp };
   }
 
   // Inside the sweep's transaction (allowance.mjs tidy). A licence goes LICENCE_KEEP after its exp,
@@ -334,5 +381,5 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
   // Whether `account` holds a licence row here: the sweep keeps its account and chain (db.mjs).
   const licensed = (account) => s.licence.get(account) !== undefined;
 
-  return { upload, http, loggedIn, present, licenceOf, tidy, licensed };
+  return { upload, http, loggedIn, present, licenceOf, gift, tidy, licensed };
 }
