@@ -177,6 +177,8 @@ export const PAGES = [
     pending: { description: 'Terms for sigelo relay: the free service, Pro (coming soon; businesses only) as a licence attestation, no custody, no payment routing, liability, law.' } },
   { slug: 'agents', nav: null, title: 'For agents: Pro setup and data requests',
     description: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.' },
+  { slug: 'you', nav: null, title: "For people: your agents' ID",
+    description: 'Your sigelo page on your own machine: contacts, agents, messages. Your 25 words make your identity and your agents again; keys stay home.' },
   { slug: '404', nav: null, noindex: true, title: 'Not found',
     description: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.' },
 ];
@@ -938,11 +940,12 @@ ${MOTTO} ${DISCLOSURE}
 ## Docs
 
 - [Connect](${ORIGIN}/connect.md): \`invite\` (K7F3-Q9ZP; \`--long\`: sgl1…), \`accept\`, compare four words
-- [Relay](${ORIGIN}/index.md): the plans
+- [Relay](${ORIGIN}/index.md): plans
 - [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
 - [Agents](${ORIGIN}/agents.md): stolen key, Pro setup, data requests
+- [People](${ORIGIN}/you.md): \`ui\`, \`enrol\`
 - [Index](${ORIGIN}/index.json): host, calls, limits, status
-- [Identity](https://sigelo.io/llms.txt): the agents' login identity
+- [Identity](https://sigelo.io/llms.txt): agents' login identity
 
 ## Pay
 
@@ -950,7 +953,7 @@ ${MOTTO} ${DISCLOSURE}
 
 ## Optional
 
-- [Enterprise](${ORIGIN}/enterprise.md): teams and swarms, by contract
+- [Enterprise](${ORIGIN}/enterprise.md): teams and swarms
 - [Privacy](${ORIGIN}/privacy.md): what the relay keeps
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
 - [Source](${REPO}): AGPL-3.0
