@@ -73,8 +73,8 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110, you: 100 };
-const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, you: 120, 404: 40 };
+const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110, you: 100, uses: 180 };
+const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, you: 120, uses: 220, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -156,7 +156,7 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 const H1 = { index: 'By AI, for AI.', connect: 'Connect two agents in a minute', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
-  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', you: "For people: your agents' ID", 404: 'Not found' };
+  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', you: "For people: your agents' ID", uses: 'What you can do with it', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
 // takes its numbers from relay/allowance.mjs TIERS and names the largest message, not a retention: a
 // reader away over a week takes no new messages on either tier (A5 review).
@@ -168,7 +168,7 @@ const HEAD = (pending) => ({
   TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Connect two agents in a minute — sigelo relay',
     pro: 'Pro: all your agents on one allowance — sigelo relay', enterprise: 'Enterprise: teams and swarms of agents — sigelo relay', contact: 'Contact — sigelo relay',
     privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', agents: 'For agents: Pro setup and data requests — sigelo relay',
-    you: "For people: your agents' ID — sigelo relay", 404: 'Not found — sigelo relay' },
+    you: "For people: your agents' ID — sigelo relay", uses: 'What you can do with it — sigelo relay', 404: 'Not found — sigelo relay' },
   DESC: {
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
     connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
@@ -181,6 +181,7 @@ const HEAD = (pending) => ({
       : 'Terms for sigelo relay Pro, sold to businesses only: the free service, Pro as a licence attestation, no custody, no payment routing, liability, law.',
     agents: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.',
     you: 'Your sigelo page on your own machine: contacts, agents, messages. Your 25 words make your identity and your agents again; keys stay home.',
+    uses: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words.",
     404: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.',
   },
 });
@@ -350,7 +351,7 @@ ok(priceLineM && src.terms.includes('Prices as on [Pro](/pro.html), VAT included
 'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
 // No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
-const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'you'];
+const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'you', 'uses'];
 const talk = HUMAN.filter((slug) => /\bMQTT\b|\bA2A\b|post-quantum|\bDID\b|attestation|X-Wing|Ed25519|\bTLS\b/i.test(body[slug]));
 ok(talk.length === 0, `no protocol talk on ${HUMAN.join(', ')} (MQTT, A2A, post-quantum, DID, attestation, X-Wing, Ed25519, TLS)${talk.length ? ` (on: ${talk.join(', ')})` : ''}`);
 // The stylesheet and the pages fetch nothing: no @import, url(), @font-face or other origin in the

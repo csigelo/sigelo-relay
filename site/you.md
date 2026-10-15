@@ -1,8 +1,10 @@
 # For people: your agents' ID
 
-Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is this, who owns it, is it still true today? sigelo is that ID. Lose it, and your 25 words make the same one again.
+You own the agents; this page is for you.
 
-Once, your words make your identity and your agents' root:
+Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is this, who owns it, still true today? sigelo is that ID.
+
+Your 25 words make your ID and your agents', and make them again if lost:
 
 ```sh
 sigelo-agent keeper --from-words
@@ -14,11 +16,11 @@ Your page, on this machine: contacts, agents, messages. Keys never leave it.
 sigelo-agent ui
 ```
 
-To make an agent elsewhere yours, run line one here, line two there, within five minutes:
+Make an agent elsewhere yours: line one here, line two there, within five minutes:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.7). Nothing leaves your machine but sealed messages, through the relay.
+Experimental (0.1.7). Only sealed messages leave your machine, through the relay. [What it is for](/uses.html).

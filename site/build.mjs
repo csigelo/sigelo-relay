@@ -7,7 +7,7 @@
 //   node relay/site/build.mjs --launch  in the private tree: the official statement, then what npm
 //                                       serves; writes relay/site/launch.json when both pass (launchGate)
 //
-// Nine pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
+// Eleven pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
 // plus what agents and crawlers read: robots.txt (and relay-robots.txt, which nginx serves as
 // relay.sigelo.ai's), sitemap.xml, llms.txt, llms-full.txt, index.json, relay.json (the relay info
 // document of plan §11) and .well-known/security.txt. nginx (relay/deploy/nginx.conf) serves
@@ -149,8 +149,10 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 
 // The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only. The
 // home page is reached by the wordmark; the agents' page (the Pro steps and erasure requests, what an
-// agent runs for its operator) and the not-found page are in neither: the agents' page is linked from
-// /pro and /privacy, and listed in llms.txt, the sitemap and index.json; the not-found page nowhere.
+// agent runs for its operator), the people's page (you), the uses page and the not-found page are in
+// neither: the agents' page is linked from /pro and /privacy, the people's page from /connect and
+// /uses, the uses page from / and /you; all three are listed in llms.txt, the sitemap and index.json;
+// the not-found page nowhere.
 // Titles get " — sigelo relay" but the home page's. `pending`: the title or description while Pro is
 // coming soon (VENDOR_PENDING), for each page whose head would otherwise read as a sale; a search
 // result or link preview shows the head, not the page's first paragraph. No title or description
@@ -179,6 +181,8 @@ export const PAGES = [
     description: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.' },
   { slug: 'you', nav: null, title: "For people: your agents' ID",
     description: 'Your sigelo page on your own machine: contacts, agents, messages. Your 25 words make your identity and your agents again; keys stay home.' },
+  { slug: 'uses', nav: null, title: 'What you can do with it',
+    description: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words." },
   { slug: '404', nav: null, noindex: true, title: 'Not found',
     description: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.' },
 ];
@@ -944,8 +948,8 @@ ${MOTTO} ${DISCLOSURE}
 - [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
 - [Agents](${ORIGIN}/agents.md): stolen key, Pro setup, data requests
 - [People](${ORIGIN}/you.md): \`ui\`, \`enrol\`
-- [Index](${ORIGIN}/index.json): host, calls, limits, status
-- [Identity](https://sigelo.io/llms.txt): agents' login identity
+- [Index](${ORIGIN}/index.json): host, calls, limits
+- [Identity](https://sigelo.io/llms.txt): login identity
 
 ## Pay
 
@@ -953,7 +957,8 @@ ${MOTTO} ${DISCLOSURE}
 
 ## Optional
 
-- [Enterprise](${ORIGIN}/enterprise.md): teams and swarms
+- [Enterprise](${ORIGIN}/enterprise.md): teams, swarms
+- [Uses](${ORIGIN}/uses.md): examples
 - [Privacy](${ORIGIN}/privacy.md): what the relay keeps
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
 - [Source](${REPO}): AGPL-3.0

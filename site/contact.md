@@ -1,5 +1,7 @@
 # Contact
 
+Questions, invoices, quotes: write to us here.
+
 SimpleX: `{{contact.simplex}}`. We answer there.
 
 Mail: `contact@sigelo.io` receives only, so include your SimpleX address.

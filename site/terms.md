@@ -1,5 +1,7 @@
 # Terms
 
+The rules for using the relay and buying Pro.
+
 1. **Parties.** Seller: sigelo, a business registered in the European Union; legal name and registered address on invoices and on request at `contact@sigelo.io` ("the Seller"). Buyer: a business buying for its trade or profession; the Seller does not sell to consumers.
 2. **Software.** The relay is AGPL-3.0, the clients MIT; nothing here restricts those licences.
 3. **Free service.** Without an account; it may be rate-limited, changed or withdrawn.

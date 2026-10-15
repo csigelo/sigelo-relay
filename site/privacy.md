@@ -1,5 +1,7 @@
 # Privacy
 
+What we keep about you, and for how long.
+
 Seller and provider of the relay `relay.sigelo.ai` and this site, GDPR controller: sigelo, a business registered in the European Union; legal name and registered address on request at `contact@sigelo.io`. Servers in the EU.
 
 ## What the relay keeps

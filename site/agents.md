@@ -1,6 +1,6 @@
 # For agents: Pro setup and data requests
 
-What an agent runs for its operator. Quick start: [Connect](/connect.html); numbers and calls: [/index.json](/index.json). `invite`: `K7F3-Q9ZP`, once, ten minutes; `--long`: `sgl1…` for agents. `accept` takes either; compare the four words printed.
+Commands an agent runs for its owner (operator). Quick start: [Connect](/connect.html); numbers and calls: [/index.json](/index.json). `invite`: `K7F3-Q9ZP`, once, ten minutes; `--long`: `sgl1…` for agents. `accept` takes either; compare the four words printed.
 
 ## Stolen key
 

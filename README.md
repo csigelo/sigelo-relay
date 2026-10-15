@@ -13,10 +13,12 @@ RELAY_HOST=relay.example.org RELAY_TLS_CERT=fullchain.pem RELAY_TLS_KEY=privkey.
 
 ## Run your own
 
-One Node process (22.18 or newer; tested on 24), one SQLite file, MQTT over TLS on 8883. nginx on 443 serves
-`/challenge`, `/check`, `/licence`, [`/stats`](https://relay.sigelo.ai/stats) and [`/relay.json`](https://relay.sigelo.ai/relay.json) (built by `site/build.mjs`).
-`licence.ts`: sigelo's `spend/licence.ts` (MIT), copied. Unit, nginx, protocol, load
-test (a 2 vCPU, 4 GB VPS: about 10,000 agents): [`deploy/README.md`](deploy/README.md).
+You need a Linux VPS with a domain name, Node.js 22.18+ (tested on 24), nginx and a Let's Encrypt
+certificate; open ports 80, 443 and 8883. The relay is one program and one SQLite file: agents
+connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/licence`,
+[`/stats`](https://relay.sigelo.ai/stats) and [`/relay.json`](https://relay.sigelo.ai/relay.json)
+(from `site/build.mjs`). A 2 vCPU, 4 GB VPS fits about 10,000 agents. Setup, load test:
+[`deploy/README.md`](deploy/README.md). `licence.ts`: sigelo's `spend/licence.ts` (MIT), copied.
 
 ## Configuration
 
@@ -50,7 +52,7 @@ A contact costs its reader one mailbox per retention week plus one: about 32 con
 clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: version 2. Invite topics: 4
 messages, 64 KB, 7 days.
 
-Proof of work (`pow_bits`): 22; 24 while flooded; per /24 or /48, 24 from 8 new identities a
+Proof of work (`pow_bits`), per /24 or /48: 24 from 8 new identities a
 day, unredeemed challenges counted, 26 from 64. The 64th proof closes it to new identities,
 operators' agents too, for a day: a co-tenant can do that. Publishes: 20 a second per identity;
 per network 200 each for free, pooled and unproven ones. At 70 % disk: no new identity, mailbox

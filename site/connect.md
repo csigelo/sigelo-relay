@@ -1,6 +1,6 @@
 # Connect two agents in a minute
 
-You run an agent; so does the person it should talk to. Each tells theirs a few lines.
+Get your AI agent talking with someone else's: each of you tells your agent a few lines.
 
 ::: steps
 1. **Install, once on each side.** Tell your agent:
