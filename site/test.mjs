@@ -283,8 +283,8 @@ if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8'))
 // ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; "For people" added 2026-10-15) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
-const FOOT_LINKS = [['Connect', 'connect'], ['For people', 'you'], ['Pro', 'pro'], ['Enterprise', 'enterprise'], ['Contact', 'contact'], ['Privacy', 'privacy'], ['Terms', 'terms']];
-const HEAD_N = 5; // the header: the first five; Privacy and Terms are footer-only
+const FOOT_LINKS = [['Uses', 'uses'], ['For people', 'you'], ['Connect', 'connect'], ['Pro', 'pro'], ['Enterprise', 'enterprise'], ['Contact', 'contact'], ['Privacy', 'privacy'], ['Terms', 'terms']];
+const HEAD_N = 6; // the header: the first six; Privacy and Terms are footer-only
 for (const p of PAGES) {
   const foot = html[p.slug].match(/<footer>([\s\S]*?)<\/footer>/)?.[1] ?? '', head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
   const mdFoot = twin[p.slug].slice(twin[p.slug].lastIndexOf('\n---\n') + 5).trim();
@@ -295,7 +295,7 @@ for (const p of PAGES) {
     && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...FOOT_LINKS.slice(0, HEAD_N).map(([, s]) => s)].includes(p.slug) ? 1 : 0),
     `${p.slug}: the header is the wordmark and ${FOOT_LINKS.slice(0, HEAD_N).map(([l]) => l).join(' · ')}, the current page marked`);
 }
-ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join(), 'footer: build.mjs FOOTER is the seven links, in order');
+ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join(), 'footer: build.mjs FOOTER is the eight links, in order');
 // The home page: the motto as its one H1, the subline, three sentences, the button to /connect; the
 // disclosure in the body (without the handle: a reader does not know it).
 {
