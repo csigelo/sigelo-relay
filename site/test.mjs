@@ -280,21 +280,22 @@ for (const p of PAGES) {
 const adopt = join(ROOT, 'site', 'src', 'adopt.md');
 if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8')), 'pro: the link to sigelo.io/adopt.html#1-identity has its heading');
 
-// ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14) ---
+// ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; "For people" added 2026-10-15) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
-const FOOT_LINKS = ['Connect', 'Pro', 'Enterprise', 'Contact', 'Privacy', 'Terms'];
+const FOOT_LINKS = [['Connect', 'connect'], ['For people', 'you'], ['Pro', 'pro'], ['Enterprise', 'enterprise'], ['Contact', 'contact'], ['Privacy', 'privacy'], ['Terms', 'terms']];
+const HEAD_N = 5; // the header: the first five; Privacy and Terms are footer-only
 for (const p of PAGES) {
   const foot = html[p.slug].match(/<footer>([\s\S]*?)<\/footer>/)?.[1] ?? '', head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
   const mdFoot = twin[p.slug].slice(twin[p.slug].lastIndexOf('\n---\n') + 5).trim();
-  ok(plainText(foot.replace(/<[^>]*>/g, ' ')) === `sigelo ${FOOT_LINKS.join(' ')}` && linksIn(foot).join() === ['sigelo /', ...FOOT_LINKS.map((x) => `${x} /${x.toLowerCase()}.html`)].join(),
-    `${p.slug}: the footer is the wordmark and ${FOOT_LINKS.join(' · ')}, nothing else`);
-  ok(mdFoot === `sigelo · ${FOOT_LINKS.map((x) => `[${x}](/${x.toLowerCase()}.md)`).join(' · ')}`, `${p.slug}: the twin ends with the same footer, linking the twins (A10)`);
-  ok(linksIn(head).join() === ['sigelo /', ...FOOT_LINKS.slice(0, 4).map((x) => `${x} /${x.toLowerCase()}.html`)].join()
-    && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...FOOT_LINKS.slice(0, 4).map((x) => x.toLowerCase())].includes(p.slug) ? 1 : 0),
-    `${p.slug}: the header is the wordmark and Connect · Pro · Enterprise · Contact, the current page marked`);
+  ok(plainText(foot.replace(/<[^>]*>/g, ' ')) === `sigelo ${FOOT_LINKS.map(([l]) => l).join(' ')}` && linksIn(foot).join() === ['sigelo /', ...FOOT_LINKS.map(([l, s]) => `${l} /${s}.html`)].join(),
+    `${p.slug}: the footer is the wordmark and ${FOOT_LINKS.map(([l]) => l).join(' · ')}, nothing else`);
+  ok(mdFoot === `sigelo · ${FOOT_LINKS.map(([l, s]) => `[${l}](/${s}.md)`).join(' · ')}`, `${p.slug}: the twin ends with the same footer, linking the twins (A10)`);
+  ok(linksIn(head).join() === ['sigelo /', ...FOOT_LINKS.slice(0, HEAD_N).map(([l, s]) => `${l} /${s}.html`)].join()
+    && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...FOOT_LINKS.slice(0, HEAD_N).map(([, s]) => s)].includes(p.slug) ? 1 : 0),
+    `${p.slug}: the header is the wordmark and ${FOOT_LINKS.slice(0, HEAD_N).map(([l]) => l).join(' · ')}, the current page marked`);
 }
-ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.join(), 'footer: build.mjs FOOTER is the six links, in order');
+ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join(), 'footer: build.mjs FOOTER is the seven links, in order');
 // The home page: the motto as its one H1, the subline, three sentences, the button to /connect; the
 // disclosure in the body (without the handle: a reader does not know it).
 {
