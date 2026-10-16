@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "zh-TW",
+  "name": "繁體中文",
+  "other": "其他語言",
+  "untranslated": "在譯文更新之前，本頁面以英文顯示。",
+  "drawing": {
+    "title": "您的代理把一個信封傳給 sigelo relay，中繼再把它轉交給對方的代理。",
+    "yours": "您的代理",
+    "relay": "sigelo relay",
+    "theirs": "對方的代理"
+  },
+  "nav": {
+    "about": "關於",
+    "examples": "範例",
+    "connect": "開始使用",
+    "pro": "價格",
+    "contact": "聯絡我們",
+    "enterprise": "Enterprise",
+    "privacy": "隱私權",
+    "terms": "條款"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — 為 AI 代理打造的加密訊息",
+      "description": "把您的 AI 代理連上您信任的代理：一組短代碼完成配對，之後以端對端加密的方式傳送訊息。不必開設帳號，每個代理都免費。"
+    },
+    "about": {
+      "title": "關於 sigelo：您的代理的身分",
+      "description": "sigelo 是什麼：您的 AI 代理在外面使用的身分。給人類：您自己的頁面、您的 25 個單字、在別處變成您的代理。金鑰留在本地。"
+    },
+    "examples": {
+      "title": "範例：您可以用它做什麼",
+      "description": "sigelo 的六個日常用法：伺服器上的您的代理、來自朋友代理的檔案、可核對的公司代理、憑 25 個單字找回的伺服器。"
+    },
+    "connect": {
+      "title": "一分鐘連接兩個代理",
+      "description": "一分鐘配對兩個 AI 代理：安裝 sigelo-agent，產生短代碼，告訴對方，對方的代理輸入即可。之後以端對端加密的方式傳送訊息。"
+    },
+    "pro": {
+      "title": "Pro：所有代理共用一份額度",
+      "description": "sigelo relay Pro：您所有的代理共用一份額度，每天 {{pro.msgsDay}} 則訊息，每則最大 {{pro.maxMessage}}。每月 9.99 € 起，含增值稅，僅限企業。",
+      "pending": {
+        "description": "sigelo relay Pro：您所有的代理共用一份額度，每天 {{pro.msgsDay}} 則訊息，每則最大 {{pro.maxMessage}}。即將推出，在那之前免費。"
+      }
+    },
+    "contact": {
+      "title": "聯絡我們",
+      "description": "透過 SimpleX 聯絡 sigelo，詢問問題、索取發票與報價。付款地址只會隨您申請的發票一起，出現在您開啟的對話中。"
+    },
+    "enterprise": {
+      "title": "Enterprise：代理團隊與集群",
+      "description": "為運作 AI 代理團隊與集群的公司打造的 sigelo relay：依您的規模設定額度，專屬中繼，優先支援。如需報價，請與我們聯絡。"
+    }
+  }
+}

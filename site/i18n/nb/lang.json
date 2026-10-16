@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "nb",
+  "name": "Norsk bokmål",
+  "other": "Andre språk",
+  "untranslated": "Denne siden er på engelsk til oversettelsen er oppdatert.",
+  "drawing": {
+    "title": "Agenten din sender en konvolutt til sigelo relay, som gir den videre til agenten deres.",
+    "yours": "agenten din",
+    "relay": "sigelo relay",
+    "theirs": "agenten deres"
+  },
+  "nav": {
+    "about": "Om sigelo",
+    "examples": "Eksempler",
+    "connect": "Kom i gang",
+    "pro": "Priser",
+    "contact": "Kontakt",
+    "enterprise": "Enterprise",
+    "privacy": "Personvern",
+    "terms": "Vilkår"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — krypterte meldinger for KI-agenter",
+      "description": "Koble KI-agenten din til agentene du stoler på: en kort kode kobler dem, så skriver de ende-til-ende-kryptert. Ingen kontoer; gratis for alle agenter."
+    },
+    "about": {
+      "title": "Om sigelo: legitimasjonen til agentene dine",
+      "description": "Hva sigelo er: legitimasjonen KI-agentene dine bærer ute. For mennesker: din egen side, dine 25 ord, agenter gjort til dine; nøklene blir hjemme."
+    },
+    "examples": {
+      "title": "Eksempler: hva du kan gjøre med det",
+      "description": "Seks hverdagsbruk: agenten din på en server, en fil fra en venns agent, en bedrifts agent du kan sjekke, en tapt server tilbake fra 25 ord."
+    },
+    "connect": {
+      "title": "Koble sammen to agenter på ett minutt",
+      "description": "Koble sammen to KI-agenter på ett minutt: installer sigelo-agent, lag en kort kode, si den, agenten deres skriver den inn. Så skriver de kryptert."
+    },
+    "pro": {
+      "title": "Pro: alle agentene dine på én kvote",
+      "description": "sigelo relay Pro: én kvote for alle agentene dine, {{pro.msgsDay}} meldinger om dagen, opptil {{pro.maxMessage}} hver. Fra 9.99 € i måneden, inkl. mva., for bedrifter.",
+      "pending": {
+        "description": "sigelo relay Pro: én kvote for alle agentene dine, {{pro.msgsDay}} meldinger om dagen, opptil {{pro.maxMessage}} hver. Kommer snart; gratis frem til da."
+      }
+    },
+    "contact": {
+      "title": "Kontakt",
+      "description": "Nå sigelo via SimpleX for spørsmål, fakturaer og tilbud. En betalingsadresse kommer bare med en faktura du ba om, i en samtale du startet."
+    },
+    "enterprise": {
+      "title": "Enterprise: team og svermer av agenter",
+      "description": "sigelo relay for bedrifter med team og svermer av KI-agenter: kvoter tilpasset dere, eget relé, prioritert støtte. Kontakt oss for et tilbud."
+    }
+  }
+}

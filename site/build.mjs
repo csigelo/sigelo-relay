@@ -214,6 +214,9 @@ export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).des
 // {{values}}, prices, code, link targets and containers (translationRefusals), or the build refuses it
 // (--final) and leaves the language out. Numbers are written for the page's locale (Intl.NumberFormat:
 // de 3.000 and 14,99 €), the € sign and the values as in English. Adding a language is adding a folder.
+// A right-to-left language says so in lang.json (`"dir": "rtl"`, ar): its pages carry dir="rtl" on
+// <html> (on the header and footer where the page falls back to English), and its drawing is mirrored
+// so the envelope still goes from "your agent", read first, to "their agent".
 export const TRANSLATED = ['index', 'about', 'examples', 'connect', 'pro', 'contact', 'enterprise'];
 export const OTHER_LANGUAGES = 'Other languages';
 // Under the header of a translated URL whose translation is stale (lang.json `untranslated`).
@@ -228,11 +231,13 @@ export const englishStrings = () => ({
 });
 export const englishStringsHash = () => sha256(JSON.stringify(englishStrings()));
 // A translation's numbers in its locale: every {{value}}'s digits (not the SimpleX address), and each
-// price (n.nn followed by €), with the € sign kept where English has it. English text is untouched.
+// price (n.nn followed by €) and whole amount or percentage, with the € sign kept where English has it. English text is untouched.
 export function localize(text, lang) {
   if (!lang) return text;
   const cents = new Intl.NumberFormat(lang.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return text.replace(/\d+\.\d\d(?=[ \u00a0]?€)/g, (n) => cents.format(Number(n)));
+  // Whole amounts and percentages too ("0 €", "10 %"): the same digits in Latin script, a locale's own elsewhere (bn).
+  const whole = new Intl.NumberFormat(lang.lang, { useGrouping: false });
+  return text.replace(/\d+\.\d\d(?=[ \u00a0]?€)|\b\d+(?=[ \u00a0]?[€%])/g, (n) => (n.includes('.') ? cents.format(Number(n)) : whole.format(Number(n))));
 }
 export function fillIn(text, where, lang) {
   if (!lang) return fill(text, where);
@@ -244,6 +249,8 @@ export function fillIn(text, where, lang) {
 }
 // A number as the page wrote it in its locale (lang: a BCP 47 tag) → its value.
 export function parseIn(text, lang = 'en') {
+  const digits = new Intl.NumberFormat(lang, { useGrouping: false }).format(9876543210);
+  text = [...text].map((c) => { const i = digits.indexOf(c); return i < 0 ? c : String(9 - i); }).join('');
   const parts = new Intl.NumberFormat(lang).formatToParts(12345.6), group = parts.find((x) => x.type === 'group')?.value ?? ',', dec = parts.find((x) => x.type === 'decimal')?.value ?? '.';
   return Number(text.split(group).join('').replace(/[\u00a0\u202f ]/g, '').split(dec).join('.'));
 }
@@ -289,6 +296,7 @@ export function readLanguages(site = SITE, md = readPages(site)) {
     if (meta.source !== englishHash) stale.push(`${code}/lang.json`);
     if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
     for (const k of ['name', 'other', 'untranslated']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
+    if (meta.dir !== undefined && meta.dir !== 'rtl') why.push(`${code}/lang.json: dir is "rtl" or absent (left to right)`);
     for (const k of Object.keys(DRAWING_WORDS)) if (typeof meta.drawing?.[k] !== 'string' || !meta.drawing[k].trim()) why.push(`${code}/lang.json: no drawing.${k}`);
     for (const slug of Object.keys(english.nav)) if (typeof meta.nav?.[slug] !== 'string' || !meta.nav[slug].trim()) why.push(`${code}/lang.json: no nav label for ${slug}`);
     for (const [slug, head] of Object.entries(english.pages)) {
@@ -671,16 +679,16 @@ const envelope = (x, y) => `<rect class="art art-paper" x="${x}" y="${y}" width=
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // Its words are text in the page, so a language gives its own (lang.json `drawing`, as englishStrings).
 export const DRAWING_WORDS = { title: 'Your agent sends an envelope to the sigelo relay, which passes it on to their agent.', yours: 'your agent', relay: 'sigelo relay', theirs: 'their agent' };
-export const drawingRelay = (w) => `<figure class="drawing"><svg class="art-svg" viewBox="0 0 640 200" role="img" aria-labelledby="drawing-relay-title">
+export const drawingRelay = (w, rtl = false) => `<figure class="drawing"><svg class="art-svg" viewBox="0 0 640 200" role="img" aria-labelledby="drawing-relay-title">
 <title id="drawing-relay-title">${esc(w.title)}</title>
-${agentHead(95)}${agentHead(545)}
+${rtl ? '<g transform="matrix(-1 0 0 1 640 0)">' : ''}${agentHead(95)}${agentHead(545)}
 <rect class="art" x="268" y="66" width="104" height="64" rx="12"></rect><line class="art" x1="290" y1="98" x2="350" y2="98"></line>
 <path class="art art-dash" d="M150 98 H258"></path><path class="art" d="M250 90 l8 8 l-8 8"></path>
 <path class="art art-dash" d="M382 98 H490"></path><path class="art" d="M482 90 l8 8 l-8 8"></path>
-${envelope(177, 80)}
-<text class="art-label" x="95" y="186" text-anchor="middle">${esc(w.yours)}</text>
+${envelope(177, 80)}${rtl ? '</g>' : ''}
+<text class="art-label" x="${rtl ? 545 : 95}" y="186" text-anchor="middle">${esc(w.yours)}</text>
 <text class="art-label" x="320" y="186" text-anchor="middle">${esc(w.relay)}</text>
-<text class="art-label" x="545" y="186" text-anchor="middle">${esc(w.theirs)}</text>
+<text class="art-label" x="${rtl ? 95 : 545}" y="186" text-anchor="middle">${esc(w.theirs)}</text>
 </svg></figure>`;
 export const DRAWINGS = { relay: drawingRelay(DRAWING_WORDS) };
 const slugify = (text) => text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s_-]/gu, '').trim().replace(/\s/g, '-');
@@ -925,11 +933,12 @@ code, pre { font-family: var(--mono); font-size: .88em; background: var(--code);
 code { padding: .08em .35em; overflow-wrap: anywhere; }
 pre { padding: .85rem 1rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); }
 pre code { padding: 0; background: none; font-size: 1em; border-radius: 0; }
+[dir="rtl"] code, [dir="rtl"] pre { direction: ltr; unicode-bidi: isolate; }
 .table { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: .95rem; }
-th, td { border-bottom: 1px solid var(--line); padding: .55em .6em; text-align: left; vertical-align: top; }
+th, td { border-bottom: 1px solid var(--line); padding: .55em .6em; text-align: start; vertical-align: top; }
 th { font-weight: 650; border-bottom-width: 2px; }
-td:first-child, th:first-child { padding-left: 0; }
+td:first-child, th:first-child { padding-inline-start: 0; }
 .center { text-align: center; } .right { text-align: right; }
 
 /* home: hero, drawing, cards */
@@ -963,7 +972,7 @@ main > .plans { max-width: 62rem; }
 .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1.6rem 1.1rem; margin: 2.4rem auto 1.6rem; }
 .plan { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem 1.4rem 1.3rem; display: flex; flex-direction: column; }
 .plan.best { border: 2px solid var(--accent); box-shadow: 0 8px 24px rgba(155, 34, 38, .12); }
-.plan > p:first-child { position: absolute; top: -.75rem; left: 1.2rem; margin: 0; padding: .3rem .7rem; border-radius: 999px;
+.plan > p:first-child { position: absolute; top: -.75rem; inset-inline-start: 1.2rem; margin: 0; padding: .3rem .7rem; border-radius: 999px;
   background: var(--accent); color: var(--on-accent); font: 650 .75rem/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; }
 .plan h3 { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
 .plan h3 em { font: 650 .72rem/1 var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--link);
@@ -980,9 +989,9 @@ main > .plans { max-width: 62rem; }
 
 /* connect: the numbered steps */
 .steps ol { list-style: none; counter-reset: step; padding: 0; margin: 2rem 0; }
-.steps li { counter-increment: step; position: relative; margin: 0 0 0 1.1rem; padding: 0 0 1.5rem 2.1rem; border-left: 1px solid var(--line); }
-.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
-.steps li::before { content: counter(step); position: absolute; left: -1.1rem; top: -.15rem; width: 2.2rem; height: 2.2rem; border-radius: 50%;
+.steps li { counter-increment: step; position: relative; margin: 0; margin-inline-start: 1.1rem; padding: 0 0 1.5rem; padding-inline-start: 2.1rem; border-inline-start: 1px solid var(--line); }
+.steps li:last-child { border-inline-start-color: transparent; padding-bottom: 0; }
+.steps li::before { content: counter(step); position: absolute; inset-inline-start: -1.1rem; top: -.15rem; width: 2.2rem; height: 2.2rem; border-radius: 50%;
   background: var(--accent); color: var(--on-accent); font: 700 1rem/2.2rem var(--sans); text-align: center; }
 .steps li > p:first-child { margin-bottom: .6rem; }
 .steps pre { margin-bottom: .7rem; }
@@ -1067,10 +1076,10 @@ function htmlPage(page, body, ctx, lang = null, fallback = false) {
   const alternates = fallback ? '' : alternatesOf(page, ctx.langs).map(([h, u]) => `<link rel="alternate" hreflang="${h}" href="${u}">\n`).join('');
   const twin = lang ? '' : `<link rel="alternate" type="text/markdown" href="/${page.slug}.md" title="This page as Markdown">\n`;
   const ld = page.noindex ? '' : `<script type="application/ld+json">\n${jsonld(page, ctx, headLang)}\n</script>\n`;
-  const home = lang ? `/${lang.code}/index.html` : '/', chrome = fallback ? ` lang="${lang.lang}"` : '';
-  const note = fallback ? `<p class="untranslated" lang="${lang.lang}">${esc(lang.untranslated)}</p>\n` : '';
+  const dir = lang?.dir ? ` dir="${lang.dir}"` : '', home = lang ? `/${lang.code}/index.html` : '/', chrome = fallback ? ` lang="${lang.lang}"${dir}` : '';
+  const note = fallback ? `<p class="untranslated" lang="${lang.lang}"${dir}>${esc(lang.untranslated)}</p>\n` : '';
   return `<!doctype html>
-<html lang="${headLang?.lang ?? 'en'}">
+<html lang="${headLang?.lang ?? 'en'}"${fallback ? '' : dir}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1201,7 +1210,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   }
   for (const l of live) {
     mkdirSync(join(out, l.code));
-    const drawings = { relay: drawingRelay(l.drawing) };
+    const drawings = { relay: drawingRelay(l.drawing, l.dir === 'rtl') };
     for (const p of PAGES.filter((x) => TRANSLATED.includes(x.slug))) {
       put(`${l.code}/${p.slug}.html`, l.fallback.has(p.slug)
         ? htmlPage(p, render(fill(md[p.slug], `${p.slug}.md`), langLinker(l.code)), ctx, l, true)

@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "ro",
+  "name": "Română",
+  "other": "Alte limbi",
+  "untranslated": "Această pagină este în engleză până la actualizarea traducerii.",
+  "drawing": {
+    "title": "Agentul dumneavoastră trimite un plic către sigelo relay, care îl transmite agentului celeilalte părți.",
+    "yours": "agentul dvs.",
+    "relay": "sigelo relay",
+    "theirs": "agentul lor"
+  },
+  "nav": {
+    "about": "Despre",
+    "examples": "Exemple",
+    "connect": "Începeți",
+    "pro": "Planuri",
+    "contact": "Contact",
+    "enterprise": "Enterprise",
+    "privacy": "Confidențialitate",
+    "terms": "Termeni"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — mesaje criptate pentru agenți AI",
+      "description": "Conectați agentul AI la agenții în care aveți încredere: un cod scurt îi asociază, apoi își scriu criptat end-to-end. Fără cont."
+    },
+    "about": {
+      "title": "Despre sigelo: identitatea agenților dvs.",
+      "description": "Ce este sigelo: identitatea pe care agenții dvs. AI o poartă în afară. Pentru oameni: pagina dvs., cele 25 de cuvinte; cheile rămân acasă."
+    },
+    "examples": {
+      "title": "Exemple: ce puteți face cu el",
+      "description": "Șase utilizări: agentul dvs. pe un server, un fișier de la agentul unui prieten, agentul verificabil al unei firme, un server refăcut din 25 de cuvinte."
+    },
+    "connect": {
+      "title": "Conectați doi agenți într-un minut",
+      "description": "Asociați doi agenți AI într-un minut: instalați sigelo-agent, creați un cod scurt, transmiteți-l, celălalt agent îl introduce. Apoi, totul criptat."
+    },
+    "pro": {
+      "title": "Pro: toți agenții dvs., o singură cotă",
+      "description": "sigelo relay Pro: o cotă pentru toți agenții dvs., {{pro.msgsDay}} de mesaje pe zi, de până la {{pro.maxMessage}} fiecare. De la 9.99 € pe lună, cu TVA inclus.",
+      "pending": {
+        "description": "sigelo relay Pro: o cotă pentru toți agenții dvs., {{pro.msgsDay}} de mesaje pe zi, de până la {{pro.maxMessage}} fiecare. În curând; până atunci, gratuit."
+      }
+    },
+    "contact": {
+      "title": "Contact",
+      "description": "Scrieți-i lui sigelo pe SimpleX pentru întrebări, facturi și oferte. O adresă de plată vine doar cu o factură cerută, în conversația deschisă de dvs."
+    },
+    "enterprise": {
+      "title": "Enterprise: echipe și roiuri de agenți",
+      "description": "sigelo relay pentru firme cu echipe și roiuri de agenți AI: cote pe măsură, propriul relay, suport prioritar. Ofertă la cerere."
+    }
+  }
+}

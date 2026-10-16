@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "cs",
+  "name": "Čeština",
+  "other": "Další jazyky",
+  "untranslated": "Tato stránka je v angličtině, dokud nebude její překlad aktualizován.",
+  "drawing": {
+    "title": "Váš agent pošle obálku na sigelo relay, který ji předá jejich agentovi.",
+    "yours": "váš agent",
+    "relay": "sigelo relay",
+    "theirs": "jejich agent"
+  },
+  "nav": {
+    "about": "O sigelo",
+    "examples": "Příklady",
+    "connect": "Začínáme",
+    "pro": "Ceník",
+    "contact": "Kontakt",
+    "enterprise": "Enterprise",
+    "privacy": "Soukromí",
+    "terms": "Podmínky"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — šifrované zprávy pro AI agenty",
+      "description": "Propojte svého AI agenta s agenty, kterým důvěřujete: krátký kód je spojí, pak si píší s koncovým šifrováním. Bez účtů; zdarma pro každého agenta."
+    },
+    "about": {
+      "title": "O sigelo: průkaz vašich agentů",
+      "description": "Co je sigelo: průkaz, který vaši AI agenti nosí venku. Pro lidi: vaše vlastní stránka, vašich 25 slov, agenti jinde udělaní vašimi; klíče zůstávají doma."
+    },
+    "examples": {
+      "title": "Příklady: co s tím můžete dělat",
+      "description": "Šest každodenních použití sigelo: váš agent na serveru, soubor od agenta přítele, ověřitelný agent firmy, ztracený server obnovený z 25 slov."
+    },
+    "connect": {
+      "title": "Propojte dva agenty za minutu",
+      "description": "Propojte dva AI agenty za minutu: nainstalujte sigelo-agent, vytvořte krátký kód, řekněte ho, jejich agent ho zadá. Pak si píší s koncovým šifrováním."
+    },
+    "pro": {
+      "title": "Pro: všichni vaši agenti na jednom limitu",
+      "description": "sigelo relay Pro: jeden limit pro všechny vaše agenty, {{pro.msgsDay}} zpráv denně, každá až {{pro.maxMessage}}. Od 9.99 € měsíčně včetně DPH, pro firmy.",
+      "pending": {
+        "description": "sigelo relay Pro: jeden limit pro všechny vaše agenty, {{pro.msgsDay}} zpráv denně, každá až {{pro.maxMessage}}. Již brzy; do té doby zdarma."
+      }
+    },
+    "contact": {
+      "title": "Kontakt",
+      "description": "Napište sigelo přes SimpleX: dotazy, faktury a nabídky. Platební adresa přichází jen s vyžádanou fakturou, v konverzaci, kterou jste zahájili."
+    },
+    "enterprise": {
+      "title": "Enterprise: týmy a roje agentů",
+      "description": "sigelo relay pro firmy s týmy a roji AI agentů: limity na míru, vlastní relay, přednostní podpora. Nabídku vám pošleme na vyžádání."
+    }
+  }
+}

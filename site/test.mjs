@@ -462,29 +462,40 @@ ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now(
   'security.txt: Contact first, Expires in the future, its Canonical');
 
 // ---- languages (the Owner, 2026-10-16): /<code>/<page>.html, hreflang, the footer's switch -------
-// The first batch; the next is a folder more. Chinese is not in it.
+// The first batch, then the second (the Owner, 2026-10-16: Chinese in it); the next is a folder more.
 const FIRST_BATCH = ['de', 'es', 'fr', 'it', 'ja', 'nl', 'pl', 'pt-br'];
+const SECOND_BATCH = ['zh-cn', 'zh-tw', 'ko', 'ru', 'uk', 'cs', 'hi', 'bn', 'ta', 'ar', 'el', 'sv', 'da', 'nb', 'fi', 'ro', 'hu', 'pt-pt', 'tr', 'id', 'vi', 'th'];
+const BATCHES = [...FIRST_BATCH, ...SECOND_BATCH];
+// Written without spaces between words: no word count (the 1.3× rule counts what `wc -w` counts).
+const NO_SPACES = ['ja', 'zh-cn', 'zh-tw', 'th'];
+// Right to left (lang.json dir).
+const RTL = ['ar'];
 const ALL_LANGS = readLanguages(SITE);
 const langProblems = ALL_LANGS.flatMap((l) => [...l.stale.map((f) => `stale: ${f}`), ...l.why]);
-ok(langProblems.length === 0 && LANGS.length === ALL_LANGS.length && FIRST_BATCH.every((c) => LANGS.some((l) => l.code === c)) && !LANGS.some((l) => /^zh/.test(l.code)),
-  `languages: ${FIRST_BATCH.join(', ')} in i18n/, each fresh and well formed, so published${langProblems.length ? ` (${langProblems.join('; ')})` : ''}`);
+ok(langProblems.length === 0 && LANGS.length === ALL_LANGS.length && BATCHES.every((c) => LANGS.some((l) => l.code === c)) && LANGS.every((l) => (l.dir === 'rtl') === RTL.includes(l.code)),
+  `languages: ${BATCHES.join(', ')} in i18n/ (${RTL.join(', ')} right to left), each fresh and well formed, so published${langProblems.length ? ` (${langProblems.join('; ')})` : ''}`);
 const thtml = Object.fromEntries(LANGS.map((l) => [l.code, Object.fromEntries(TRANSLATED.map((slug) => [slug, files.has(`${l.code}/${slug}.html`) ? read(`${l.code}/${slug}.html`) : '']))]));
 const mainOf = (h) => h.match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? '';
 const alternatesIn = (h) => [...h.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map((m) => [m[1], m[2]]);
 // The prices and percentages of a page, as values (each written in the page's locale) with their sign.
-const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(/(\d[\d.,\u00a0\u202f]*\d|\d)[ \u00a0\u202f]?(€|%)/g)].map((m) => `${parseIn(m[1], lang)} ${m[2]}`).sort().join();
+const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(/(\p{Nd}[\p{Nd}.,\u00a0\u202f]*\p{Nd}|\p{Nd})[ \u00a0\u202f]?(€|%)/gu)].map((m) => `${parseIn(m[1], lang)} ${m[2]}`).sort().join();
 // The word for "card" in each language: the Owner's ban on the metaphor holds in every language (the
 // English page says "sigelo is that ID", and so must each translation).
-const CARD_WORDS = { de: /karte/i, fr: /\bcartes?\b/i, es: /\btarjetas?\b/i, 'pt-br': /\bcart(?:ão|ões)\b/i, it: /\b(?:cart[ae]|tesser[ae])\b/i, nl: /kaart/i, pl: /\bkart/i, ja: /カード/ };
+const CARD_WORDS = { de: /karte/i, fr: /\bcartes?\b/i, es: /\btarjetas?\b/i, 'pt-br': /\bcart(?:ão|ões)\b/i, it: /\b(?:cart[ae]|tesser[ae])\b/i, nl: /kaart/i, pl: /\bkart/i, ja: /カード/,
+  'zh-cn': /卡/, 'zh-tw': /卡/, ru: /карт/i, uk: /карт/i, hi: /कार्ड/, bn: /কার্ড/, ta: /அட்டை|கார்டு/, ar: /بطاق/, ko: /카드/, th: /บัตร|การ์ด/,
+  tr: /\bkart/i, id: /\bkartu\b/i, vi: /(?<!\p{L})thẻ(?!\p{L})/iu,
+  // sv, da, nb: "kort" is also "short" (a short code), so the card is the noun's forms and compounds.
+  sv: /\b(?:kortet|korten|id-?kort|betalkort|kreditkort)\b/i, da: /\b(?:kortet|kortene|id-?kort|betalingskort|kreditkort)\b/i, nb: /\b(?:kortet|kortene|id-?kort|bankkort|kredittkort)\b/i, fi: /\bkortti|\bkorti/i, cs: /\bkart/i, ro: /\bcard/i, hu: /\bkárty|\bkártya/i,
+  el: /κάρτ/i, 'pt-pt': /\bcart(?:ão|ões)\b/i };
 const sameSet = (a, b) => JSON.stringify([...a].map(String).sort()) === JSON.stringify([...b].map(String).sort());
 for (const l of LANGS) {
   const T = thtml[l.code];
   ok(TRANSLATED.every((slug) => T[slug]) && TRANSLATED.every((slug) => existsSync(join(SITE, I18N, l.code, `${slug}.md`))), `${l.code}: the seven pages, ${TRANSLATED.join(', ')}`);
-  ok(CARD_WORDS[l.code] !== undefined || !FIRST_BATCH.includes(l.code), `${l.code}: its word for "card" is listed (CARD_WORDS)`);
+  ok(CARD_WORDS[l.code] !== undefined || !BATCHES.includes(l.code), `${l.code}: its word for "card" is listed (CARD_WORDS)`);
   for (const p of PAGES.filter((x) => TRANSLATED.includes(x.slug))) {
     const h = T[p.slug], at = `${l.code}/${p.slug}`, [title, desc] = headOf(h), text = plainText(mainOf(h));
-    ok(h.startsWith(`<!doctype html>\n<html lang="${l.lang}">\n`) && title === titleIn(p, l, r.pending) && title.length <= 60 && title.includes('sigelo relay') && desc.length >= 50 && desc.length <= 155,
-      `${at}: <html lang="${l.lang}">, its own title (${title.length} chars ≤ 60, names sigelo relay) and description (${desc.length} chars, 50–155)`);
+    ok(h.startsWith(`<!doctype html>\n<html lang="${l.lang}"${l.dir ? ` dir="${l.dir}"` : ''}>\n`) && title === titleIn(p, l, r.pending) && title.length <= 60 && title.includes('sigelo relay') && desc.length >= 50 && desc.length <= 155,
+      `${at}: <html lang="${l.lang}"${l.dir ? ` dir="${l.dir}"` : ''}>, its own title (${title.length} chars ≤ 60, names sigelo relay) and description (${desc.length} chars, 50–155)`);
     ok(h.includes(`<link rel="canonical" href="${pageUrlIn(p, l.code)}">`) && !h.includes('type="text/markdown"') && (h.match(/<h1\b/g) ?? []).length === 1,
       `${at}: canonical ${pageUrlIn(p, l.code)}, one H1, no Markdown twin (agents read the English)`);
     ok(sameSet(alternatesIn(h), alternatesOf(p, LANGS)) && alternatesIn(h).length === LANGS.length + 2, `${at}: hreflang alternates for English, all ${LANGS.length} languages and x-default (English)`);
@@ -507,8 +518,8 @@ for (const l of LANGS) {
     const never = neverHits(`${text}\n${title}\n${desc}`), mails = [...new Set(h.match(EMAIL) ?? [])];
     ok(!talk && !card && never.length === 0 && mails.every((m) => m === 'contact@sigelo.io') && !/not on sale/i.test(h),
       `${at}: no protocol talk, no word for "card", none of the words never written, no e-mail but contact@sigelo.io${never.length ? ` (${never.join('; ')})` : ''}`);
-    if (l.code !== 'ja') {
-      // Not counted against a budget; kept near the English (the Owner: within about 1.3×). Japanese has no spaces to count.
+    if (!NO_SPACES.includes(l.code)) {
+      // Not counted against a budget; kept near the English (the Owner: within about 1.3×). Japanese, Chinese and Thai have no spaces to count.
       const n = words(fill(l.md[p.slug], at)), e = words(fill(src[p.slug], p.slug));
       ok(n <= Math.ceil(1.3 * e), `${at}: ${n} words, within 1.3× the English ${e}`);
     }
@@ -516,8 +527,8 @@ for (const l of LANGS) {
   const pro = T.pro, plans = [...pro.matchAll(/<div class="plan( best)?">\n(?:<p>[^<]+<\/p>\n)?<h3 id="[^"]+">.+?<\/h3>\n<p><strong>([^<]+)<\/strong>[^<]*<\/p>\n(?:<p>[^<]+<\/p>\n)?<p><a href="\/[\w-]+\/contact\.html">[^<]+<\/a><\/p>\n<\/div>/g)].map((m) => `${m[1] ? 'best ' : ''}${m[2]}`);
   const nf = new Intl.NumberFormat(l.lang), cents = (x) => `${new Intl.NumberFormat(l.lang, { minimumFractionDigits: 2 }).format(x)} €`;
   ok(plans.join() === [cents(14.99), cents(11.99), `best ${cents(9.99)}`].join() && /<div class="card pro">/.test(T.index) && (T.index.match(/<div class="card( pro)?">/g) ?? []).length === 3
-    && T.index.includes(drawingRelay(l.drawing)) && !T.index.includes(`>${DRAWING_WORDS.yours}<`),
-    `${l.code}: the three plans render as on /pro, prices in ${l.lang} (${plans.join(', ')}), each button to its contact page, 12 months best; the home page's three tier cards and the drawing in its words`);
+    && T.index.includes(drawingRelay(l.drawing, l.dir === 'rtl')) && T.index.includes('matrix(-1 0 0 1 640 0)') === (l.dir === 'rtl') && !T.index.includes(`>${DRAWING_WORDS.yours}<`),
+    `${l.code}: the three plans render as on /pro, prices in ${l.lang} (${plans.join(', ')}), each button to its contact page, 12 months best; the home page's three tier cards and the drawing in its words${l.dir ? ', mirrored (right to left)' : ''}`);
   ok(allowance && T.pro.includes(nf.format(allowance.TIERS.pro.msgsDay)) && T.index.includes(nf.format(allowance.TIERS.free.msgsDay)) && (nf.format(1000) === '1,000' || !T.pro.includes('50,000'))
     && headOf(T.pro)[1].includes(nf.format(allowance.TIERS.pro.msgsDay)),
     `${l.code}: every {{value}} number written for ${l.lang} (${nf.format(allowance?.TIERS.pro.msgsDay)} messages a day), in the page and its description`);
@@ -536,14 +547,25 @@ for (const l of LANGS) {
   ok(new Set(LANGS.map((l) => l.name)).size === LANGS.length && LANGS.every((l) => l.name !== 'English' && !/<|&/.test(l.name + l.other)),
     'languages: each named by its own name, once');
 }
-const FIRST_SENTENCE = { de: 'Verbinde', es: 'Conecta', fr: 'Connectez', it: 'Collega', ja: 'あなた', nl: 'Verbind', pl: 'Połącz', 'pt-br': 'Conecte' };
-ok(LANGS.every((l) => { const ps = [...(thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '').matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1])); return ps[0]?.startsWith(FIRST_SENTENCE[l.code] ?? '') && ps[1]?.split(/(?<=\.) |(?<=。)/).filter(Boolean).length === 3; }),
-  'home page in every language: the subline first (pinned per language), then three sentences, as the English');
+const FIRST_SENTENCE = { de: 'Verbinde', es: 'Conecta', fr: 'Connectez', it: 'Collega', ja: 'あなた', nl: 'Verbind', pl: 'Połącz', 'pt-br': 'Conecte',
+  'zh-cn': '把您的', 'zh-tw': '把您的', ko: '신뢰하는',
+  ru: 'Соедините', uk: "З'єднайте", cs: 'Propojte', hi: 'अपने एजेंटों', bn: 'আপনার এজেন্টদের', ta: 'நீங்கள் நம்பும்', ar: 'صِل وكلاءك', el: 'Συνδέστε τους',
+  sv: 'Koppla ihop', da: 'Forbind dine', nb: 'Koble agentene', fi: 'Yhdistä agenttisi', ro: 'Conectați', hu: 'Kösse', 'pt-pt': 'Ligue',
+  tr: 'Ajanlarınızı', id: 'Hubungkan', vi: 'Kết nối', th: 'เชื่อม' };
+ok(LANGS.every((l) => { const ps = [...(thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '').matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1])); return ps[0]?.startsWith(FIRST_SENTENCE[l.code] ?? '') && (l.code === 'th' || ps[1]?.split(/(?<=[.।]) |(?<=。)/).filter(Boolean).length === 3); }),
+  'home page in every language: the subline first (pinned per language), then three sentences, as the English (Thai, which ends a sentence with a space alone, not counted)');
 {
   // The home page's title in each language, pinned (the head a search result shows).
-  const HOME_TITLE = {"de":"sigelo relay — verschlüsselte Nachrichten für KI-Agenten", "es":"sigelo relay — mensajes cifrados para agentes de IA", "fr":"sigelo relay — messagerie chiffrée pour agents IA", "it":"sigelo relay — messaggi cifrati per agenti IA", "ja":"sigelo relay — AIエージェントのための暗号化メッセージ", "nl":"sigelo relay — versleutelde berichten voor AI-agents", "pl":"sigelo relay — szyfrowane wiadomości dla agentów AI", "pt-br":"sigelo relay — mensagens criptografadas para agentes de IA"};
+  const HOME_TITLE = {"de":"sigelo relay — verschlüsselte Nachrichten für KI-Agenten", "es":"sigelo relay — mensajes cifrados para agentes de IA", "fr":"sigelo relay — messagerie chiffrée pour agents IA", "it":"sigelo relay — messaggi cifrati per agenti IA", "ja":"sigelo relay — AIエージェントのための暗号化メッセージ", "nl":"sigelo relay — versleutelde berichten voor AI-agents", "pl":"sigelo relay — szyfrowane wiadomości dla agentów AI", "pt-br":"sigelo relay — mensagens criptografadas para agentes de IA",
+    "zh-cn":"sigelo relay — 为 AI 智能体提供的加密消息", "zh-tw":"sigelo relay — 為 AI 代理打造的加密訊息", "ko":"sigelo relay — AI 에이전트를 위한 암호화 메시지",
+    "ru":"sigelo relay — зашифрованные сообщения для ИИ-агентов", "uk":"sigelo relay — зашифровані повідомлення для ШІ-агентів", "cs":"sigelo relay — šifrované zprávy pro AI agenty",
+    "hi":"sigelo relay — AI एजेंटों के लिए एन्क्रिप्टेड संदेश", "bn":"sigelo relay — AI এজেন্টদের জন্য এনক্রিপ্টেড বার্তা", "ta":"sigelo relay — AI ஏஜென்ட்களுக்கான மறையாக்கச் செய்திகள்",
+    "ar":"sigelo relay — رسائل مشفّرة لوكلاء الذكاء الاصطناعي", "el":"sigelo relay — κρυπτογραφημένα μηνύματα για πράκτορες ΤΝ",
+    "sv":"sigelo relay — krypterade meddelanden för AI-agenter", "da":"sigelo relay — krypterede beskeder til AI-agenter", "nb":"sigelo relay — krypterte meldinger for KI-agenter", "fi":"sigelo relay — salattua viestintää tekoälyagenteille",
+    "ro":"sigelo relay — mesaje criptate pentru agenți AI", "hu":"sigelo relay — titkosított üzenetek MI-ügynököknek", "pt-pt":"sigelo relay — mensagens cifradas para agentes de IA",
+    "tr":"sigelo relay — yapay zekâ ajanları için şifreli mesajlaşma", "id":"sigelo relay — pesan terenkripsi untuk agen AI", "vi":"sigelo relay — nhắn tin mã hóa cho agent AI", "th":"sigelo relay — ข้อความเข้ารหัสสำหรับเอเจนต์ AI"};
   const off = LANGS.filter((l) => headOf(thtml[l.code].index)[0] !== HOME_TITLE[l.code]).map((l) => `${l.code}: "${headOf(thtml[l.code].index)[0]}"`);
-  ok(off.length === 0 && FIRST_BATCH.every((c) => HOME_TITLE[c]), `home page title in every language, as pinned${off.length ? ` (${off.join('; ')})` : ''}`);
+  ok(off.length === 0 && BATCHES.every((c) => HOME_TITLE[c]), `home page title in every language, as pinned${off.length ? ` (${off.join('; ')})` : ''}`);
 }
 ok(spawnSync(process.execPath, [join(SITE, 'build.mjs'), '--stale'], { encoding: 'utf8' }).stdout.startsWith(`relay/site/build --stale: none; ${ALL_LANGS.length} languages up to date`),
   'build.mjs --stale: no translation to refresh');
@@ -1054,8 +1076,8 @@ try {
     const at = (b, f) => readFileSync(join(b.out, f), 'utf8');
     // The fallback: the English page at the translated URL, under the line saying so, no hreflang.
     const isFallback = (h, l, slug) => h.startsWith('<!doctype html>\n<html lang="en">\n') && h.includes(`<link rel="canonical" href="${pageUrl({ slug })}">`) && !/hreflang=/.test(h.split('</head>')[0])
-      && h.includes(`<main>\n<p class="untranslated" lang="${l.lang}">${l.untranslated.replace(/&/g, '&amp;')}</p>\n`) && mainOf(h).includes(mainOf(html[slug]).trim().slice(0, 80))
-      && h.includes(`<header class="top" lang="${l.lang}">`) && h.includes(`<a class="wordmark" href="/${l.code}/index.html"`);
+      && h.includes(`<main>\n<p class="untranslated" lang="${l.lang}"${l.dir ? ` dir="${l.dir}"` : ''}>${l.untranslated.replace(/&/g, '&amp;')}</p>\n`) && mainOf(h).includes(mainOf(html[slug]).trim().slice(0, 80))
+      && h.includes(`<header class="top" lang="${l.lang}"${l.dir ? ` dir="${l.dir}"` : ''}>`) && h.includes(`<a class="wordmark" href="/${l.code}/index.html"`);
     const deL = LANGS.find((l) => l.code === 'de'), others = LANGS.filter((l) => l.code !== 'de');
     const want = (slug, langs) => [['en', pageUrl({ slug })], ...langs.map((l) => [l.lang, pageUrlIn({ slug }, l.code)]), ['x-default', pageUrl({ slug })]];
     const tampered = both(copySite(edit(de('pro.md'), /^---\nsource: ([0-9a-f])/, (_, c) => `---\nsource: ${c === '0' ? '1' : '0'}`)));

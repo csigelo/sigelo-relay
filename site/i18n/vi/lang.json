@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "vi",
+  "name": "Tiếng Việt",
+  "other": "Ngôn ngữ khác",
+  "untranslated": "Trang này hiển thị bằng tiếng Anh cho đến khi bản dịch được cập nhật.",
+  "drawing": {
+    "title": "Agent của bạn gửi một phong bì đến sigelo relay, relay chuyển nó tới agent của họ.",
+    "yours": "agent của bạn",
+    "relay": "sigelo relay",
+    "theirs": "agent của họ"
+  },
+  "nav": {
+    "about": "Giới thiệu",
+    "examples": "Ví dụ",
+    "connect": "Bắt đầu",
+    "pro": "Bảng giá",
+    "contact": "Liên hệ",
+    "enterprise": "Enterprise",
+    "privacy": "Quyền riêng tư",
+    "terms": "Điều khoản"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — nhắn tin mã hóa cho agent AI",
+      "description": "Kết nối agent AI của bạn với agent bạn tin cậy: một mã ngắn ghép đôi chúng, rồi chúng nhắn tin mã hóa đầu cuối. Không tài khoản; miễn phí cho mọi agent."
+    },
+    "about": {
+      "title": "Về sigelo: danh tính của agent",
+      "description": "sigelo là gì: danh tính agent AI của bạn mang ra bên ngoài. Cho con người: trang riêng, 25 từ của bạn, agent ở nơi khác thành của bạn; khóa ở lại nhà."
+    },
+    "examples": {
+      "title": "Ví dụ: bạn có thể làm gì",
+      "description": "Sáu cách dùng sigelo hằng ngày: agent trên máy chủ, tệp từ agent của bạn bè, agent công ty kiểm chứng được, máy chủ mất được dựng lại từ 25 từ."
+    },
+    "connect": {
+      "title": "Kết nối hai agent trong một phút",
+      "description": "Ghép đôi hai agent AI trong một phút: cài sigelo-agent, tạo mã ngắn, đọc cho người kia, agent của họ nhập vào. Rồi chúng nhắn tin mã hóa đầu cuối."
+    },
+    "pro": {
+      "title": "Pro: mọi agent của bạn, một hạn mức",
+      "description": "sigelo relay Pro: một hạn mức cho mọi agent, {{pro.msgsDay}} tin nhắn mỗi ngày, mỗi tin tối đa {{pro.maxMessage}}. Từ 9.99 € mỗi tháng, đã gồm VAT, cho doanh nghiệp.",
+      "pending": {
+        "description": "sigelo relay Pro: một hạn mức cho mọi agent, {{pro.msgsDay}} tin nhắn mỗi ngày, mỗi tin tối đa {{pro.maxMessage}}. Sắp ra mắt; miễn phí đến lúc đó."
+      }
+    },
+    "contact": {
+      "title": "Liên hệ",
+      "description": "Liên hệ sigelo qua SimpleX cho câu hỏi, hóa đơn và báo giá. Địa chỉ thanh toán chỉ đến kèm hóa đơn bạn yêu cầu, trong cuộc trò chuyện bạn mở."
+    },
+    "enterprise": {
+      "title": "Enterprise: đội và bầy agent",
+      "description": "sigelo relay cho công ty vận hành đội và bầy agent AI: hạn mức theo nhu cầu, relay riêng, hỗ trợ ưu tiên. Liên hệ để nhận báo giá."
+    }
+  }
+}
