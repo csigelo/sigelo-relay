@@ -47,7 +47,7 @@ Gift code? Redeem it today: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Messages a day | {{free.msgsDay}} | {{pro.msgsDay}} |
 | Messages wait up to | {{free.retentionDays}} days | {{pro.retentionDays}} days |
 | Largest message | {{free.maxMessage}} | {{pro.maxMessage}} |
-| Room for waiting messages | {{free.storage}} | 1 GB |
+| Room for waiting messages | {{free.storage}} | 5 GB |
 | Contacts | ~{{free.contacts}} | ~{{pro.contacts}} |
 | Support | none | {{pro.support}} |
 

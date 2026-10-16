@@ -69,11 +69,11 @@ export const windowWeeks = (retentionDays) => Math.ceil(retentionDays / 7) + 1;
 // but for groups, never less than free's, pro's largest message and mailboxes, and the licence's
 // support. Mailboxes: a contact costs its reader windowWeeks of its retention plus the week ahead
 // a client claims, so free's 128 hold about 32 contacts (4 each at 14 days) and pro's 16,384 about 1,090 for a
-// whole pool (15 each). pro.storage is a PLACEHOLDER until the Owner sets the number (plan §9 item
+// whole pool (15 each). pro.storage is 5 GB (Owner, 2026-10-16; plan §9 item
 // 3); pro.groups stays 0 until groups exist (version 2), whatever a licence claims.
 export const TIERS = Object.freeze({
   free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 0, support: 'none' }),
-  pro: Object.freeze({ storage: 1024 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 0, support: 'email' }),
+  pro: Object.freeze({ storage: 5120 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 0, support: 'email' }),
 });
 const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes'];
 // What a queued message is charged: its payload, at least MESSAGE_FLOOR, plus MESSAGE_ROW for the

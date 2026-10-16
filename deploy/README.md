@@ -24,7 +24,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to. Until the vendor ceremony it is the placeholder and no licence verifies: Pro is not on sale, and the site says so |
-| `RELAY_PRO_STORAGE_MB` | 1024 (pro.md sells 1 GB) | the most storage any Pro pool gets, whatever its licence says; set the same where the site is built |
+| `RELAY_PRO_STORAGE_MB` | 5120 (pro.md sells 5 GB) | the most storage any Pro pool gets, whatever its licence says; set the same where the site is built |
 | `RELAY_POW_BITS` | 22 | the proof of work a new identity sends once |
 | `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 24, 1000 | the proof asked once more than `RELAY_POW_LOAD` new identities have proven work in a clock hour, for that hour and the next |
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A native SHA-256 finds 26 bits in seconds, so this count, not the bits, bounds what one network mints |

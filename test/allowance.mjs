@@ -1320,11 +1320,11 @@ const fresh = (name, extra = {}) => {
   ok(migrated === 'email' && swept && R.db.raw.prepare('SELECT support FROM licences').get().support === 'email', `a licence table of an earlier version: its licence reads support "${migrated}", and survives the sweep's rebuild`);
   const opd = identity('operator d'), agd = identity('agent d'), frd = identity('free d');
   (await login(opd, {}, R)).client?.end(true);
-  const up = await upload(licence(opd, { claims: { tier: 'pro', storage_mb: 2048, msgs_day: 50000, retention_days: 365, groups: 5, support: 'priority' } }), R);
+  const up = await upload(licence(opd, { claims: { tier: 'pro', storage_mb: 8192, msgs_day: 50000, retention_days: 365, groups: 5, support: 'priority' } }), R);
   (await login(agd, { pow: true, bundle: withVouch(agd, opd, vouch(opd, agd)) }, R)).client?.end(true);
   const t = D.tier(agd).limits, f = D.tier(frd).limits;
-  ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 1024 * MB && t.groups === 0 && t.support === 'priority',
-    'a licence selling 365 days, 2 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 1 GB, groups 0 until they exist, support "priority"');
+  ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 5120 * MB && t.groups === 0 && t.support === 'priority',
+    'a licence selling 365 days, 8 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 5 GB, groups 0 until they exist, support "priority"');
   ok(f.retentionDays === 14 && f.maxMessage === 512 * KB && f.mailboxes === 128 && f.support === 'none' && D.pol.retention(accountOf(agd.original)) === 90 * DAY,
     'a free identity: 14 days, 512 KB, 128 mailboxes, no support; the pooled agent\'s messages are kept 90 days');
   await R.close();

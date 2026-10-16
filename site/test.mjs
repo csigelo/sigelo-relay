@@ -764,8 +764,8 @@ try {
   ok(/launch: no site\/launch\.json/.test(finalWith(undefined, { launched: false }) ?? ''),
     '--final: in the relay export (no SECURITY.md above it) refuses without the launch record the private tree\'s --launch wrote');
   if (allowance) {
-    const { MB } = allowance, cell = src.pro.match(/^\| Room for waiting messages \| [^|]+ \| ([^|]+) \|$/m)?.[1].trim(), big = set('pro', `| ${cell} |`, '| 2 GB |');
-    ok(new RegExp(`the storage cell says 2 GB, more than the relay grants a Pro pool \\(${allowance.TIERS.pro.storage / MB} MB`).test(finalWith(big) ?? '') && finalWith(big, { proStorage: 2048 * MB }) === null,
+    const { MB } = allowance, cell = src.pro.match(/^\| Room for waiting messages \| [^|]+ \| ([^|]+) \|$/m)?.[1].trim(), big = set('pro', `| ${cell} |`, '| 8 GB |');
+    ok(new RegExp(`the storage cell says 8 GB, more than the relay grants a Pro pool \\(${allowance.TIERS.pro.storage / MB} MB`).test(finalWith(big) ?? '') && finalWith(big, { proStorage: 8192 * MB }) === null,
       '--final: refuses a Pro storage cell above what the relay grants (TIERS.pro.storage, or RELAY_PRO_STORAGE_MB where the site is built), and builds once that allows it');
     ok(proStorageCap(undefined) === allowance.TIERS.pro.storage && proStorageCap('') === allowance.TIERS.pro.storage && proStorageCap('2048') === 2048 * MB
       && ['0', '1e3', '-5', '10000001', ' 5'].every((v) => proStorageCap(v) === null), 'RELAY_PRO_STORAGE_MB: read as the relay reads it (a whole number of MB, 1 to 10,000,000), else TIERS.pro.storage');
