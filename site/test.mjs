@@ -20,7 +20,7 @@
 // against the pages and the relay's own code; the numbers, fields and steps the pages promise against
 // the relay's behaviour. In the private tree it also compares the official names with sigelo.io's
 // and relay/licence.ts with spend/licence.ts, and runs the internal runbook's self-test
-// (commercial/relay-pro-runbook.md §11). No network: the registry check of --launch runs here against
+// (runbook §11). No network: the registry check of --launch runs here against
 // stand-in registry documents.
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -120,7 +120,7 @@ ok(pending.length ? refused !== null && pending.every((x) => refused.includes(x)
 ok(!DRAFT_RE.test(src.terms) && !r.open.includes('DRAFT') && !(src.terms.match(PLACEHOLDER_RE) ?? []).length
   && src.terms.includes("**Law and courts.** The law and courts of the Seller's registered seat in the European Union."),
 'terms.md: final (no DRAFT mark, no placeholder), law and courts of the Seller\'s registered seat in the EU');
-// The Owner's decision: the pages name the seller by the trade name only, the legal name on request.
+// The pages name the seller by the trade name only, the legal name on request.
 // The terms add where a buyer finds it anyway: on the invoice (runbook §1, as VAT law requires).
 const SELLER_LINE = (where) => `${SELLER}, a business registered in the European Union; legal name and registered address ${where} \`contact@sigelo.io\``;
 ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('on request at')}.`) && src.terms.includes(`Seller: ${SELLER_LINE('on invoices and on request at')} ("the Seller").`)
@@ -281,7 +281,7 @@ for (const p of PAGES) {
 const adopt = join(ROOT, 'site', 'src', 'adopt.md');
 if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8')), 'pro: the link to sigelo.io/adopt.html#1-identity has its heading');
 
-// ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
+// ---- header and footer (A10): the wordmark and the links, nothing else (2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
 const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
@@ -331,7 +331,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   ok(/::: cta\n\[Contact us →\]\(\/contact\.html\)\n:::\n?$/.test(src.enterprise) && src.enterprise.includes('Contact us for a quote.'),
     'enterprise: ends with the Contact button; "Contact us for a quote."');
 }
-// pro: the three plans side by side (the Owner, 2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
+// pro: the three plans side by side (2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
 // /contact; the 12-month one highlighted, "Best value"; under them one line, VAT included, no rate or reverse charge.
 {
   const plans = [...html.pro.matchAll(/<div class="plan( best)?">\n(?:<p>([^<]+)<\/p>\n)?<h3 id="[^"]+">(\d+ months?)(?: <em>([^<]+)<\/em>)?<\/h3>\n<p><strong>([^<]+)<\/strong> a month<\/p>\n(?:<p>([^<]+)<\/p>\n)?<p><a href="\/contact\.html">Get Pro<\/a><\/p>\n<\/div>/g)]
@@ -358,15 +358,15 @@ const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
   `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Gross prices, "VAT included", no rate and no reverse-charge wording anywhere (the Owner, 2026-10-14); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
-// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (the Owner, 2026-10-14).
+// Gross prices, "VAT included", no rate and no reverse-charge wording anywhere (2026-10-14); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
+// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (2026-10-14).
 ok(priceLineM && src.terms.includes('Prices as on [Pro](/pro.html), VAT included, billed up front for the period. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
   && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[1]} % off)`)
   && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Contact us for a quote.')
   && src.privacy.includes('Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet.')
   && !/Monero only|24 hours|excluding VAT|none on a reverse-charge|100 € a year|a month or a year|EU business with a VAT number|valid EU VAT number|reverse.charge|Belgi|\d %(?:\s|&nbsp;)*(?:Belgian )?VAT/i.test(src.terms + src.pro + src.agents + src.privacy + src.index + src.contact + PAGES.map((p) => p.description).join() + read('index.json') + read('relay.json') + read('llms.txt') + read('llms-full.txt')),
 'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
-// No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
+// No protocol talk on the pages a person reads first (2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'about', 'examples'];
 const talk = HUMAN.filter((slug) => /\bMQTT\b|\bA2A\b|post-quantum|\bDID\b|attestation|X-Wing|Ed25519|\bTLS\b/i.test(body[slug]));
@@ -461,8 +461,8 @@ const sec = read('.well-known/security.txt'), expires = Date.parse(sec.match(/^E
 ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now() && sec.includes(`\nCanonical: ${ORIGIN}/.well-known/security.txt\n`),
   'security.txt: Contact first, Expires in the future, its Canonical');
 
-// ---- languages (the Owner, 2026-10-16): /<code>/<page>.html, hreflang, the footer's switch -------
-// The first batch, then the second (the Owner, 2026-10-16: Chinese in it); the next is a folder more.
+// ---- languages (2026-10-16): /<code>/<page>.html, hreflang, the footer's switch -------
+// The first batch, then the second (2026-10-16: Chinese in it); the next is a folder more.
 const FIRST_BATCH = ['de', 'es', 'fr', 'it', 'ja', 'nl', 'pl', 'pt-br'];
 const SECOND_BATCH = ['zh-cn', 'zh-tw', 'ko', 'ru', 'uk', 'cs', 'hi', 'bn', 'ta', 'ar', 'el', 'sv', 'da', 'nb', 'fi', 'ro', 'hu', 'pt-pt', 'tr', 'id', 'vi', 'th'];
 const BATCHES = [...FIRST_BATCH, ...SECOND_BATCH];
@@ -594,7 +594,7 @@ ok(index.tiers.pro.on_sale === false && relayInfo.fees.on_sale === false && null
   `index.json, relay.json: a draft is not on sale, not_yet_on_sale is what the pages say (${r.pending}), a value is null exactly while it is open, the vendor DID while unset${nullWrong.length ? ` (wrong: ${nullWrong.join(', ')})` : ''}`);
 // Until the vendor ceremony no licence can be issued: pro.md says so at its top, in the one sentence the
 // build reads (VENDOR_PENDING), and so do the home page's Pro card (HOME_PENDING, under the price) and
-// llms.txt. The Owner's words: "coming soon", no date.
+// llms.txt. The pages say "coming soon", no date.
 ok(VENDOR_PENDING_PAGES.join() === 'pro' && VENDOR_PENDING === 'Pro is coming soon. Every agent runs free until then.' && HOME_PENDING === 'Coming soon.'
   && (r.pending ? body.pro.startsWith(`# ${H1.pro}\n\n${VENDOR_PENDING}\n\n`) && /\(https:\/\/sigelo\.ai\/pro\.md\): [^\n]*; coming soon\n/.test(read('llms.txt'))
       && /<p><strong>From 9\.99 € a month<\/strong>, VAT included<\/p>\n<p>Coming soon\.<\/p>/.test(html.index)
@@ -1153,7 +1153,7 @@ if (allowance && mailbox && operator && db) {
   };
   const offRows = Object.entries(table).filter(([label, want]) => row(label).join() !== want.join()).map(([label]) => label);
   const storage = row('Room for waiting messages');
-  // Pro's storage is the constant the relay grants (TIERS.pro.storage), never more: the Owner asked
+  // Pro's storage is the constant the relay grants (TIERS.pro.storage), never more: the plan said
   // for 5 GB, the relay grants 1 GB, so the page says 1 GB.
   if (storage[0] !== size(free.storage) || storage[1] !== (pro.storage % (1024 * MB) === 0 ? `${pro.storage / 1024 / MB} GB` : size(pro.storage))) offRows.push('Room for waiting messages');
   ok(offRows.length === 0, `pro: the Free/Pro table is relay/allowance.mjs TIERS, Pro's storage TIERS.pro.storage${offRows.length ? ` (differs: ${offRows.join(', ')})` : ''}`);
@@ -1289,7 +1289,7 @@ ok(['No custody', 'No payment routing', 'No access to content', 'The attestation
   'terms: B2B, no custody, no payment routing, no access to content, the attestation is the subscription');
 // No custody: should a pay page ever ask for a transaction key, the clause must say it only proves a
 // payment. Refunds: a licence not yet on the relay within 14 days, and the §9 warranty with a time to
-// fix it, as commercial/LICENCE-TERMS-draft.md §9 (A5 review). Ending a licence is a later, shorter
+// fix it, as the licence terms §9 (A5 review). Ending a licence is a later, shorter
 // reissue (operator.mjs keeps the one issued last), which is how a refund is made safe.
 ok(src.terms.includes('never receives or holds a seed, private key or other means of access')
   && (!/transaction key/.test(src.contact + src.agents) || src.terms.includes('(transaction keys only prove payments)'))

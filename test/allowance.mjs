@@ -154,7 +154,7 @@ async function loginBadPow(id, r = relay) {
 }
 const isoOf = (t) => new Date(t * 1000).toISOString().replace('.000Z', 'Z');
 
-// ---- licences and operator attestations, as commercial/issue-licence.mjs and an operator write them ----
+// ---- licences and operator attestations, as the offline issuer and an operator write them ----
 const relayClaims = { tier: 'pro', storage_mb: 1, msgs_day: 5, retention_days: 20, groups: 0 };
 function licence(sub, o = {}) {
   const v = o.vendor ?? vendor, iat = o.iat ?? now - 60;
@@ -720,7 +720,7 @@ let annC, benC, K;
   la.client?.end(true);
   const reissued = await upload(licence(opr, { vendor: vendor2, exp: now + 90 * DAY }));
   ok(reissued.ok && tierOf(ann).pool === POOL, 'the vendor reissues the operator\'s licence under its new key: ann pools again, without a new login');
-  // The licence check alone, as commercial/test.sh runs it: the same rules without the store.
+  // The licence check alone, as the issuer's own test runs it: the same rules without the store.
   const alone = checkRelayLicence(licence(opy, { vendor: vendor2 }), now, { vendor: vendor.original });
   ok(alone.ok === true && alone.chain.chain.length === 2 && checkRelayLicence(licence(opy), now, { vendor: other.original }).why.includes('not the vendor'), 'checkRelayLicence: the vendor rules of spend/licence.ts with ctx sigelo-relay');
 }
@@ -1739,7 +1739,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ gift codes (gifts.mjs, POST /gift, operator.mjs gift)
 // A relay of its own, with its own clock, so months can pass and it can restart. Codes are made
-// here as commercial/gift-codes.mjs makes them, and hashed as contact/short.mjs giftHash does,
+// here as the offline issuer makes them, and hashed as contact/short.mjs giftHash does,
 // spelled out (relay/ is published without contact/): SHA-256("sigelo-gift/0" ‖ 8 characters).
 {
   const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
