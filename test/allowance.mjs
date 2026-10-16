@@ -483,6 +483,11 @@ let F;
   await publish(iv, F, randomBytes(564));
   ok(charged(frank) === 5000 && queued(F).n === 4, 'quota_storage edge: a message whose charge fills the reader\'s 5,000 exactly is stored');
   await refusedPublish(iv, F, 1, 'quota_storage', 'quota_storage edge: one byte more');
+  {
+    const n = notices(iv).find((x) => x.code === 'quota_storage');
+    ok(n?.side === 'reader' && /^reader over quota: the reader \(free tier\) has 5000 of 5000 bytes/.test(n.detail),
+      `the reader's own queue full: side "reader", the detail begins "reader over quota" (the writer's relay and allowance are fine) (${JSON.stringify(n)})`);
+  }
   await refusedPublish(iv, F, 0, 'quota_storage', 'and an empty message: charged 640 (at least 256, plus 384), not nothing');
   const back = (await login(frank, { bundle: false })).client;
   ok(await until(() => queued(F).n === 0) && got(back, F).length === 4 && charged(frank) === 0, 'the reader collects its 4 messages: acknowledged, deleted, nothing charged');
@@ -934,7 +939,7 @@ const fresh = (name, extra = {}) => {
   await publish(sc, Y, Buffer.alloc(0));
   sc.box.length = 0;
   await publish(sc, Y, Buffer.alloc(0));
-  ok(await noticed(sc, 'quota_storage') && /free tier is full/.test(notices(sc)[0]?.detail) && queued(Y, R).n === 2 && charged(r2, R) === 1280,
+  ok(await noticed(sc, 'quota_storage') && /free tier is full/.test(notices(sc)[0]?.detail) && notices(sc)[0]?.side === 'relay' && queued(Y, R).n === 2 && charged(r2, R) === 1280,
     `a second free reader, its own allowance far from spent, stops at the relay's free ceiling: "quota_storage" (${notices(sc)[0]?.detail})`);
   const t = S.tier(ags);
   ok(up.ok && t.pool === accountOf(ops.original) && t.limits.msgsDay === 100 && t.limits.retention === 7 * DAY && t.limits.storage === 64000,
@@ -979,7 +984,8 @@ const fresh = (name, extra = {}) => {
   for (let i = 0; i < 5; i++) await publish(i % 2 ? a2 : a1, SINK, Buffer.alloc(0));
   ok(queued(SINK, R).n === 5 && notices(a1).length === 0 && notices(a2).length === 0, 'two identities on 127.0.0.0/24 store 5 empty messages for their own mailbox: 3,200 bytes, with the rows half the ceiling');
   await refusedPublish(a1, SINK, 0, 'quota_storage', 'a 6th from that network would pass half: refused, its share (a quarter of the ceiling) passed');
-  ok(/your network stored 3200 bytes/.test(notices(a1)[0]?.detail ?? ''), `named as the network's share (${notices(a1)[0]?.detail})`);
+  ok(/^network share used: .*your network stored 3200 bytes/.test(notices(a1)[0]?.detail ?? '') && notices(a1)[0]?.side === 'sender',
+    `named as the network's share: side "sender", the detail begins "network share used" (${JSON.stringify(notices(a1)[0])})`);
   const sc = (await login(st, { local: '127.0.1.1' }, R)).client;
   await publish(sc, RD, Buffer.alloc(0));
   await sleep(50);
@@ -1534,7 +1540,8 @@ const fresh = (name, extra = {}) => {
   for (let i = 0; i < 3; i++) await publish(sc, T1, randomBytes(1000));
   ok(queued(T1, R).n === 3, 'three of 1,000 bytes are stored (4,152 charged)');
   await refusedPublish(sc, T1, 1000, 'quota_storage', 'a fourth: past agent 1\'s share of its pool from outside it (5,000)');
-  ok(/the most one agent of its pool holds from writers outside it/.test(notices(sc).at(-1)?.detail ?? ''), `named as that share (${notices(sc).at(-1)?.detail})`);
+  ok(/^reader over quota: .*the most one agent of its pool holds from writers outside it/.test(notices(sc).at(-1)?.detail ?? '') && notices(sc).at(-1)?.side === 'reader',
+    `named as that share, on the reader's side (side "reader") (${notices(sc).at(-1)?.detail})`);
   sc.box.length = 0;
   await publish(sc, T2, randomBytes(1000));
   await sleep(50);

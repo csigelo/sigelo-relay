@@ -12,8 +12,10 @@
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
 //     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park and GET /park/<hash> (short
 //                       invite codes: park.mjs), POST /licence, POST /gift (gift codes:
-//                       gifts.mjs) and GET /stats (counts only: stats.mjs) on 127.0.0.1 for
-//                       nginx (default 8791)
+//                       gifts.mjs), GET /stats (counts only: stats.mjs) and MQTT over WebSocket
+//                       (an upgrade at /mqtt, subprotocol mqtt) on 127.0.0.1 for nginx (default
+//                       8791). Each takes the client's address from X-Real-IP, believed from
+//                       loopback only (auth.mjs clientAddress)
 //     RELAY_LOGIN_RATE  CONNECTs and POST /check together, per minute per /24 (IPv4) or /48 (IPv6)
 //                       (default 30); GET /challenge separately at the same number. HTTP calls
 //                       are counted by nginx's X-Real-IP
@@ -32,14 +34,15 @@ import { readFileSync, realpathSync, statfsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Duplex } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { auth, MAX_BODY, MAX_PER_PREFIX, MAX_SESSIONS, UNPROVEN_SECONDS, prefixOf } from './auth.mjs';
+import { WebSocketServer, createWebSocketStream } from 'ws';
+import { auth, clientAddress, MAX_BODY, MAX_PER_PREFIX, MAX_SESSIONS, UNPROVEN_SECONDS, WS_PATH, WS_PROTOCOL, prefixOf } from './auth.mjs';
 import { openDb } from './db.mjs';
 import { mailboxes, MAX_TOPICS } from './mailbox.mjs';
 import { relayPolicyFromEnv } from './allowance.mjs';   // M4: allowances, proof of work, licences
 import { relayStats } from './stats.mjs';
 import { parking } from './park.mjs';
 
-export { prefixOf };
+export { WS_PATH, prefixOf };
 
 export const FULL = 0.70;
 // The CONNECT is capped at the HTTP body limit (its password carries the bundle); a later packet
@@ -82,6 +85,13 @@ export const EARLY_PER_PREFIX = 2 * 1024 * 1024, EARLY_MAX = 32 * 1024 * 1024;
 // writer's PUBACK waits for the delivery too.
 export const MAX_BACKLOG = 1024 * 1024, DRAIN_MS = 10000;
 const SUBSCRIBE = 8, UNSUBSCRIBE = 10;
+// MQTT over WebSocket (clients whose network lets only HTTPS out, on 443; nginx passes the upgrade
+// on). A WebSocket frame is held whole before its bytes reach Capped, so it is capped first: at the
+// largest packet frameCheck lets through, its fixed header (1 type byte, 4 length bytes) included,
+// and before the CONNACK at the largest CONNECT. MQTT.js writes one packet per frame. Its unfinished
+// bytes draw on the same budgets, with the same deadline, as an unfinished packet's (wsFrameCheck).
+// Not ws's default of 100 MiB, and no compression (a small frame must not inflate).
+export const MAX_WS_FRAME = MAX_FRAME + 5, MAX_WS_EARLY = MAX_CONNECT + 5;
 
 // The bytes held of packets not yet whole, per prefix and in all (the header above). reserve →
 // true when they fit; release gives them back.
@@ -133,30 +143,77 @@ function frameCheck(cap, begin, grow, end) {
   };
 }
 
+// The WebSocket frames (RFC 6455 §5.2) in the raw bytes of an upgraded socket, as frameCheck reads
+// packets: 2 header bytes, a 16- or 64-bit length when the 7-bit one says 126 or 127, a 4-byte mask
+// when the mask bit is set, then the payload. cap() → the most a frame may hold now; begin, grow,
+// end as frameCheck's. → null, or why the connection must close.
+function wsFrameCheck(cap, begin, grow, end) {
+  let head = [], need = 2, left = 0;
+  return (chunk) => {
+    for (let i = 0; i < chunk.length;) {
+      if (left > 0) {
+        const n = Math.min(left, chunk.length - i), why = grow(n);
+        if (why) return why;
+        left -= n; i += n;
+        if (left === 0) end();
+        continue;
+      }
+      head.push(chunk[i++]);
+      if (head.length === 2) need = 2 + ((head[1] & 127) === 126 ? 2 : (head[1] & 127) === 127 ? 8 : 0) + (head[1] & 128 ? 4 : 0);
+      if (head.length < need) continue;
+      const l7 = head[1] & 127, len = l7 < 126 ? l7 : head.slice(2, l7 === 126 ? 4 : 10).reduce((a, b) => a * 256 + b, 0);
+      head = []; need = 2;
+      if (len > cap()) return 'WebSocket frame over its size cap';
+      left = len;
+      if (left > 0) begin();
+    }
+    return null;
+  };
+}
+
+// One unfinished unit at a time of connection c (a packet, or a WebSocket frame) against the
+// budgets: begin() when one is announced (its pool: held once logged in, else early; its deadline),
+// grow(n) → why the next n bytes of it may not be held (or null), done() when it is whole or the
+// connection ends.
+function holding(c, { held, early, prefix, frameMs }) {
+  let pool = null, open = 0, timer = null;
+  const done = () => { clearTimeout(timer); timer = null; if (open > 0) pool.release(prefix, open); open = 0; pool = null; };
+  return {
+    begin() {
+      pool = c.loggedIn ? held : early;
+      timer = setTimeout(() => c.destroy(Object.assign(new Error('a packet not whole in time'), { check: 'slow_packet' })), frameMs);
+    },
+    grow(n) {
+      if (!pool.reserve(prefix, n)) return 'packets left unfinished over the budget';
+      open += n;
+      return null;
+    },
+    done,
+  };
+}
+
 // What Aedes reads and writes instead of the socket: the socket's bytes, each checked by
 // frameCheck() before the parser sees it. destroy() closes the socket, as on a bare socket.
 // held, early: the shared budgets of unfinished packets (partials), after and before the CONNACK;
 // prefix: this socket's /24 or /48. loggedIn is set by server.mjs once the CONNECT is admitted.
+// raw: for MQTT over WebSocket, sock is the stream of messages (createWebSocketStream) and raw the
+// upgraded socket under it, whose frames are checked as they arrive (wsFrameCheck).
 class Capped extends Duplex {
-  constructor(sock, { held, early, prefix, frameMs }) {
+  constructor(sock, { held, early, prefix, frameMs, raw }) {
     super();
-    this.sock = sock; this.loggedIn = false;
-    // The budget this socket's unfinished packet draws on, the bytes it holds there, its deadline.
-    let pool = null, open = 0, timer = null;
-    const done = () => { clearTimeout(timer); timer = null; if (open > 0) pool.release(prefix, open); open = 0; pool = null; };
-    this.done = done;
+    this.sock = sock; this.raw = raw; this.loggedIn = false;
+    const packet = holding(this, { held, early, prefix, frameMs }), frame = raw ? holding(this, { held, early, prefix, frameMs }) : null;
+    this.done = () => { packet.done(); frame?.done(); };
     const check = frameCheck(
       (type, first) => (first ? MAX_CONNECT : type === SUBSCRIBE || type === UNSUBSCRIBE ? MAX_SUBSCRIBE : this.loggedIn ? MAX_FRAME : MAX_EARLY),
-      () => {
-        pool = this.loggedIn ? held : early;
-        timer = setTimeout(() => this.destroy(Object.assign(new Error('a packet not whole in time'), { check: 'slow_packet' })), frameMs);
-      },
-      (n) => {
-        if (!pool.reserve(prefix, n)) return 'packets left unfinished over the budget';
-        open += n;
-        return null;
-      },
-      done);
+      packet.begin, packet.grow, packet.done);
+    if (raw) {
+      const frames = wsFrameCheck(() => (this.loggedIn ? MAX_WS_FRAME : MAX_WS_EARLY), frame.begin, frame.grow, frame.done);
+      raw.on('data', (chunk) => {
+        const why = frames(chunk);
+        if (why) this.destroy(Object.assign(new Error(why), { check: 'size' }));
+      });
+    }
     sock.on('data', (chunk) => {
       const why = check(chunk);
       if (why) return this.destroy(Object.assign(new Error(why), { check: 'size' }));
@@ -169,10 +226,10 @@ class Capped extends Duplex {
   _read() { this.sock.resume(); }
   // Bytes written to this connection and not yet taken by the network: this stream's buffer and
   // the socket's own.
-  get backlog() { return this.writableLength + this.sock.writableLength; }
+  get backlog() { return this.writableLength + this.sock.writableLength + (this.raw?.writableLength ?? 0); }
   _write(chunk, encoding, cb) { this.sock.write(chunk, cb); }
   _final(cb) { this.sock.end(cb); }
-  _destroy(err, cb) { this.done(); this.sock.destroy(); cb(err); }
+  _destroy(err, cb) { this.done(); this.sock.destroy(); this.raw?.destroy(); cb(err); }
 }
 
 const diskUsage = (dir, log) => {
@@ -245,16 +302,20 @@ export async function startRelay(cfg) {
   broker.on('clientError', onError);
   broker.on('connectionError', onError);
 
-  const onSocket = (sock) => {
+  // A connection's bytes (sock), its client's address, and for MQTT over WebSocket the upgraded
+  // socket under the stream (raw).
+  const onStream = (sock, address, raw) => {
     // No Nagle delay on small acknowledgements; TCP keepalive finds a peer that vanished without a
     // FIN even when its MQTT keepalive is 0.
-    sock.setNoDelay(true);
-    sock.setKeepAlive(true, 60000);
-    const prefix = prefixOf(sock.remoteAddress);
-    const client = broker.handle(new Capped(sock, { held, early, prefix, frameMs }));
+    const net = raw ?? sock;
+    net.setNoDelay(true);
+    net.setKeepAlive(true, 60000);
+    const prefix = prefixOf(address);
+    const client = broker.handle(new Capped(sock, { held, early, prefix, frameMs, raw }));
     a.attach(client, prefix);
-    sock.once('close', () => a.detach(client));   // every socket closes, whatever ended it: the session caps count down
+    net.once('close', () => a.detach(client));   // every socket closes, whatever ended it: the session caps count down
   };
+  const onSocket = (sock) => onStream(sock, sock.remoteAddress);
   const listen = (server, port, host) => new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => { server.off('error', reject); resolve(server.address().port); });
@@ -262,6 +323,24 @@ export async function startRelay(cfg) {
 
   const ports = {};
   const http = a.http;
+  // MQTT over WebSocket on the HTTP port: an upgrade at WS_PATH asking for subprotocol mqtt, else
+  // 400 and closed. The address is auth.mjs clientAddress's, as for /challenge and /check: nginx
+  // connects from loopback, so without X-Real-IP every client would be one network.
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_WS_FRAME, perMessageDeflate: false, handleProtocols: () => WS_PROTOCOL });
+  http.on('upgrade', (req, sock, head) => {
+    let path = null;
+    try { path = new URL(req.url, 'http://relay').pathname; } catch {}
+    const asked = String(req.headers['sec-websocket-protocol'] ?? '').split(',').map((p) => p.trim());
+    if (path !== WS_PATH || !asked.includes(WS_PROTOCOL) || String(req.headers.upgrade).toLowerCase() !== 'websocket') {
+      sock.on('error', () => {});
+      return sock.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    }
+    const address = clientAddress(req);
+    wss.handleUpgrade(req, sock, head, (ws) => {
+      ws.on('error', () => {});   // a frame over maxPayload, a protocol error: the close follows
+      onStream(createWebSocketStream(ws), address, sock);
+    });
+  });
   ports.http = await listen(http, cfg.httpPort, '127.0.0.1');
   let tcp, tls, reloadTls = () => {};
   if (cfg.tcpPort !== undefined) { tcp = tcpServer(onSocket); ports.tcp = await listen(tcp, cfg.tcpPort, '127.0.0.1'); }
@@ -291,6 +370,7 @@ export async function startRelay(cfg) {
     clearInterval(timer);
     const stopped = Promise.all([closeServer(tcp), closeServer(tls)]);
     await new Promise((resolve) => broker.close(resolve));
+    for (const ws of wss.clients) ws.terminate();
     http.closeAllConnections();
     await Promise.all([stopped, closeServer(http)]);
     m.close();

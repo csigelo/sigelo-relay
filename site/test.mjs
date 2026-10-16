@@ -635,6 +635,8 @@ ok(same(off.payment_details_only_on, PAYMENT_PLACES) && same(off.never_asks_for,
   'index.json: the official "never" and invoice fields say what the "Nobody…" line says (an address only with an invoice the buyer asked for, over sigelo.io\'s SimpleX address)');
 ok(same(relayInfo.official, off) && relayInfo.payments_url === `${ORIGIN}/pro.html`, 'relay.json: the same official names as index.json, and where to pay');
 const INFO_FIELDS = ['name', 'software', 'version', 'source', 'limits', 'fees', 'payments_url', 'terms', 'privacy', 'contact', 'official'];
+ok(relayInfo.endpoints?.mqtt === `mqtts://${HOST}:8883` && relayInfo.endpoints?.mqtt_ws === `wss://${HOST}/mqtt` && relayInfo.mqtt?.url === relayInfo.endpoints.mqtt,
+  'relay.json: endpoints, MQTT over TLS on 8883 and over WebSocket on 443 (wss, /mqtt)');
 ok(INFO_FIELDS.every((k) => relayInfo[k] !== undefined && relayInfo[k] !== null) && relayInfo.limits.free && relayInfo.limits.pro && Array.isArray(relayInfo.official.domains),
   `relay.json: plan §11's fields (${INFO_FIELDS.join(', ')}), limits per tier, the official domains`);
 // Plan §11's four sentences: in index.json, relay.json and llms-full.txt; on the pages, the first three
@@ -699,8 +701,18 @@ if (conf) {
     .filter((b) => !b.blocks.some((x) => x.head === 'if ($sigelo_browser)' && x.directives.join() === 'return 403')).map((b) => b.head);
   const proxied = servers.flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))));
   const browserMap = conf.blocks.find((b) => b.head === 'map $http_sec_fetch_site$http_origin $sigelo_browser')?.directives ?? [];
-  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 7 && browserGaps(conf).length === 0,
-    `nginx: /challenge, /check, /park, /park/<hash>, /licence and /gift answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 8 && browserGaps(conf).length === 0,
+    `nginx: /challenge, /check, /park, /park/<hash>, /licence, /gift and /mqtt answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  // MQTT over WebSocket (relay/server.mjs): the upgrade passed on over HTTP/1.1, unbuffered, with
+  // timeouts above 1.5 times the longest keepalive the relay allows (600 s), and Upgrade and
+  // Connection set at the server's level beside X-Real-IP (a location setting its own would drop it).
+  const upgradeMap = conf.blocks.find((b) => b.head === 'map $http_upgrade $relay_connection')?.directives ?? [];
+  const ml = rl['location = /mqtt'] ?? [], secs = (d) => Number(ml.find((x) => x.startsWith(d + ' '))?.split(' ')[1].replace(/s$/, ''));
+  ok(ml.includes('proxy_pass http://127.0.0.1:8791') && ml.includes('proxy_http_version 1.1') && ml.includes('proxy_buffering off') && ml.some((d) => d.startsWith('limit_req zone='))
+    && secs('proxy_read_timeout') >= 900 && secs('proxy_send_timeout') >= 900
+    && relay.directives.includes('proxy_set_header Upgrade $http_upgrade') && relay.directives.includes('proxy_set_header Connection $relay_connection')
+    && upgradeMap.join('|') === 'default upgrade|"" close',
+  'nginx: relay.sigelo.ai/mqtt passes the WebSocket upgrade to 127.0.0.1:8791 (HTTP/1.1, unbuffered, 900 s timeouts, Upgrade and Connection at server level, Connection: close otherwise)');
   // GET /park/<hash>: its path is a short invite code's hash (relay/park.mjs), 40 bits a log reader
   // could search through while the code is good, so it is never logged.
   ok(rl['location ^~ /park/']?.includes('access_log off') && !rl['location = /park']?.some((d) => d.startsWith('access_log')), 'nginx: GET /park/<hash> is not logged (the path is a short code\'s hash); POST /park logs as /park');

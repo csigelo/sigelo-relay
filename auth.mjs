@@ -106,6 +106,18 @@ export function prefixOf(address) {
   return groups.slice(0, 3).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/48';
 }
 
+// MQTT over WebSocket: the path of the upgrade on the loopback HTTP port (server.mjs), and its subprotocol.
+export const WS_PATH = '/mqtt', WS_PROTOCOL = 'mqtt';
+// The client's address for a request on the loopback HTTP port, a WebSocket upgrade (server.mjs)
+// included: X-Real-IP is believed only from loopback (nginx on this host); else the peer's own
+// address. Every per-address and per-network limit counts what this returns: believed from any
+// peer, a client could name a new network for every request.
+export function clientAddress(req) {
+  const peer = req.socket?.remoteAddress ?? '', real = req.headers['x-real-ip'];
+  const loopback = /^(127\.|::1$|::ffff:127\.)/.test(peer);
+  return loopback && typeof real === 'string' ? real : peer;
+}
+
 // world/server.mjs's guard: verify() costs one Ed25519 check per rotation, attestation and binding
 // (~5 ms each; a Monero proof more), on the one thread every client shares, so a bundle far larger
 // than any real identity is refused before the work starts. Counted on the bundle as sent.
@@ -478,12 +490,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
 
   // ---- HTTP (loopback; nginx fronts it and sends the client's address as X-Real-IP) ----
   const httpFail = (status, error) => Object.assign(new Error(error), { status });
-  // X-Real-IP is believed only from loopback (nginx on this host); else the peer's own address.
-  function httpPrefix(req) {
-    const peer = req.socket.remoteAddress ?? '', real = req.headers['x-real-ip'];
-    const loopback = /^(127\.|::1$|::ffff:127\.)/.test(peer);
-    return prefixOf(loopback && typeof real === 'string' ? real : peer);
-  }
+  const httpPrefix = (req) => prefixOf(clientAddress(req));
   function challenge(url, prefix) {
     const d = url.searchParams.get('did') ?? '';
     if (!DID_RE.test(d)) throw httpFail(400, 'did: want ?did=did:sigelo:z… (your current DID, in full)');
@@ -583,6 +590,8 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or older than 10 minutes' });
         return send(200, { ok: true, invite });
       }
+      // MQTT over WebSocket is an upgrade (server.mjs); a plain request gets here.
+      if (url.pathname === WS_PATH) throw httpFail(426, 'MQTT over WebSocket: send a WebSocket upgrade with subprotocol mqtt');
       throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);

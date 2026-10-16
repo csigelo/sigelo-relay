@@ -4,7 +4,7 @@
 // the outside, the way an agent meets it.
 //
 //   node deploy/check.mjs                         https://sigelo.ai and relay.sigelo.ai
-//   node deploy/check.mjs --origin URL --relay HOST [--mqtt HOST:PORT]
+//   node deploy/check.mjs --origin URL --relay HOST [--mqtt HOST:PORT] [--ws HOST:PORT]
 //
 // Checks: the front page (200, HTML) and its headers (HSTS, nosniff, a Content-Security-Policy, a
 // Referrer-Policy, no cookie); /pay-monero.html (301 to /pro.html); https://<relay>/stats (200, the
@@ -17,19 +17,22 @@
 // 8883 naming <relay> and nothing else (the broker parses untrusted packets: a key taken from it
 // must be valid for no other name, sigelo.ai's pages included, so it holds a lineage of its
 // own); and the certificate on 443 and on 8883 valid 14 more days (the broker's copy comes from
-// certbot's deploy hook: a renewal that never reached it shows here). Prints PASS/FAIL lines, then ALL PASS and exit
+// certbot's deploy hook: a renewal that never reached it shows here); MQTT over WebSocket at
+// wss://<relay>/mqtt: the upgrade answers 101 with subprotocol mqtt and the same CONNECT gets
+// CONNACK 4 through it, and a plain GET /mqtt is refused (not 2xx). Prints PASS/FAIL lines, then ALL PASS and exit
 // 0, or FAIL and exit 1. No dependencies, node >= 22. Certificates are verified as any client
 // does; for a test against a self-signed relay, NODE_EXTRA_CA_CERTS=<its cert>.
 import tls from 'node:tls';
 
 const argv = process.argv.slice(2);
-const opts = { '--origin': 'https://sigelo.ai', '--relay': 'relay.sigelo.ai', '--mqtt': '' };
+const opts = { '--origin': 'https://sigelo.ai', '--relay': 'relay.sigelo.ai', '--mqtt': '', '--ws': '' };
 for (let i = 0; i < argv.length; i += 2) {
   if (!(argv[i] in opts) || argv[i + 1] === undefined) { console.error(`check.mjs: unknown argument or missing value: ${argv[i]}`); process.exit(2); }
   opts[argv[i]] = argv[i + 1];
 }
 const ORIGIN = opts['--origin'].replace(/\/+$/, ''), RELAY = opts['--relay'];
 const [MQTT_HOST, MQTT_PORT] = opts['--mqtt'] ? opts['--mqtt'].split(':') : [RELAY, '8883'];
+const [WS_HOST, WS_PORT] = opts['--ws'] ? opts['--ws'].split(':') : [RELAY, '443'];
 // The DID of test-vectors.json's first vector: well-formed, public, from a documented seed. Asking a
 // challenge for it costs the relay nothing it keeps (the nonce is stateless).
 const PROBE_DID = 'did:sigelo:zF5FYbH5zNLX5pfd7DZUjPirXeAFzLVxrdFyCrnexdpBG';
@@ -81,7 +84,8 @@ await check('relay.json', `https://${RELAY}/relay.json`, (r, b) => {
   if (!/max-age=3600\b/.test(r.headers.get('cache-control') ?? '')) return 'Cache-Control lacks max-age=3600';
   const j = JSON.parse(b);
   const missing = ['name', 'software', 'version', 'source', 'limits'].filter((k) => j[k] === undefined);
-  return missing.length ? `missing ${missing.join(', ')}` : '';
+  if (missing.length) return `missing ${missing.join(', ')}`;
+  return j.endpoints?.mqtt_ws === `wss://${RELAY}/mqtt` ? '' : `endpoints.mqtt_ws ${JSON.stringify(j.endpoints?.mqtt_ws)}, want "wss://${RELAY}/mqtt"`;
 });
 await check('/stats (counts only)', `https://${RELAY}/stats`, (r, b) => {
   if (!type(r).startsWith('application/json')) return `content-type ${type(r)}`;
@@ -140,6 +144,49 @@ const brokerName = `certificate ${MQTT_HOST}:${MQTT_PORT} names ${RELAY} alone`;
 if (m.san === undefined) fail(brokerName, m.err ?? 'no certificate');
 else if (m.san !== `DNS:${RELAY}`) fail(brokerName, `it names ${JSON.stringify(m.san)}: the broker must hold a lineage of its own, for ${RELAY} alone (site/deploy/server-setup.sh --relay, R9)`);
 else pass(brokerName);
+// MQTT over WebSocket on 443 (nginx location = /mqtt → the relay's HTTP port): the upgrade, then
+// the CONNECT above in one masked binary frame; the answer, CONNACK, in unmasked frames.
+const wsProbe = (host, port) => new Promise((resolve) => {
+  let got = Buffer.alloc(0), head = null;
+  const done = (v) => { s.destroy(); resolve(v); };
+  const s = tls.connect({ host, port: Number(port), servername: host, timeout: 20000 }, () => {
+    s.write(`GET /mqtt HTTP/1.1\r\nHost: ${host}\r\nUser-Agent: ${UA}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\n`
+      + `Sec-WebSocket-Key: c2lnZWxvLWNoZWNrLXdzMQ==\r\nSec-WebSocket-Protocol: mqtt\r\n\r\n`);
+  });
+  s.on('data', (d) => {
+    got = Buffer.concat([got, d]);
+    if (head === null) {
+      const at = got.indexOf('\r\n\r\n');
+      if (at < 0) return;
+      head = got.subarray(0, at).toString('latin1'); got = got.subarray(at + 4);
+      const status = Number(head.split(' ')[1]), proto = /\r\nsec-websocket-protocol: *([^\r]*)/i.exec(head)?.[1];
+      if (status !== 101 || proto !== 'mqtt') return done({ err: `status ${status}, subprotocol ${JSON.stringify(proto ?? null)}; want 101, mqtt` });
+      const mask = Buffer.from([0x5a, 0x17, 0xc3, 0x2e]), body = Buffer.from(CONNECT.map((b, i) => b ^ mask[i % 4]));
+      s.write(Buffer.concat([Buffer.from([0x82, 0x80 | CONNECT.length]), mask, body]));
+    }
+    // The broker may write a packet in more than one frame: the payloads of small binary frames, joined.
+    const mq = [];
+    for (let i = 0; i + 2 <= got.length && (got[i + 1] & 0x7f) < 126 && i + 2 + got[i + 1] <= got.length; i += 2 + got[i + 1]) {
+      if ((got[i] & 0x0f) !== 2 && (got[i] & 0x0f) !== 0) return done({ err: `a frame of opcode ${got[i] & 0x0f}, not binary` });
+      mq.push(...got.subarray(i + 2, i + 2 + got[i + 1]));
+    }
+    if (mq.length < 4) return;
+    done(mq[0] === 0x20 && mq[1] === 2 ? { connack: mq[3] } : { err: `not a CONNACK: ${Buffer.from(mq.slice(0, 4)).toString('hex')}` });
+  });
+  s.on('timeout', () => done({ err: 'timeout' }));
+  s.on('error', (e) => done({ err: e.code ?? e.message }));
+  s.on('close', () => done({ err: 'closed before a CONNACK' }));
+});
+const w = await wsProbe(WS_HOST, WS_PORT), wsName = `MQTT over WebSocket wss://${WS_HOST}:${WS_PORT}/mqtt`;
+if (w.err) fail(wsName, w.err);
+else if (w.connack === 4) pass(`${wsName} (101, subprotocol mqtt; CONNACK 4: a login without credentials refused)`);
+else fail(wsName, `CONNACK ${w.connack}, want 4`);
+{
+  const { r, err } = await get(`https://${RELAY}/mqtt`), name = `a plain GET https://${RELAY}/mqtt refused`;
+  if (err) fail(name, err);
+  else if (r.status >= 200 && r.status < 300) fail(name, `status ${r.status}`);
+  else pass(`${name} (${r.status})`);
+}
 const o = new URL(ORIGIN), webPort = o.port || 443;
 const web = await tlsProbe(o.hostname, webPort, false);
 for (const [name, p] of [[`certificate ${o.hostname}:${webPort}`, web], [`certificate ${MQTT_HOST}:${MQTT_PORT}`, m]]) {

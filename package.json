@@ -10,13 +10,14 @@
   "dependencies": {
     "aedes": "^1.2.0",
     "aedes-persistence": "^11.0.0",
-    "sigelo": "^0.1.1"
+    "sigelo": "^0.1.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "mqtt": "^5.16.0"
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs && node test/ws.mjs"
   }
 }

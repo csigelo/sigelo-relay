@@ -116,7 +116,8 @@ check_conf() { # $1 = file; prints every offending line, returns 1 if any
         "ssl_reject_handshake http2 root index log_not_found types default_type charset " \
         "charset_types gzip gzip_vary gzip_min_length gzip_types add_header location if rewrite " \
         "try_files error_page internal limit_req limit_req_status client_max_body_size proxy_pass " \
-        "proxy_set_header log_format auth_basic auth_basic_user_file", a, " ")
+        "proxy_set_header proxy_http_version proxy_buffering proxy_read_timeout proxy_send_timeout " \
+        "log_format auth_basic auth_basic_user_file", a, " ")
       for (i = 1; i <= n; i++) allowed[a[i]] = 1
       depth = 0; block = ""; blockdepth = 0
     }
@@ -163,7 +164,10 @@ check_conf() { # $1 = file; prints every offending line, returns 1 if any
       if (d == "ssl_certificate" && v != "/etc/letsencrypt/live/sigelo.ai/fullchain.pem") bad("ssl_certificate must be /etc/letsencrypt/live/sigelo.ai/fullchain.pem")
       if (d == "ssl_certificate_key" && v != "/etc/letsencrypt/live/sigelo.ai/privkey.pem") bad("ssl_certificate_key must be /etc/letsencrypt/live/sigelo.ai/privkey.pem")
       if (d == "proxy_pass" && v != "http://127.0.0.1:8791") bad("proxy_pass must be http://127.0.0.1:8791 (the relay, RELAY_HTTP_PORT)")
-      if (d == "proxy_set_header" && !(ntok == 3 && tok[2] == "X-Real-IP" && tok[3] == "$remote_addr")) bad("proxy_set_header must be X-Real-IP $remote_addr")
+      if (d == "proxy_set_header" && !(ntok == 3 && ((tok[2] == "X-Real-IP" && tok[3] == "$remote_addr") || (tok[2] == "Upgrade" && tok[3] == "$http_upgrade") || (tok[2] == "Connection" && tok[3] == "$relay_connection")))) bad("proxy_set_header must be X-Real-IP $remote_addr, Upgrade $http_upgrade or Connection $relay_connection")
+      if (d == "proxy_http_version" && v != "1.1") bad("proxy_http_version must be 1.1")
+      if (d == "proxy_buffering" && v != "off") bad("proxy_buffering must be off")
+      if ((d == "proxy_read_timeout" || d == "proxy_send_timeout") && v !~ /^[0-9]{1,3}s$/) bad(d " must be 1-999 seconds, as Ns")
       if (d == "listen") {
         ok = (ntok >= 2 && tok[2] ~ /^(\[::\]:)?(80|443)$/)
         for (i = 3; i <= ntok; i++) if (tok[i] != "ssl" && tok[i] != "http2" && tok[i] != "default_server") ok = 0
@@ -229,6 +233,10 @@ proxy_temp_path /etc/cron.d;
 proxy_pass http://unix:/run/systemd/private;
 proxy_pass http://127.0.0.1:22;
 proxy_set_header X-Real-IP $http_x_forwarded_for;
+proxy_set_header Connection $http_connection;
+proxy_set_header Host evil;
+proxy_http_version 1.0;
+proxy_read_timeout 1d;
 listen unix:/etc/cron.d/x;
 listen 127.0.0.1:8883;
 listen 443 ssl reuseport so_keepalive=on;

@@ -25,7 +25,12 @@
 // the sender's and the reader's; one pooled reader holds at most a share of its pool from writers
 // outside it (POOL_SHARES). Publishes, subscribed topics and claims are rate-limited per identity
 // and per network. Refusals reach the client as $sigelo/notice {code, detail}:
-// quota_storage, quota_messages, quota_mailboxes, too_large, pow, rate. An identity that has not
+// quota_storage, quota_messages, quota_mailboxes, too_large, pow, rate. A quota_storage refusing a
+// publish also says whose quota it is (side): "reader" (the reader's queue or its pool's, or its
+// share of its pool, is full: a free reader full, a lapsed Pro back on the free tier's storage),
+// "sender" (the writer's network used its share of the free tier) or "relay" (the free tier is
+// full); the detail begins "reader over quota" or "network share used" for the first two. A new
+// code would read as stored to clients that do not know it. An identity that has not
 // proven work (pow.mjs) may log in, but nothing is stored for it (no account, chain or pool row),
 // and its first claim or message is refused "pow". A login whose operator attestation pools
 // nothing still succeeds, on the free tier, and is told why ("operator" or "licence") as soon as
@@ -612,23 +617,23 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       const tr = tierOf(reader, now), charge = chargeOf(bytes);
       const queued = tr.pool ? s.poolBytes.get(tr.pool)?.bytes ?? 0 : s.queued.get(reader)?.bytes ?? 0;
       if (queued + charge > tr.limits.storage) {
-        return { code: 'quota_storage', detail: `${readerOf(tr)} has ${queued} of ${tr.limits.storage} bytes queued (a message counts its size, at least ${MESSAGE_FLOOR}, plus ${MESSAGE_ROW}): it frees as messages are collected or expire` };
+        return { code: 'quota_storage', side: 'reader', detail: `reader over quota: ${readerOf(tr)} has ${queued} of ${tr.limits.storage} bytes queued (a message counts its size, at least ${MESSAGE_FLOOR}, plus ${MESSAGE_ROW}): it frees as messages are collected or expire` };
       }
       // A pooled reader's own share, against writers outside its pool (POOL_SHARES); its pool's
       // members write to it on the whole pool.
       if (tr.pool && ts.pool !== tr.pool) {
         const mine = s.queued.get(reader)?.bytes ?? 0, most = Math.max(tiers.free.storage, Math.floor(tr.limits.storage / POOL_SHARES));
         if (mine + charge > most) {
-          return { code: 'quota_storage', detail: `the reader has ${mine} of ${most} bytes queued, the most one agent of its pool holds from writers outside it (1/${POOL_SHARES} of the pool's ${tr.limits.storage}, at least ${tiers.free.storage}): it frees as messages are collected or expire` };
+          return { code: 'quota_storage', side: 'reader', detail: `reader over quota: the reader has ${mine} of ${most} bytes queued, the most one agent of its pool holds from writers outside it (1/${POOL_SHARES} of the pool's ${tr.limits.storage}, at least ${tiers.free.storage}): it frees as messages are collected or expire` };
         }
       }
       if (!tr.pool) {
         const all = freeUsed(), mine = prefix === undefined ? 0 : sharedBy(prefix, day);
         if (all + charge > freeQueue) {
-          return { code: 'quota_storage', detail: `this relay's free tier is full (${freeQueue} bytes queued and held for identities in all): free readers take nothing more until messages are collected or expire` };
+          return { code: 'quota_storage', side: 'relay', detail: `this relay's free tier is full (${freeQueue} bytes queued and held for identities in all): free readers take nothing more until messages are collected or expire` };
         }
         if (prefix !== undefined && all + charge > freeQueue / 2 && mine + charge > freeQueue / freeShares) {
-          return { code: 'quota_storage', detail: `this relay's free tier is more than half full, and your network stored ${mine} bytes for free readers in the last ${tiers.free.retentionDays} days, its share (1/${freeShares} of ${freeQueue}): nothing more from it until messages are collected or expire` };
+          return { code: 'quota_storage', side: 'sender', detail: `network share used: this relay's free tier is more than half full, and your network stored ${mine} bytes for free readers in the last ${tiers.free.retentionDays} days, its share (1/${freeShares} of ${freeQueue}): nothing more from it until messages are collected or expire` };
         }
         if (prefix !== undefined) share(prefix, day, charge);
       }

@@ -116,9 +116,10 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
   };
 
   // done() runs once the notice is written to the client's connection (or the connection is gone):
-  // the refused request is acknowledged only then (the header). id: the refused PUBLISH's packet id.
-  const notify = (client, code, detail, done = () => {}, id = undefined) => {
-    const n = id === undefined ? { code, detail } : { code, detail, id };
+  // the refused request is acknowledged only then (the header). id: the refused PUBLISH's packet id;
+  // side: whose quota a quota_storage is (allowance.mjs).
+  const notify = (client, code, detail, done = () => {}, id = undefined, side = undefined) => {
+    const n = { code, detail, ...(id !== undefined && { id }), ...(typeof side === 'string' && { side }) };
     stats?.count('refused', code);
     client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify(n)), qos: 0, retain: false }, () => done());
   };
@@ -184,7 +185,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     if (!r) return cb(null);
     packet.topic = SINK;
     packet.payload = Buffer.alloc(0);
-    notify(client, r.code, r.detail, () => cb(null), packet.messageId);   // the PUBACK after the notice
+    notify(client, r.code, r.detail, () => cb(null), packet.messageId, r.side);   // the PUBACK after the notice
   }
 
   // First subscriber claims; its own later subscriptions use the claim. → null when granted, else

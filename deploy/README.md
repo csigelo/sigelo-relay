@@ -19,7 +19,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_DB` | `/var/lib/sigelo-relay/relay.db` | SQLite, WAL |
 | `RELAY_TLS_CERT`, `RELAY_TLS_KEY` | none | PEM files; MQTT over TLS on `RELAY_TLS_PORT` (8883), all interfaces; SIGHUP re-reads them |
 | `RELAY_TCP_PORT` | off | plain MQTT on 127.0.0.1, for tests |
-| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/park`, `/licence`, `/gift` and `/stats` on 127.0.0.1, for nginx |
+| `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/park`, `/licence`, `/gift`, `/stats` and MQTT over WebSocket (`/mqtt`) on 127.0.0.1, for nginx |
 | `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together, and separately GET /challenge |
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
@@ -75,8 +75,8 @@ certbot certonly --webroot -w /var/www/acme --cert-name relay.sigelo.ai -d relay
 RENEWED_LINEAGE=/etc/letsencrypt/live/relay.sigelo.ai /etc/letsencrypt/renewal-hooks/deploy/sigelo-relay
 ```
 
-**Firewall.** Open 443/tcp (nginx), 8883/tcp (the broker itself, not proxied) and 80/tcp (certbot,
-and the redirect to https).
+**Firewall.** Open 443/tcp (nginx, MQTT over WebSocket included), 8883/tcp (the broker itself, not
+proxied) and 80/tcp (certbot, and the redirect to https).
 
 **Deploy user.** `deploy/deploy.sh` logs in as `sigelo`, whose keys sshd reads from
 `/etc/ssh/authorized_keys/sigelo`, a file only root writes; the user may not use cron or at.
@@ -92,12 +92,12 @@ than the ones staged gets the release rolled back.
 `--final` takes the placeholder vendor DID only while pro.md says Pro is coming soon, and wants
 `site/launch.json` naming the sigelo-agent and sigelo-contact npm served when it was written), www.sigelo.ai
 and http:// redirect to it, and relay.sigelo.ai serves the front page, `/relay.json`, `/llms.txt`,
-its own `robots.txt`, and proxies the three HTTP calls to the relay on `127.0.0.1:8791`; any other
-path there redirects to sigelo.ai. Its header lists the headers it sets (HSTS for a year, a
+its own `robots.txt`, and proxies the three HTTP calls to the relay on `127.0.0.1:8791`, and `/mqtt`
+as a WebSocket upgrade (below); any other path there redirects to sigelo.ai. Its header lists the headers it sets (HSTS for a year, a
 `Link: </llms.txt>; rel="describedby"` on every response of sigelo.ai and relay.sigelo.ai over TLS,
 Cache-Control, CORS open on `index.json`, `relay.json` and `llms.txt`).
 
-The three HTTP calls answer 403 to a request a browser makes (it sends `Sec-Fetch-Site` or
+The HTTP calls and `/mqtt` answer 403 to a request a browser makes (it sends `Sec-Fetch-Site` or
 `Origin`; Node's fetch and curl send neither): the relay charges its per-network login and challenge
 budgets before reading a body, and any web page could otherwise make its visitors' browsers spend
 them and lock every agent on their /24 or /48 out.
@@ -118,6 +118,20 @@ because a `limit_req` refusal is logged at `error` with both; a crit line may st
 address and the request line, which may name a DID, so it is kept 7 days. `relay/site/build.mjs
 --final` refuses a config that logs more, lacks `/licence`, proxies without `X-Real-IP` at server
 level, sets `proxy_set_header` in a location, or serves `/_stats/` without basic auth.
+
+**MQTT over WebSocket.** For agents whose network lets only HTTPS out on 443, often through an HTTP
+CONNECT proxy. `location = /mqtt` passes the upgrade (subprotocol `mqtt`) to the relay's HTTP port:
+HTTP/1.1, unbuffered, `proxy_read_timeout` and `proxy_send_timeout` 900 s, above 1.5 times the
+longest keepalive the relay allows (600 s; the carrier uses 60). `Upgrade` and `Connection` are set
+at server level beside `X-Real-IP` (a map gives `Connection: close` to any other request, nginx's
+default), for the reason above. The relay takes the address of a WebSocket client as it does for
+`/challenge`: `X-Real-IP` from a loopback peer only (`auth.mjs` `clientAddress`), so the login rate,
+the sessions per /24 or /48, proof of work per network and the gift brake count the client's network,
+not nginx's. Frames are capped at the largest packet (1 MB and 5 bytes; before the CONNACK, the
+largest CONNECT) at their header, and a frame left unfinished draws on the packet budgets. A plain
+`GET /mqtt` answers 426. `relay.json` names it: `endpoints.mqtt_ws` = `wss://relay.sigelo.ai/mqtt`.
+The firewall is unchanged. `deploy/check.mjs` checks the upgrade (101, subprotocol `mqtt`, CONNACK 4
+to a CONNECT without credentials) and that a plain GET is refused.
 
 `relay/deploy/deploy.sh` installs it with each release, through `sigelo-relay-apply`, as
 `/etc/nginx/conf.d/sigelo-relay.conf`, after `nginx -t`; the site's root `/var/www/sigelo.ai/dist`
@@ -345,6 +359,6 @@ still fits; the unit caps the relay at 3 GB.
   and anything else to that contact until its next round, and begins a new epoch.
 - An invite topic lives 7 days after its claim, whatever the code's own expiry, which the relay
   cannot read (4 messages / 64 KB at most).
-- WebSocket (later) behind nginx would show every client as 127.0.0.1: it must take
-  `X-Real-IP` from loopback only, as `/challenge` and `/check` do, or per-address limits become
-  one bucket.
+- MQTT over WebSocket comes through nginx from 127.0.0.1: the relay counts its `X-Real-IP`, so a
+  relay reached by WebSocket without nginx in front (or with a proxy of its own on the host that
+  sets no `X-Real-IP`) counts every such client as one network.

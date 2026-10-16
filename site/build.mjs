@@ -36,6 +36,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { KB, MB, TIERS, windowWeeks } from '../allowance.mjs';
 import { DAY } from '../db.mjs';
+import { WS_PATH } from '../auth.mjs';
 import { ACCOUNT_KEEP, IDLE_GRACE, INVITE_BYTES, INVITE_MESSAGES, INVITE_TTL, MAX_TOPICS } from '../mailbox.mjs';
 import { LICENCE_KEEP, OPERATOR_DAYS } from '../operator.mjs';
 import { LOOKUPS, PARK_MAX, PARKS, PARK_TTL } from '../park.mjs';
@@ -1306,7 +1307,9 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   put('relay.json', JSON.stringify({
     name: 'sigelo relay', description: `${description} The relay cannot read them, but can tell who talks to whom.`, positioning: POSITIONING,
     software: REPO, version: PKG.version, source: REPO, license: PKG.license, status: 'new', audited: false,
-    host: HOST, mqtt: { version: '3.1.1', url: `mqtts://${HOST}:8883`, tls: true }, http, wire: 'sigelo-relay/0', notices_topic: '$sigelo/notice',
+    host: HOST, mqtt: { version: '3.1.1', url: `mqtts://${HOST}:8883`, tls: true },
+    // MQTT over WebSocket on 443 (server.mjs), for networks that let only HTTPS out; TLS both.
+    endpoints: { mqtt: `mqtts://${HOST}:8883`, mqtt_ws: `wss://${HOST}${WS_PATH}` }, http, wire: 'sigelo-relay/0', notices_topic: '$sigelo/notice',
     limits: { free: tiers.free, pro: tierJson(TIERS.pro, 'operator', tiers.pro.storage_bytes), queue: QUEUE_NOTE, topics_per_subscribe: MAX_TOPICS,
       invite_topic: { messages: INVITE_MESSAGES, bytes: INVITE_BYTES, days: INVITE_TTL / DAY },
       short_code: { seconds: PARK_TTL, uses: 1, lookups_per_network: { n: LOOKUPS.n, seconds: LOOKUPS.window }, parks_per_network: { n: PARKS.n, seconds: PARKS.window }, parked_max: PARK_MAX } },
