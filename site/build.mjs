@@ -52,21 +52,21 @@ export const REPO = 'https://github.com/csigelo/sigelo-relay';
 const PKG = JSON.parse(readFileSync(join(RELAY, 'package.json'), 'utf8'));
 
 // Who sells Pro and operates the relay, as the pages name it (footer, JSON-LD provider, index.json):
-// the trade name. The Owner's decision: the pages give no legal name; privacy.md and terms.md say
+// the trade name. The pages give no legal name; privacy.md and terms.md say
 // "a business registered in the European Union; legal name and registered address on request".
 // --final refuses null, and a name privacy.md and terms.md do not begin their seller line with
-// (commercial/relay-pro-runbook.md §0).
+// (see the runbook).
 export const SELLER = 'sigelo';
 
-// Pro is not on sale until the vendor identity exists: the Owner mints it at a terminal
-// (commercial/vendor-ceremony-runbook.md §2–3), and no licence can be issued before. pro.md says so in
+// Pro is not on sale until the vendor identity exists: it is minted at a terminal
+// (offline ceremony), and no licence can be issued before. pro.md says so in
 // this sentence at its top, and the build reads it from the page (vendorPending), so the two cannot
 // drift: while it is there, --final and --launch take the relay's placeholder vendor DID, index.json
 // and relay.json mark Pro not_yet_on_sale, the JSON-LD offers only the free tier, and the
 // descriptions and llms.txt lines that would read as a sale say "coming soon" (PAGES `pending`,
 // llmsTxt). The home page's Pro card says so too (HOME_PENDING). Once the sentence is gone, the
 // vendor DID is required again. A vendor DID set while the sentence stays, or the home card out of
-// step with pro.md, is refused (vendorRefusals). The Owner's words: "coming soon", no date.
+// step with pro.md, is refused (vendorRefusals). The pages say "coming soon", no date.
 export const VENDOR_PENDING = 'Pro is coming soon. Every agent runs free until then.';
 export const VENDOR_PENDING_PAGES = ['pro'];
 // The home page's Pro card, under its price: this line while Pro is coming soon, the other once on sale.
@@ -150,7 +150,7 @@ export const PAYMENT_WORDS = `How to pay is published only here and in \`site/co
 export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3gPLNts_ovwxmZM';
 
 // The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only (the
-// Owner, 2026-10-16: the header is About, Get started, Plans, Contact; the footer adds Examples,
+// 2026-10-16: the header is About, Get started, Plans, Contact; the footer adds Examples,
 // Enterprise, Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
 // steps and erasure requests, what an agent runs for its operator) and the not-found page are in
 // neither: the agents' page is linked from /pro and /privacy and listed in llms.txt, the sitemap and
@@ -195,7 +195,7 @@ export const titleOf = (p, pending = false) => (p.slug === 'index' ? p.title : `
 export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).description, p.slug);
 
 // ---------------------------------------------------------------------------------------------
-// Languages (the Owner, 2026-10-16): the seven pages a person reads (TRANSLATED), in every language
+// Languages (2026-10-16): the seven pages a person reads (TRANSLATED), in every language
 // of i18n/, one URL each, /<code>/<page>.html. No redirect by location or browser language: the
 // footer's "Other languages" is the only switch. Terms, privacy, agents, 404 and the agent files
 // stay English; a translated page links them in English. A language is a folder,
@@ -362,16 +362,16 @@ export function fill(text, where) {
 }
 
 // The inputs the pages still lack, as `[text]` → what fills it. Every one is filled (2026-10-13:
-// the Owner's and the orchestrator's decisions, commercial/relay-pro-runbook.md §0). A new one goes
+// decided per page). A new one goes
 // here with its page; anything shaped like a placeholder that is not listed here fails
 // relay/site/test.mjs, and --final refuses any placeholder left in a page, listed or not.
 export const PLACEHOLDERS = {};
 // `[text]` not followed by `(`: Markdown link text always is, so only placeholders match.
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
-// pro.md's plans (gross prices only: no net amount on the pages, the Owner 2026-10-14) and the lines
+// pro.md's plans (gross prices only: no net amount on the pages, 2026-10-14) and the lines
 // under them, which the JSON-LD offers and index.json read. PRICE_RE → [Monero discount %]. VAT
-// included, no rate and no reverse-charge wording on the pages (the Owner, 2026-10-14).
+// included, no rate and no reverse-charge wording on the pages (2026-10-14).
 // PLAN_RE, a plan a period → [months, save %, a month, for the period]; the one-month plan has no
 // "save" badge and no period total, the others have both.
 export const PRICE_RE = /^VAT included\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
@@ -999,7 +999,7 @@ main > .plans { max-width: 62rem; }
 
 // ---------------------------------------------------------------------------------------------
 // The footer, every page the same: the wordmark, the eight links and "Other languages", nothing else
-// (the Owner, 2026-10-16). The twin ends with the links as Markdown, the page as HTML, with the same
+// (2026-10-16). The twin ends with the links as Markdown, the page as HTML, with the same
 // links in the same order (relay/site/test.mjs). The seller is named on privacy and terms; how to pay
 // on contact. "Other languages" is a <details> (no script): open, it lists every language by its own
 // name, the current one unlinked; each links the same page in that language, or its home page where
@@ -1185,7 +1185,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     l.fallback = new Set(l.stale.includes(`${l.code}/lang.json`) ? TRANSLATED : l.stale.map((f) => f.split('/')[1].replace(/\.md$/, '')));
   }
   const live = langs.filter((l) => !l.why.length), stale = live.flatMap((l) => l.stale);
-  if (final && (open.length || wrong.length)) throw new Error(`--final: ${[...open, ...wrong].join('; ')} (commercial/relay-pro-runbook.md §0)`);
+  if (final && (open.length || wrong.length)) throw new Error(`--final: ${[...open, ...wrong].join('; ')}`);
   for (const p of PAGES) if (!/^# /.test(stripBoxes(md[p.slug]))) throw new Error(`${p.slug}.md: does not start with an H1 (containers aside)`);
 
   // Final: every value is filled (the gate above). A draft writes null for each open value and

@@ -241,7 +241,7 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    right after a login `operator` or `licence` (the attestation pools nothing: the free tier). A
    refused publish is acknowledged and dropped; a publish to another topic, or at QoS 0 or 2,
    closes the connection.
-6. `POST /licence` with the licence file (`commercial/issue-licence.mjs --ctx sigelo-relay`) →
+6. `POST /licence` with the licence file (from the offline issuer) →
    `{ok: true, operator, exp, chain, claims}` or `{ok: false, check, detail}`. The operator logs in
    once with its bundle first, and again after each rotation of its key. 3 uploads a minute per
    /24 or /48.

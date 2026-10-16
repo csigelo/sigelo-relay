@@ -7,7 +7,7 @@
 // The tiers (§11): free allowances are per DID, and a DID costs seconds of proof of work (more
 // from a network that mints many: pow.mjs), so free volume is not what Pro sells. Free: 14 days,
 // 512 KB, a modest daily count, 128 mailboxes (raised 2026-10-14 from 7 days, 256 KB, 1,000 a day,
-// 50 MB, 64: the Owner's decision). Pro sells what cannot be minted: 90 days' retention,
+// 50 MB, 64). Pro sells what cannot be minted: 90 days' retention,
 // 1 MB messages, the operator pool, groups (version 2: counted in no table yet), support.
 //
 // Charged per account (an identity's original DID, db.mjs): bytes queued to the reader, freed when
@@ -69,7 +69,7 @@ export const windowWeeks = (retentionDays) => Math.ceil(retentionDays / 7) + 1;
 // but for groups, never less than free's, pro's largest message and mailboxes, and the licence's
 // support. Mailboxes: a contact costs its reader windowWeeks of its retention plus the week ahead
 // a client claims, so free's 128 hold about 32 contacts (4 each at 14 days) and pro's 16,384 about 1,090 for a
-// whole pool (15 each). pro.storage is 5 GB (Owner, 2026-10-16; plan §9 item
+// whole pool (15 each). pro.storage is 5 GB (2026-10-16; plan §9 item
 // 3); pro.groups stays 0 until groups exist (version 2), whatever a licence claims.
 export const TIERS = Object.freeze({
   free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 0, support: 'none' }),

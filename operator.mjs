@@ -2,7 +2,7 @@
 // relay/operator.mjs — the Pro licence and the operator attestation (design/relay-plan.md §3
 // "Operator attestation", "Licence", "Errors"; §5).
 //
-// Licence: what `commercial/issue-licence.mjs --ctx sigelo-relay` writes, {attestation, issuer,
+// Licence: what the offline issuer writes, {attestation, issuer,
 // rotations}: an attestation by the vendor's current key, ctx "sigelo-relay", claims {tier: "pro",
 // storage_mb, msgs_day, retention_days, groups, support} (design/relay-plan.md §11: what Pro sells).
 // support ("none", "email" or "priority") is what the vendor owes, not a limit the relay applies:

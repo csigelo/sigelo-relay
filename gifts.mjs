@@ -6,7 +6,7 @@
 //                  (auth.mjs: a fresh GET /challenge nonce, signed, spent here) of the OPERATOR
 //                  identity, then the code's hash → {ok: true, exp, months} | {ok: false, check, detail}
 //   node gifts.mjs load <file>   (or - for stdin) as the relay's user, the relay running or not:
-//                  the lines commercial/gift-codes.mjs writes, {code_hash, months, expires, campaign}
+//                  the lines the offline issuer writes, {code_hash, months, expires, campaign}
 //                  each, into the relay's database (RELAY_DB, the relay's default) → one line of counts
 //   node gifts.mjs counts        the same way: per campaign, codes loaded and used, as JSON
 //
