@@ -22,7 +22,7 @@
 // and relay/licence.ts with spend/licence.ts, and runs the internal runbook's self-test
 // (commercial/relay-pro-runbook.md §11). No network: the registry check of --launch runs here against
 // stand-in registry documents.
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -33,6 +33,7 @@ import {
   REPOSITORIES, CONTENT_HOSTS, PAYMENT_PLACES, PAYMENT_WORDS, POSITIONING, ISSUER_DID, STATEMENT, QUEUE_NOTE, titleOf, pageUrl, isPrivateTree, proStorageCap, launchGate,
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
   recordRefusals, registryRefusals, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
+  HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
 } from './build.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -60,10 +61,12 @@ const twin = Object.fromEntries(PAGES.map((p) => [p.slug, read(`${p.slug}.md`)])
 // A twin is the page, then `---`, then the footer; body = the page alone, as rendered.
 const body = Object.fromEntries(PAGES.map((p) => [p.slug, twin[p.slug].slice(0, twin[p.slug].lastIndexOf('\n---\n'))]));
 const indexable = PAGES.filter((p) => !p.noindex);
+// The languages of i18n/ the build published (all of them: a stale or wrong one fails below).
+const LANGS = readLanguages(SITE).filter((l) => r.languages.includes(l.code));
 const AGENT_FILES = ['style.css', 'robots.txt', 'relay-robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'index.json', 'relay.json', '.well-known/security.txt'];
-const expected = [...PAGES.flatMap((p) => [`${p.slug}.html`, `${p.slug}.md`]), ...AGENT_FILES];
+const expected = [...PAGES.flatMap((p) => [`${p.slug}.html`, `${p.slug}.md`]), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => `${l.code}/${slug}.html`)), ...AGENT_FILES];
 ok(expected.every((f) => files.has(f)) && files.size === expected.length,
-  `dist: the ${PAGES.length} pages, their twins and ${AGENT_FILES.join(', ')}, nothing else (${files.size} files${[...files].filter((f) => !expected.includes(f)).map((f) => `; extra ${f}`).join('')})`);
+  `dist: the ${PAGES.length} pages, their twins, the ${TRANSLATED.length} translated pages in each of ${LANGS.length} languages and ${AGENT_FILES.join(', ')}, nothing else (${files.size} files${[...files].filter((f) => !expected.includes(f)).map((f) => `; extra ${f}`).join('')})`);
 ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} filled');
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
@@ -73,8 +76,8 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110, you: 100, uses: 180 };
-const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, you: 120, uses: 220, 404: 40 };
+const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110, about: 125, examples: 170 };
+const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 150, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -156,7 +159,7 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 const H1 = { index: 'By AI, for AI.', connect: 'Connect two agents in a minute', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
-  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', you: "For people: your agents' ID", uses: 'What you can do with it', 404: 'Not found' };
+  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
 // takes its numbers from relay/allowance.mjs TIERS and names the largest message, not a retention: a
 // reader away over a week takes no new messages on either tier (A5 review).
@@ -168,7 +171,7 @@ const HEAD = (pending) => ({
   TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Connect two agents in a minute — sigelo relay',
     pro: 'Pro: all your agents on one allowance — sigelo relay', enterprise: 'Enterprise: teams and swarms of agents — sigelo relay', contact: 'Contact — sigelo relay',
     privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', agents: 'For agents: Pro setup and data requests — sigelo relay',
-    you: "For people: your agents' ID — sigelo relay", uses: 'What you can do with it — sigelo relay', 404: 'Not found — sigelo relay' },
+    about: "About sigelo: your agents' ID — sigelo relay", examples: 'Examples: what you can do with it — sigelo relay', 404: 'Not found — sigelo relay' },
   DESC: {
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
     connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
@@ -180,8 +183,8 @@ const HEAD = (pending) => ({
       ? 'Terms for sigelo relay: the free service, Pro (coming soon; businesses only) as a licence attestation, no custody, no payment routing, liability, law.'
       : 'Terms for sigelo relay Pro, sold to businesses only: the free service, Pro as a licence attestation, no custody, no payment routing, liability, law.',
     agents: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.',
-    you: 'Your sigelo page on your own machine: contacts, agents, messages. Your 25 words make your identity and your agents again; keys stay home.',
-    uses: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words.",
+    about: 'What sigelo is: the ID your AI agents carry outside. For people: your own page, your 25 words, agents made yours elsewhere; keys stay home.',
+    examples: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words.",
     404: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.',
   },
 });
@@ -226,7 +229,7 @@ for (const p of PAGES) {
   ok(scripts === (p.noindex ? 0 : 1) && (p.noindex || SCRIPT.test(h)), `${p.slug}: ${p.noindex ? 'no script' : 'one script, type application/ld+json'} (A6)`);
   const rest = h.replace(SCRIPT, '');
   ok(!/<script\b|<style\b|\sstyle=|\son[a-z]+\s*=|javascript:|\ssrc=|<(?:iframe|object|embed|img)\b/i.test(rest), `${p.slug}: no other script, inline style, handler or embedded resource`);
-  ok(attrs(h, 'link', 'href').every((u) => u.startsWith('/') || u === pageUrl(p)), `${p.slug}: loads nothing from another origin (stylesheet /style.css)`);
+  ok(attrs(h, 'link', 'href').every((u) => u.startsWith('/') || u === pageUrl(p) || alternatesOf(p, LANGS).some(([, x]) => x === u)), `${p.slug}: loads nothing from another origin (stylesheet /style.css; the canonical and hreflang alternates name sigelo.ai)`);
   ok(!/\b(?:og|twitter):/.test(h), `${p.slug}: no Open Graph or Twitter tags until a logo exists (A7)`);
   const why = balance(h);
   ok(why === null, `${p.slug}: tags balance${why ? ` (${why})` : ''}`);
@@ -260,18 +263,16 @@ if (graphs.index) {
 ok(graphs.index?.['@graph'].find((x) => x['@type'] === 'WebSite')?.description === `${MOTTO} ${DISCLOSURE}`, 'JSON-LD: WebSite.description is the motto and the disclosure');
 
 // ---- links: internal ones resolve (with #fragments), external ones only to allowed places -------
-const ids = Object.fromEntries(PAGES.map((p) => [p.slug, new Set([...html[p.slug].matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))]));
-const pageOf = (path) => (path === '/' ? 'index' : path.match(/^\/([\w-]+)\.(?:html|md)$/)?.[1]);
+// A link inside the site names a file of dist (/ the home page), and a #fragment an id of that page.
+const idsIn = (f) => new Set([...read(f).matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 const ALLOWED = [/^https:\/\/sigelo\.io(?:\/[\w./#-]*)?$/, /^https:\/\/github\.com\/csigelo\/[\w./#-]*$/];
+const badLinks = (h) => attrs(h, 'a', 'href').filter((href) => {
+  if (!href.startsWith('/')) return !(ALLOWED.some((re) => re.test(href)) || href === 'mailto:contact@sigelo.io');
+  const [path, frag] = href.split('#'), f = path === '/' ? 'index.html' : path.slice(1);
+  return !files.has(f) || (frag !== undefined && !(f.endsWith('.html') && idsIn(f).has(frag)));
+});
 for (const p of PAGES) {
-  const bad = [];
-  for (const href of attrs(html[p.slug], 'a', 'href')) {
-    if (href.startsWith('/')) {
-      const [path, frag] = href.split('#');
-      const slug = pageOf(path);
-      if (slug ? !src[slug] || (path !== '/' && !files.has(path.slice(1))) || (frag && !ids[slug].has(frag)) : !files.has(path.slice(1)) || frag) bad.push(href);
-    } else if (!(ALLOWED.some((re) => re.test(href)) || href === 'mailto:contact@sigelo.io')) bad.push(href);
-  }
+  const bad = badLinks(html[p.slug]);
   ok(bad.length === 0, `${p.slug}: links resolve or go to sigelo.io, github.com/csigelo (no payment link: it comes with an invoice)${bad.length ? ` (bad: ${bad.join(' ')})` : ''}`);
   const badMd = [...twin[p.slug].replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '').matchAll(/\]\((\/[^)\s]*)\)/g)]
     .map((m) => m[1]).filter((u) => !/^\/[\w-]+\.(?:md|txt|json)(#[\w-]+)?$/.test(u) || !files.has(u.slice(1).split('#')[0]));
@@ -280,22 +281,37 @@ for (const p of PAGES) {
 const adopt = join(ROOT, 'site', 'src', 'adopt.md');
 if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8')), 'pro: the link to sigelo.io/adopt.html#1-identity has its heading');
 
-// ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; "For people" added 2026-10-15) ---
+// ---- header and footer (A10): the wordmark and the links, nothing else (the Owner, 2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
-const FOOT_LINKS = [['What it is', 'uses'], ['For people', 'you'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
-const HEAD_N = 5; // the header: the first five; Enterprise, Privacy and Terms are footer-only
+const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
+const HEAD_LINKS = ['about', 'connect', 'pro', 'contact']; // the header: About, Get started, Plans, Contact; the rest are footer-only
+// The footer: the wordmark, the links, then one <details> "Other languages" as the last item of its
+// list, nothing else. → { rest, links, summary, langs: [[name, href or null (current), lang]] }.
+const footerOf = (h) => {
+  const foot = h.match(/<footer>([\s\S]*?)<\/footer>/)?.[1] ?? '';
+  const det = foot.match(/<li><details><summary>([^<]+)<\/summary><ul>([\s\S]*?)<\/ul><\/details><\/li><\/ul><\/nav>\n<\/div>$/);
+  const rest = det ? foot.slice(0, det.index) + foot.slice(det.index + det[0].length - '</ul></nav>\n</div>'.length) : foot;
+  const langs = det ? [...det[2].matchAll(/<li>(?:<a href="([^"]+)" hreflang="([^"]+)" lang="\2">([^<]+)<\/a>|<span lang="([^"]+)" aria-current="true">([^<]+)<\/span>)<\/li>/g)].map((m) => (m[1] ? [m[3], m[1], m[2]] : [m[5], null, m[4]])) : [];
+  return { rest, links: linksIn(rest), text: plainText(rest.replace(/<[^>]*>/g, ' ')), summary: det?.[1], langs, count: (foot.match(/<details\b/g) ?? []).length };
+};
+// The language list a page's footer must show: English first, then each language, by its own name;
+// the current one unlinked, each other to this page in that language (its home page where this page is English only).
+const langList = (p, code) => [['English', null, 'en'], ...LANGS.map((l) => [l.name, l.code, l.lang])]
+  .map(([name, c, lang]) => [name, c === code ? null : TRANSLATED.includes(p.slug) ? (c ? `/${c}/${p.slug}.html` : (p.slug === 'index' ? '/' : `/${p.slug}.html`)) : (c ? `/${c}/index.html` : `/${p.slug}.html`), lang]);
 for (const p of PAGES) {
-  const foot = html[p.slug].match(/<footer>([\s\S]*?)<\/footer>/)?.[1] ?? '', head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
+  const f = footerOf(html[p.slug]), head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
   const mdFoot = twin[p.slug].slice(twin[p.slug].lastIndexOf('\n---\n') + 5).trim();
-  ok(plainText(foot.replace(/<[^>]*>/g, ' ')) === `sigelo ${FOOT_LINKS.map(([l]) => l).join(' ')}` && linksIn(foot).join() === ['sigelo /', ...FOOT_LINKS.map(([l, s]) => `${l} /${s}.html`)].join(),
-    `${p.slug}: the footer is the wordmark and ${FOOT_LINKS.map(([l]) => l).join(' · ')}, nothing else`);
-  ok(mdFoot === `sigelo · ${FOOT_LINKS.map(([l, s]) => `[${l}](/${s}.md)`).join(' · ')}`, `${p.slug}: the twin ends with the same footer, linking the twins (A10)`);
-  ok(linksIn(head).join() === ['sigelo /', ...FOOT_LINKS.slice(0, HEAD_N).map(([l, s]) => `${l} /${s}.html`)].join()
-    && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...FOOT_LINKS.slice(0, HEAD_N).map(([, s]) => s)].includes(p.slug) ? 1 : 0),
-    `${p.slug}: the header is the wordmark and ${FOOT_LINKS.slice(0, HEAD_N).map(([l]) => l).join(' · ')}, the current page marked`);
+  ok(f.text === `sigelo ${FOOT_LINKS.map(([l]) => l).join(' ')}` && f.links.join() === ['sigelo /', ...FOOT_LINKS.map(([l, s]) => `${l} /${s}.html`)].join(),
+    `${p.slug}: the footer is the wordmark and ${FOOT_LINKS.map(([l]) => l).join(' · ')}, then "Other languages", nothing else`);
+  ok(f.count === 1 && f.summary === OTHER_LANGUAGES && JSON.stringify(f.langs) === JSON.stringify(langList(p, null)),
+    `${p.slug}: the footer ends with one "Other languages" (<details>, no script): English unlinked, ${LANGS.length} languages by their own names, each linking ${TRANSLATED.includes(p.slug) ? 'this page' : 'its home page'} in that language`);
+  ok(mdFoot === `sigelo · ${FOOT_LINKS.map(([l, s]) => `[${l}](/${s}.md)`).join(' · ')}`, `${p.slug}: the twin ends with the same footer links, linking the twins (A10)`);
+  ok(linksIn(head).join() === ['sigelo /', ...HEAD_LINKS.map((s) => `${FOOT_LINKS.find(([, x]) => x === s)[0]} /${s}.html`)].join()
+    && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...HEAD_LINKS].includes(p.slug) ? 1 : 0),
+    `${p.slug}: the header is the wordmark and About · Get started · Plans · Contact, the current page marked`);
 }
-ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join(), 'footer: build.mjs FOOTER is the eight links, in order');
+ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEADER.map((p) => p.slug).join() === HEAD_LINKS.join(), 'footer and header: build.mjs FOOTER is the eight links, HEADER the four, in order');
 // The home page: the motto as its one H1, the subline, three sentences, the button to /connect; the
 // disclosure in the body (without the handle: a reader does not know it).
 {
@@ -352,7 +368,7 @@ ok(priceLineM && src.terms.includes('Prices as on [Pro](/pro.html), VAT included
 'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
 // No protocol talk on the pages a person reads first (the Owner, 2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
-const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'you', 'uses'];
+const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'about', 'examples'];
 const talk = HUMAN.filter((slug) => /\bMQTT\b|\bA2A\b|post-quantum|\bDID\b|attestation|X-Wing|Ed25519|\bTLS\b/i.test(body[slug]));
 ok(talk.length === 0, `no protocol talk on ${HUMAN.join(', ')} (MQTT, A2A, post-quantum, DID, attestation, X-Wing, Ed25519, TLS)${talk.length ? ` (on: ${talk.join(', ')})` : ''}`);
 // The stylesheet and the pages fetch nothing: no @import, url(), @font-face or other origin in the
@@ -420,11 +436,21 @@ ok(![llms, full, ...Object.values(twin), ...Object.values(html)].some((t) => /no
 
 // ---- sitemap.xml, robots.txt, security.txt (A11–A13) -------------------------------------------
 const sitemap = read('sitemap.xml');
-const locs = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)].map((m) => [m[1], m[2]]);
-const wantLocs = [...indexable.map(pageUrl), `${ORIGIN}/llms.txt`, `${ORIGIN}/index.json`];
+const sitemapOf = (x) => [...x.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?((?:<xhtml:link rel="alternate" hreflang="[^"]+" href="[^"]+"\/>)*)<\/url>/g)]
+  .map((m) => [m[1], m[2], [...m[3].matchAll(/hreflang="([^"]+)" href="([^"]+)"/g)].map((y) => [y[1], y[2]])]);
+const locs = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?((?:<xhtml:link rel="alternate" hreflang="[^"]+" href="[^"]+"\/>)*)<\/url>/g)]
+  .map((m) => [m[1], m[2], [...m[3].matchAll(/hreflang="([^"]+)" href="([^"]+)"/g)].map((x) => [x[1], x[2]])]);
+const wantLocs = [...indexable.map(pageUrl), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => pageUrlIn({ slug }, l.code))), `${ORIGIN}/llms.txt`, `${ORIGIN}/index.json`];
 const commitDay = r.built.commit_date?.slice(0, 10);
-ok(locs.map(([l]) => l).join() === wantLocs.join() && locs.every(([l]) => (l === `${ORIGIN}/` ? files.has('index.html') : files.has(l.slice(ORIGIN.length + 1)))),
-  'sitemap: the indexable pages, llms.txt and index.json, each in dist; no twin, no not-found page');
+ok(locs.map(([l]) => l).join() === wantLocs.join() && sitemap.split('<url>').length - 1 === locs.length && locs.every(([l]) => (l === `${ORIGIN}/` ? files.has('index.html') : files.has(l.slice(ORIGIN.length + 1)))),
+  `sitemap: the indexable pages, the ${TRANSLATED.length} translated pages in each of ${LANGS.length} languages, llms.txt and index.json, each in dist; no twin, no not-found page`);
+{
+  // Each variant of a translated page lists every variant (English, each language, x-default English); nothing else has any.
+  const want = (slug) => [['en', pageUrl({ slug })], ...LANGS.map((l) => [l.lang, pageUrlIn({ slug }, l.code)]), ['x-default', pageUrl({ slug })]];
+  const slugOfLoc = (l) => (l === `${ORIGIN}/` ? 'index' : l.match(/\/([\w-]+)\.html$/)?.[1]);
+  const off = locs.filter(([l, , alt]) => { const slug = slugOfLoc(l); return JSON.stringify(alt) !== JSON.stringify(TRANSLATED.includes(slug) && LANGS.length ? want(slug) : []); }).map(([l]) => l);
+  ok(sitemap.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"') && off.length === 0, `sitemap: every variant of a translated page carries the hreflang alternates of all ${LANGS.length + 1} languages and x-default${off.length ? ` (wrong: ${off.join(' ')})` : ''}`);
+}
 ok(locs.every(([, d]) => d === undefined || (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!commitDay || d <= commitDay))), 'sitemap: each lastmod a date, none after the build commit');
 const robots = read('robots.txt'), robotLines = robots.split('\n').filter((l) => l && !l.startsWith('#'));
 ok(robotLines.every((l) => /^(?:User-agent|Allow|Disallow|Sitemap): \S/.test(l)) && !/^Disallow:/m.test(robots) && /^Allow: \/$/m.test(robots)
@@ -434,6 +460,93 @@ ok(read('relay-robots.txt') === 'User-agent: *\nDisallow: /challenge\nDisallow: 
 const sec = read('.well-known/security.txt'), expires = Date.parse(sec.match(/^Expires: (.+)$/m)?.[1] ?? '');
 ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now() && sec.includes(`\nCanonical: ${ORIGIN}/.well-known/security.txt\n`),
   'security.txt: Contact first, Expires in the future, its Canonical');
+
+// ---- languages (the Owner, 2026-10-16): /<code>/<page>.html, hreflang, the footer's switch -------
+// The first batch; the next is a folder more. Chinese is not in it.
+const FIRST_BATCH = ['de', 'es', 'fr', 'it', 'ja', 'nl', 'pl', 'pt-br'];
+const ALL_LANGS = readLanguages(SITE);
+const langProblems = ALL_LANGS.flatMap((l) => [...l.stale.map((f) => `stale: ${f}`), ...l.why]);
+ok(langProblems.length === 0 && LANGS.length === ALL_LANGS.length && FIRST_BATCH.every((c) => LANGS.some((l) => l.code === c)) && !LANGS.some((l) => /^zh/.test(l.code)),
+  `languages: ${FIRST_BATCH.join(', ')} in i18n/, each fresh and well formed, so published${langProblems.length ? ` (${langProblems.join('; ')})` : ''}`);
+const thtml = Object.fromEntries(LANGS.map((l) => [l.code, Object.fromEntries(TRANSLATED.map((slug) => [slug, files.has(`${l.code}/${slug}.html`) ? read(`${l.code}/${slug}.html`) : '']))]));
+const mainOf = (h) => h.match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? '';
+const alternatesIn = (h) => [...h.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map((m) => [m[1], m[2]]);
+// The prices and percentages of a page, as values (each written in the page's locale) with their sign.
+const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(/(\d[\d.,\u00a0\u202f]*\d|\d)[ \u00a0\u202f]?(€|%)/g)].map((m) => `${parseIn(m[1], lang)} ${m[2]}`).sort().join();
+// The word for "card" in each language: the Owner's ban on the metaphor holds in every language (the
+// English page says "sigelo is that ID", and so must each translation).
+const CARD_WORDS = { de: /karte/i, fr: /\bcartes?\b/i, es: /\btarjetas?\b/i, 'pt-br': /\bcart(?:ão|ões)\b/i, it: /\b(?:cart[ae]|tesser[ae])\b/i, nl: /kaart/i, pl: /\bkart/i, ja: /カード/ };
+const sameSet = (a, b) => JSON.stringify([...a].map(String).sort()) === JSON.stringify([...b].map(String).sort());
+for (const l of LANGS) {
+  const T = thtml[l.code];
+  ok(TRANSLATED.every((slug) => T[slug]) && TRANSLATED.every((slug) => existsSync(join(SITE, I18N, l.code, `${slug}.md`))), `${l.code}: the seven pages, ${TRANSLATED.join(', ')}`);
+  ok(CARD_WORDS[l.code] !== undefined || !FIRST_BATCH.includes(l.code), `${l.code}: its word for "card" is listed (CARD_WORDS)`);
+  for (const p of PAGES.filter((x) => TRANSLATED.includes(x.slug))) {
+    const h = T[p.slug], at = `${l.code}/${p.slug}`, [title, desc] = headOf(h), text = plainText(mainOf(h));
+    ok(h.startsWith(`<!doctype html>\n<html lang="${l.lang}">\n`) && title === titleIn(p, l, r.pending) && title.length <= 60 && title.includes('sigelo relay') && desc.length >= 50 && desc.length <= 155,
+      `${at}: <html lang="${l.lang}">, its own title (${title.length} chars ≤ 60, names sigelo relay) and description (${desc.length} chars, 50–155)`);
+    ok(h.includes(`<link rel="canonical" href="${pageUrlIn(p, l.code)}">`) && !h.includes('type="text/markdown"') && (h.match(/<h1\b/g) ?? []).length === 1,
+      `${at}: canonical ${pageUrlIn(p, l.code)}, one H1, no Markdown twin (agents read the English)`);
+    ok(sameSet(alternatesIn(h), alternatesOf(p, LANGS)) && alternatesIn(h).length === LANGS.length + 2, `${at}: hreflang alternates for English, all ${LANGS.length} languages and x-default (English)`);
+    const scripts = (h.match(/<script\b/g) ?? []).length, rest = h.replace(SCRIPT, ''), why = balance(h);
+    let g = null; try { g = JSON.parse(h.match(SCRIPT)?.[1] ?? ''); } catch { /* below */ }
+    const web = g?.['@graph']?.find((x) => x['@type'] === 'WebPage');
+    ok(scripts === 1 && !/<script\b|<style\b|\sstyle=|\son[a-z]+\s*=|javascript:|\ssrc=|<(?:iframe|object|embed|img|form|input|button)\b/i.test(rest) && why === null
+      && web?.url === pageUrlIn(p, l.code) && web?.inLanguage === l.lang && web?.name === title,
+      `${at}: no script but its JSON-LD (a WebPage in ${l.lang}), no style, handler, form or embed; tags balance${why ? ` (${why})` : ''}`);
+    const head = h.match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
+    ok(linksIn(head).join() === [`sigelo /${l.code}/index.html`, ...HEAD_LINKS.map((s) => `${l.nav[s]} /${l.code}/${s}.html`)].join(), `${at}: the header is the wordmark and its four links, in ${l.lang}`);
+    const f = footerOf(h);
+    ok(f.links.join() === [`sigelo /${l.code}/index.html`, ...FOOT_LINKS.map(([, s]) => `${l.nav[s]} ${TRANSLATED.includes(s) ? `/${l.code}/${s}.html` : `/${s}.html`}`)].join()
+      && f.count === 1 && f.summary === l.other && JSON.stringify(f.langs) === JSON.stringify(langList(p, l.code)),
+      `${at}: the footer has the same eight links (Privacy and Terms in English) and "${l.other}", ${l.name} unlinked`);
+    const bad = badLinks(h);
+    ok(bad.length === 0, `${at}: links resolve or go to sigelo.io, github.com/csigelo${bad.length ? ` (bad: ${bad.join(' ')})` : ''}`);
+    ok(priceTokens(h, l.lang) === priceTokens(html[p.slug]), `${at}: the prices and percentages are the English page's in value, written for ${l.lang} (${priceTokens(h, l.lang) || 'none'})`);
+    const talk = /\bMQTT\b|\bA2A\b|post-quant|\bDID\b|attestation|X-Wing|Ed25519|\bTLS\b/i.test(text), card = CARD.test(text) || CARD_WORDS[l.code]?.test(text) || CARD_WORDS[l.code]?.test(title + desc);
+    const never = neverHits(`${text}\n${title}\n${desc}`), mails = [...new Set(h.match(EMAIL) ?? [])];
+    ok(!talk && !card && never.length === 0 && mails.every((m) => m === 'contact@sigelo.io') && !/not on sale/i.test(h),
+      `${at}: no protocol talk, no word for "card", none of the words never written, no e-mail but contact@sigelo.io${never.length ? ` (${never.join('; ')})` : ''}`);
+    if (l.code !== 'ja') {
+      // Not counted against a budget; kept near the English (the Owner: within about 1.3×). Japanese has no spaces to count.
+      const n = words(fill(l.md[p.slug], at)), e = words(fill(src[p.slug], p.slug));
+      ok(n <= Math.ceil(1.3 * e), `${at}: ${n} words, within 1.3× the English ${e}`);
+    }
+  }
+  const pro = T.pro, plans = [...pro.matchAll(/<div class="plan( best)?">\n(?:<p>[^<]+<\/p>\n)?<h3 id="[^"]+">.+?<\/h3>\n<p><strong>([^<]+)<\/strong>[^<]*<\/p>\n(?:<p>[^<]+<\/p>\n)?<p><a href="\/[\w-]+\/contact\.html">[^<]+<\/a><\/p>\n<\/div>/g)].map((m) => `${m[1] ? 'best ' : ''}${m[2]}`);
+  const nf = new Intl.NumberFormat(l.lang), cents = (x) => `${new Intl.NumberFormat(l.lang, { minimumFractionDigits: 2 }).format(x)} €`;
+  ok(plans.join() === [cents(14.99), cents(11.99), `best ${cents(9.99)}`].join() && /<div class="card pro">/.test(T.index) && (T.index.match(/<div class="card( pro)?">/g) ?? []).length === 3
+    && T.index.includes(drawingRelay(l.drawing)) && !T.index.includes(`>${DRAWING_WORDS.yours}<`),
+    `${l.code}: the three plans render as on /pro, prices in ${l.lang} (${plans.join(', ')}), each button to its contact page, 12 months best; the home page's three tier cards and the drawing in its words`);
+  ok(allowance && T.pro.includes(nf.format(allowance.TIERS.pro.msgsDay)) && T.index.includes(nf.format(allowance.TIERS.free.msgsDay)) && (nf.format(1000) === '1,000' || !T.pro.includes('50,000'))
+    && headOf(T.pro)[1].includes(nf.format(allowance.TIERS.pro.msgsDay)),
+    `${l.code}: every {{value}} number written for ${l.lang} (${nf.format(allowance?.TIERS.pro.msgsDay)} messages a day), in the page and its description`);
+  ok(T.contact.includes(`<code>${SIMPLEX}</code>`) && !T.contact.includes(`href="${SIMPLEX}"`) && T.contact.includes(`<code>${PAYMENT_PLACES[0]}</code>`) && T.contact.includes('<code>site/contact.md</code>'),
+    `${l.code}/contact: the SimpleX address as text, and where how to pay is published: the English page ${PAYMENT_PLACES[0]} and site/contact.md (a translation is not a third place)`);
+}
+// hreflang is symmetric: every variant of a page names the same set, itself among them; the English pages too.
+{
+  const asym = TRANSLATED.filter((slug) => {
+    const p = PAGES.find((x) => x.slug === slug), want = alternatesOf(p, LANGS);
+    return ![html[slug], ...LANGS.map((l) => thtml[l.code][slug])].every((h) => sameSet(alternatesIn(h), want))
+      || !want.every(([lang, u]) => lang === 'x-default' || [pageUrl(p), ...LANGS.map((l) => pageUrlIn(p, l.code))].includes(u));
+  });
+  ok(LANGS.length > 0 && asym.length === 0 && PAGES.filter((p) => !TRANSLATED.includes(p.slug)).every((p) => alternatesIn(html[p.slug]).length === 0),
+    `hreflang: complete and symmetric over English and ${LANGS.length} languages on each of the seven pages; none on the English-only pages${asym.length ? ` (off: ${asym.join(', ')})` : ''}`);
+  ok(new Set(LANGS.map((l) => l.name)).size === LANGS.length && LANGS.every((l) => l.name !== 'English' && !/<|&/.test(l.name + l.other)),
+    'languages: each named by its own name, once');
+}
+const FIRST_SENTENCE = { de: 'Verbinde', es: 'Conecta', fr: 'Connectez', it: 'Collega', ja: 'あなた', nl: 'Verbind', pl: 'Połącz', 'pt-br': 'Conecte' };
+ok(LANGS.every((l) => { const ps = [...(thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '').matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1])); return ps[0]?.startsWith(FIRST_SENTENCE[l.code] ?? '') && ps[1]?.split(/(?<=\.) |(?<=。)/).filter(Boolean).length === 3; }),
+  'home page in every language: the subline first (pinned per language), then three sentences, as the English');
+{
+  // The home page's title in each language, pinned (the head a search result shows).
+  const HOME_TITLE = {"de":"sigelo relay — verschlüsselte Nachrichten für KI-Agenten", "es":"sigelo relay — mensajes cifrados para agentes de IA", "fr":"sigelo relay — messagerie chiffrée pour agents IA", "it":"sigelo relay — messaggi cifrati per agenti IA", "ja":"sigelo relay — AIエージェントのための暗号化メッセージ", "nl":"sigelo relay — versleutelde berichten voor AI-agents", "pl":"sigelo relay — szyfrowane wiadomości dla agentów AI", "pt-br":"sigelo relay — mensagens criptografadas para agentes de IA"};
+  const off = LANGS.filter((l) => headOf(thtml[l.code].index)[0] !== HOME_TITLE[l.code]).map((l) => `${l.code}: "${headOf(thtml[l.code].index)[0]}"`);
+  ok(off.length === 0 && FIRST_BATCH.every((c) => HOME_TITLE[c]), `home page title in every language, as pinned${off.length ? ` (${off.join('; ')})` : ''}`);
+}
+ok(spawnSync(process.execPath, [join(SITE, 'build.mjs'), '--stale'], { encoding: 'utf8' }).stdout.startsWith(`relay/site/build --stale: none; ${ALL_LANGS.length} languages up to date`),
+  'build.mjs --stale: no translation to refresh');
 
 // ---- index.json and relay.json (A14, plan §11) -------------------------------------------------
 if (allowance) {
@@ -599,6 +712,13 @@ if (conf) {
     && al['location = /pay-monero.md']?.join() === 'return 301 https://sigelo.ai/pro.md' && !files.has('pay-monero.html')
     && /\/pay-monero\.html 301 to \/pro\.html/.test(readFileSync(join(RELAY, 'deploy', 'check.mjs'), 'utf8')),
     'nginx: the old pay page (/pay-monero.html, /pay-monero, its twin) answers 301 to /pro, which deploy/check.mjs checks live; dist has no pay page');
+  ok(al['location = /you.html']?.join() === 'return 301 https://sigelo.ai/about.html' && al['location = /you']?.join() === 'return 301 https://sigelo.ai/about.html' && al['location = /you.md']?.join() === 'return 301 https://sigelo.ai/about.md'
+    && al['location = /uses.html']?.join() === 'return 301 https://sigelo.ai/examples.html' && al['location = /uses']?.join() === 'return 301 https://sigelo.ai/examples.html' && al['location = /uses.md']?.join() === 'return 301 https://sigelo.ai/examples.md'
+    && !files.has('you.html') && !files.has('uses.html'), 'nginx: the old pages /you and /uses (and their twins) answer 301 to /about and /examples');
+  const langRoot = Object.keys(al).find((h) => h.startsWith('location ~ ^/([a-z]'));
+  ok(langRoot === 'location ~ ^/([a-z][a-z](-[a-z][a-z])?)/?$' && al[langRoot].join() === 'return 301 https://sigelo.ai/$1/index.html' && LANGS.every((l) => new RegExp(langRoot.slice(11)).test(`/${l.code}/`))
+    && Object.keys(al).indexOf(langRoot) < Object.keys(al).indexOf('location ~ ^/[\\w-]+$') && !/\$http_accept_language|\$geoip|accept-language/i.test(confText),
+    'nginx: /<lang> and /<lang>/ answer 301 to /<lang>/index.html (before the page rules); nothing redirects by browser language or location');
   ok(al['location = /404']?.includes('return 404') && al['location = /404.html']?.includes('internal'), 'nginx: /404 and /404.html asked for by name answer 404, not a 200 "Not found"');
   const defaults = servers.filter((s) => s.directives.some((d) => /^listen .*\bdefault_server$/.test(d)));
   ok(defaults.length === 2 && defaults.every((s) => s.directives.includes('return 444') && s.directives.includes('access_log off')),
@@ -910,6 +1030,60 @@ try {
     && said(tree(goodSecurity, ioConf('sigelo.ai', 'server {\n    server_name sigelo.ai www.sigelo.ai;\n    return 301 https://sigelo.io$request_uri;\n}\n')), /still serves sigelo\.ai/),
   'launch gate: refuses while sigelo.io\'s host sends sigelo.net elsewhere, or still serves sigelo.ai');
   ok(sellerRefusal(null, src) === undefined && /plain text/.test(sellerRefusal('Bad <b>Ltd</b>', src) ?? ''), 'seller: unset passes the shape check (open instead); markup refused');
+
+  // The stale check: a translation whose English page changed since (its source hash) is left out of
+  // the build, and --final refuses it, naming it; so is a lang.json whose English strings changed.
+  if (LANGS.length) {
+    const copySite = (change) => {
+      const dir = join(scratch, `i18n-${++k}`);
+      mkdirSync(dir);
+      for (const p of PAGES) writeFileSync(join(dir, `${p.slug}.md`), src[p.slug]);
+      cpSync(join(SITE, I18N), join(dir, I18N), { recursive: true });
+      writeFileSync(join(dir, LAUNCH_RECORD), RECORD);
+      writeFileSync(join(dir, 'nginx.conf'), confText);
+      change(dir);
+      return dir;
+    };
+    const both = (dir) => {
+      const out = join(dir, 'dist'), r1 = build({ site: dir, out, deploy: join(dir, 'nginx.conf'), root: emptyRoot });
+      let refused = null;
+      try { build({ final: true, site: dir, out: join(dir, 'final'), deploy: join(dir, 'nginx.conf'), root: emptyRoot }); } catch (e) { refused = e.message; }
+      return { r1, out, refused };
+    };
+    const de = (f) => join(I18N, 'de', f), edit = (f, from, to) => (dir) => { const t = readFileSync(join(dir, f), 'utf8'); writeFileSync(join(dir, f), t.replace(from, to)); };
+    const at = (b, f) => readFileSync(join(b.out, f), 'utf8');
+    // The fallback: the English page at the translated URL, under the line saying so, no hreflang.
+    const isFallback = (h, l, slug) => h.startsWith('<!doctype html>\n<html lang="en">\n') && h.includes(`<link rel="canonical" href="${pageUrl({ slug })}">`) && !/hreflang=/.test(h.split('</head>')[0])
+      && h.includes(`<main>\n<p class="untranslated" lang="${l.lang}">${l.untranslated.replace(/&/g, '&amp;')}</p>\n`) && mainOf(h).includes(mainOf(html[slug]).trim().slice(0, 80))
+      && h.includes(`<header class="top" lang="${l.lang}">`) && h.includes(`<a class="wordmark" href="/${l.code}/index.html"`);
+    const deL = LANGS.find((l) => l.code === 'de'), others = LANGS.filter((l) => l.code !== 'de');
+    const want = (slug, langs) => [['en', pageUrl({ slug })], ...langs.map((l) => [l.lang, pageUrlIn({ slug }, l.code)]), ['x-default', pageUrl({ slug })]];
+    const tampered = both(copySite(edit(de('pro.md'), /^---\nsource: ([0-9a-f])/, (_, c) => `---\nsource: ${c === '0' ? '1' : '0'}`)));
+    const tmap = sitemapOf(at(tampered, 'sitemap.xml'));
+    ok(tampered.refused === null && tampered.r1.stale.join() === 'de/pro.md' && tampered.r1.open.every((x) => !/stale/.test(x)) && tampered.r1.languages.includes('de')
+      && isFallback(at(tampered, 'de/pro.html'), deL, 'pro') && at(tampered, 'de/about.html').startsWith('<!doctype html>\n<html lang="de">')
+      && /for \(const f of r\.stale\) console\.log\(`warning: stale: \$\{f\}/.test(readFileSync(join(SITE, 'build.mjs'), 'utf8')),
+      'stale: a tampered source hash in de/pro.md serves the English page at /de/pro.html (lang en, canonical /pro.html, no hreflang, the German line saying so); the other German pages stay; --final builds, with a warning line');
+    ok([at(tampered, 'pro.html'), ...others.map((l) => at(tampered, `${l.code}/pro.html`))].every((h) => sameSet(alternatesIn(h), want('pro', others)))
+      && [at(tampered, 'about.html'), ...LANGS.map((l) => at(tampered, `${l.code}/about.html`))].every((h) => sameSet(alternatesIn(h), want('about', LANGS)))
+      && !tmap.some(([l]) => l === pageUrlIn({ slug: 'pro' }, 'de')) && tmap.every(([, , alt]) => !alt.some(([, u]) => u === pageUrlIn({ slug: 'pro' }, 'de'))) && tmap.some(([l]) => l === pageUrlIn({ slug: 'about' }, 'de')),
+      'stale: hreflang stays symmetric: /pro and its other languages drop de, every other page keeps all; the sitemap lists no /de/pro.html');
+    const english = both(copySite(edit('pro.md', '## How it works', '## How it works now')));
+    ok(english.refused === null && LANGS.every((l) => english.r1.stale.includes(`${l.code}/pro.md`) && isFallback(at(english, `${l.code}/pro.html`), l, 'pro'))
+      && alternatesIn(at(english, 'pro.html')).length === 0 && sameSet(alternatesIn(at(english, 'connect.html')), want('connect', LANGS)),
+      'stale: an edit to the English pro.md makes every pro.md translation fall back to it, and /pro carries no hreflang; the other pages keep theirs');
+    const head = both(copySite(edit(de('lang.json'), /"source": "([0-9a-f])/, (_, c) => `"source": "${c === '0' ? '1' : '0'}`)));
+    ok(head.r1.stale.join() === 'de/lang.json' && TRANSLATED.every((slug) => isFallback(at(head, `de/${slug}.html`), deL, slug)), 'stale: a stale de/lang.json (English titles or labels changed since) makes all seven German URLs fall back');
+    const price = both(copySite(edit(de('pro.md'), '**9.99 €**', '**8.99 €**')));
+    const code = both(copySite(edit(de('connect.md'), 'sigelo-agent inbox\n', 'sigelo-agent inbox --all\n')));
+    ok(/de\/pro\.md: its prices and percentages are not pro\.md's/.test(price.refused ?? '') && !price.r1.languages.includes('de')
+      && /de\/connect\.md: its code blocks are not connect\.md's/.test(code.refused ?? '') && !code.r1.languages.includes('de'),
+      'translations: a changed price or command line is refused (--final) and leaves the language out');
+    const noFront = both(copySite(edit(de('about.md'), /^---\nsource: [0-9a-f]{64}\n---\n/, '')));
+    ok(/de\/about\.md: does not begin with "---", "source: <sha256 of about\.md>"/.test(noFront.refused ?? ''), 'translations: a page without its source line is refused');
+    ok(translationRefusals('xx', { contact: src.contact }, { contact: src.contact }).some((w) => /xx\/contact\.md: its inline code/.test(w))
+      && translationRefusals('xx', { pro: src.pro }, { pro: src.pro }).length === 0, 'translations: the contact page must name the English contact page in code, as where how to pay is published');
+  }
 
   // terms.md is final, so it keeps its budget too.
   for (const p of PAGES) {

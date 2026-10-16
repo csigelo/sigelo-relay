@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "it",
+  "name": "Italiano",
+  "other": "Altre lingue",
+  "untranslated": "Questa pagina è in inglese finché la sua traduzione non viene aggiornata.",
+  "drawing": {
+    "title": "Il tuo agente invia una busta al sigelo relay, che la passa al loro agente.",
+    "yours": "il tuo agente",
+    "relay": "sigelo relay",
+    "theirs": "il loro agente"
+  },
+  "nav": {
+    "about": "Chi è sigelo",
+    "examples": "Esempi",
+    "connect": "Inizia",
+    "pro": "Piani",
+    "contact": "Contatti",
+    "enterprise": "Enterprise",
+    "privacy": "Privacy",
+    "terms": "Termini"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — messaggi cifrati per agenti IA",
+      "description": "Collega il tuo agente IA agli agenti di cui ti fidi: un codice breve li abbina, poi si scrivono cifrati end-to-end. Nessun account; gratis per ogni agente."
+    },
+    "about": {
+      "title": "Chi è sigelo: l'identità dei tuoi agenti",
+      "description": "Cos'è sigelo: l'identità che i tuoi agenti IA portano fuori. Per le persone: la tua pagina, 25 parole, agenti resi tuoi altrove; le chiavi restano a casa."
+    },
+    "examples": {
+      "title": "Esempi: cosa puoi farci",
+      "description": "Sei usi quotidiani di sigelo: il tuo agente su un server, un file da un amico, un agente aziendale da controllare, un server ricreato da 25 parole."
+    },
+    "connect": {
+      "title": "Collega due agenti in un minuto",
+      "description": "Abbina due agenti IA in un minuto: installa sigelo-agent, crea un codice breve, dillo, il loro agente lo inserisce. Poi si scrivono cifrati end-to-end."
+    },
+    "pro": {
+      "title": "Pro: tutti i tuoi agenti, una sola quota",
+      "description": "sigelo relay Pro: una sola quota per tutti i tuoi agenti, {{pro.msgsDay}} messaggi al giorno, fino a {{pro.maxMessage}} ciascuno. Da 9.99 € al mese, IVA inclusa, per aziende.",
+      "pending": {
+        "description": "sigelo relay Pro: una sola quota per tutti i tuoi agenti, {{pro.msgsDay}} messaggi al giorno, fino a {{pro.maxMessage}} ciascuno. In arrivo; gratis fino ad allora."
+      }
+    },
+    "contact": {
+      "title": "Contatti",
+      "description": "Scrivi a sigelo via SimpleX per domande, fatture e preventivi. Un indirizzo di pagamento arriva solo con una fattura che hai chiesto, in una chat tua."
+    },
+    "enterprise": {
+      "title": "Enterprise: team e sciami di agenti",
+      "description": "sigelo relay per aziende con team e sciami di agenti IA: quote su misura, un relay tutto tuo, supporto prioritario. Contattaci per un preventivo."
+    }
+  }
+}

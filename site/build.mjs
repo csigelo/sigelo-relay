@@ -4,6 +4,7 @@
 //
 //   node relay/site/build.mjs           build, and list what is still open before a deploy
 //   node relay/site/build.mjs --final   refuse while anything is open or wrong (the deploy gate)
+//   node relay/site/build.mjs --stale   the translations whose English page changed since (i18n/)
 //   node relay/site/build.mjs --launch  in the private tree: the official statement, then what npm
 //                                       serves; writes relay/site/launch.json when both pass (launchGate)
 //
@@ -29,7 +30,8 @@
 // The Markdown renderer and the stylesheet are copied from sigelo's site/build.mjs and
 // site/src/style.css (MIT, same authors), not imported: relay/ is published alone, without site/.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { KB, MB, TIERS, windowWeeks } from '../allowance.mjs';
@@ -147,12 +149,13 @@ export const PAYMENT_WORDS = `How to pay is published only here and in \`site/co
 // DOMAINS is: relay/site/test.mjs compares the two in the private tree, and --launch SECURITY.md's.
 export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3gPLNts_ovwxmZM';
 
-// The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only. The
-// home page is reached by the wordmark; the agents' page (the Pro steps and erasure requests, what an
-// agent runs for its operator), the people's page (you), the uses page and the not-found page are in
-// neither: the agents' page is linked from /pro and /privacy, the people's page from /connect and
-// /uses, the uses page from / and /you; all three are listed in llms.txt, the sitemap and index.json;
-// the not-found page nowhere.
+// The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only (the
+// Owner, 2026-10-16: the header is About, Get started, Plans, Contact; the footer adds Examples,
+// Enterprise, Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
+// steps and erasure requests, what an agent runs for its operator) and the not-found page are in
+// neither: the agents' page is linked from /pro and /privacy and listed in llms.txt, the sitemap and
+// index.json; the not-found page nowhere. The seven pages of TRANSLATED are also in every language
+// of i18n/ (below); the rest are English only.
 // Titles get " — sigelo relay" but the home page's. `pending`: the title or description while Pro is
 // coming soon (VENDOR_PENDING), for each page whose head would otherwise read as a sale; a search
 // result or link preview shows the head, not the page's first paragraph. No title or description
@@ -163,10 +166,10 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 export const PAGES = [
   { slug: 'index', nav: null, title: 'sigelo relay — end-to-end encrypted messaging for AI agents',
     description: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.' },
-  { slug: 'uses', nav: 'What it is', title: 'What you can do with it',
+  { slug: 'about', nav: 'About', title: "About sigelo: your agents' ID",
+    description: 'What sigelo is: the ID your AI agents carry outside. For people: your own page, your 25 words, agents made yours elsewhere; keys stay home.' },
+  { slug: 'examples', nav: 'Examples', foot: true, title: 'Examples: what you can do with it',
     description: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words." },
-  { slug: 'you', nav: 'For people', title: "For people: your agents' ID",
-    description: 'Your sigelo page on your own machine: contacts, agents, messages. Your 25 words make your identity and your agents again; keys stay home.' },
   { slug: 'connect', nav: 'Get started', title: 'Connect two agents in a minute',
     description: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.' },
   { slug: 'pro', nav: 'Plans', title: 'Pro: all your agents on one allowance',
@@ -190,6 +193,126 @@ export const pageUrl = (p) => (p.slug === 'index' ? `${ORIGIN}/` : `${ORIGIN}/${
 const headOf = (p, pending) => ({ title: p.title, description: p.description, ...(pending && p.pending) });
 export const titleOf = (p, pending = false) => (p.slug === 'index' ? p.title : `${headOf(p, pending).title} — sigelo relay`);
 export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).description, p.slug);
+
+// ---------------------------------------------------------------------------------------------
+// Languages (the Owner, 2026-10-16): the seven pages a person reads (TRANSLATED), in every language
+// of i18n/, one URL each, /<code>/<page>.html. No redirect by location or browser language: the
+// footer's "Other languages" is the only switch. Terms, privacy, agents, 404 and the agent files
+// stay English; a translated page links them in English. A language is a folder,
+// relay/site/i18n/<code>/ (a BCP 47 tag in lower case: de, pt-br), holding lang.json (its hreflang,
+// its own name, the nav labels, OTHER_LANGUAGES, and each page's title and description) and the
+// seven pages. Each page begins with
+//   ---
+//   source: <sha256 of the English page's bytes at translation time>
+//   ---
+// and lang.json carries `source` too, over the English strings it translates (englishStrings). A
+// source that no longer matches is stale, and a stale translation never goes live: its URL serves
+// the English page (<html lang="en">, canonical the English URL, no hreflang), under one line in the
+// language saying so (lang.json `untranslated`); a stale lang.json does that for all seven. The build
+// and --final print a warning per stale file and do not refuse; `node relay/site/build.mjs --stale`
+// lists them with the hash to write once refreshed. A translation keeps the English page's
+// {{values}}, prices, code, link targets and containers (translationRefusals), or the build refuses it
+// (--final) and leaves the language out. Numbers are written for the page's locale (Intl.NumberFormat:
+// de 3.000 and 14,99 €), the € sign and the values as in English. Adding a language is adding a folder.
+export const TRANSLATED = ['index', 'about', 'examples', 'connect', 'pro', 'contact', 'enterprise'];
+export const OTHER_LANGUAGES = 'Other languages';
+// Under the header of a translated URL whose translation is stale (lang.json `untranslated`).
+export const STALE_NOTE = 'This page is in English until its translation is updated.';
+export const I18N = 'i18n';
+export const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+export const FRONT_RE = /^---\nsource: ([0-9a-f]{64})\n---\n\n?/;
+// What lang.json translates, as the English has it; its hash is lang.json's `source`.
+export const englishStrings = () => ({
+  nav: Object.fromEntries(PAGES.filter((p) => p.nav).map((p) => [p.slug, p.nav])), other: OTHER_LANGUAGES, untranslated: STALE_NOTE, drawing: DRAWING_WORDS,
+  pages: Object.fromEntries(PAGES.filter((p) => TRANSLATED.includes(p.slug)).map((p) => [p.slug, { title: p.title, description: p.description, ...(p.pending && { pending: p.pending }) }])),
+});
+export const englishStringsHash = () => sha256(JSON.stringify(englishStrings()));
+// A translation's numbers in its locale: every {{value}}'s digits (not the SimpleX address), and each
+// price (n.nn followed by €), with the € sign kept where English has it. English text is untouched.
+export function localize(text, lang) {
+  if (!lang) return text;
+  const cents = new Intl.NumberFormat(lang.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return text.replace(/\d+\.\d\d(?=[ \u00a0]?€)/g, (n) => cents.format(Number(n)));
+}
+export function fillIn(text, where, lang) {
+  if (!lang) return fill(text, where);
+  const nf = new Intl.NumberFormat(lang.lang);
+  return localize(text.replace(/\{\{([\w.]+)\}\}/g, (_, k) => {
+    if (!(k in VALUES)) throw new Error(`${where}: unknown value {{${k}}} (VALUES in relay/site/build.mjs)`);
+    return k === 'contact.simplex' ? VALUES[k] : VALUES[k].replace(/\d{1,3}(?:,\d{3})+|\d+/g, (n) => nf.format(Number(n.replace(/,/g, ''))));
+  }), lang);
+}
+// A number as the page wrote it in its locale (lang: a BCP 47 tag) → its value.
+export function parseIn(text, lang = 'en') {
+  const parts = new Intl.NumberFormat(lang).formatToParts(12345.6), group = parts.find((x) => x.type === 'group')?.value ?? ',', dec = parts.find((x) => x.type === 'decimal')?.value ?? '.';
+  return Number(text.split(group).join('').replace(/[\u00a0\u202f ]/g, '').split(dec).join('.'));
+}
+export const pageUrlIn = (p, code) => (code ? `${ORIGIN}/${code}/${p.slug}.html` : pageUrl(p));
+// Prices and percentages as written ("14.99 €", "10 %"): the same in every language, in any order.
+export const PRICE_TOKEN_RE = /\d+(?:[.,]\d+)?[  ]?(?:€|%)/g;
+const tokens = (md, re) => (md.match(re) ?? []).map((t) => t.replace(/[  ]/g, ' ')).sort();
+const fences = (md) => [...md.matchAll(/^( *)```[^\n]*\n[\s\S]*?\n\1```$/gm)].map((m) => m[0].trim().split('\n').map((l) => l.trim()).join('\n'));
+const spans = (md) => md.replace(/^( *)```[^\n]*\n[\s\S]*?\n\1```$/gm, '').match(/`[^`\n]+`/g) ?? [];
+const targets = (md) => [...md.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1]).sort();
+const boxes = (md) => md.split('\n').filter((l) => /^:{3,}/.test(l)).map((l) => l.trim());
+// A translation against its English page. → [why …]. The contact page names, in code, the English
+// contact page as where how to pay is published (PAYMENT_PLACES): its one span the English lacks.
+export function translationRefusals(code, en, tr) {
+  const why = [];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  for (const slug of TRANSLATED) {
+    const e = en[slug], t = tr[slug], at = `${code}/${slug}.md`;
+    if (t === undefined) continue;
+    if (!/^# /.test(stripBoxes(t))) why.push(`${at}: does not start with an H1 (containers aside)`);
+    if (!same(tokens(t, /\{\{[\w.]+\}\}/g), tokens(e, /\{\{[\w.]+\}\}/g))) why.push(`${at}: its {{values}} are not ${slug}.md's`);
+    if (!same(tokens(t, PRICE_TOKEN_RE), tokens(e, PRICE_TOKEN_RE))) why.push(`${at}: its prices and percentages are not ${slug}.md's (${tokens(t, PRICE_TOKEN_RE).join(', ')})`);
+    if (!same(fences(t), fences(e))) why.push(`${at}: its code blocks are not ${slug}.md's, line for line`);
+    const extra = slug === 'contact' ? [`\`${PAYMENT_PLACES[0]}\``] : [];
+    if (!same(spans(t).sort(), [...spans(e), ...extra].sort())) why.push(`${at}: its inline code is not ${slug}.md's${extra.length ? ` plus ${extra.join()}` : ''}`);
+    if (!same(targets(t), targets(e))) why.push(`${at}: its links do not go where ${slug}.md's go`);
+    if (!same(boxes(t), boxes(e))) why.push(`${at}: its containers (::: lines) are not ${slug}.md's`);
+    if ((t.match(PLACEHOLDER_RE) ?? []).length) why.push(`${at}: carries a placeholder`);
+  }
+  return [...why, ...paymentDetailRefusals(Object.fromEntries(Object.entries(tr).map(([slug, t]) => [`${code}/${slug}.md`, t])))];
+}
+// → the languages in i18n/, by code: { code, lang, name, other, nav, pages, md: { slug: body },
+// stale: [file …], why: [why …] }. md: the English pages (readPages).
+export function readLanguages(site = SITE, md = readPages(site)) {
+  const dir = join(site, I18N);
+  if (!existsSync(dir)) return [];
+  const english = englishStrings(), englishHash = englishStringsHash();
+  return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort().map((code) => {
+    const at = join(dir, code), stale = [], why = [], pages = {};
+    if (!/^[a-z]{2}(?:-[a-z]{2})?$/.test(code)) why.push(`${code}: not a language tag as nginx.conf sends a folder to its home page: two letters, a region optional (de, pt-br)`);
+    let meta = {};
+    try { meta = JSON.parse(readFileSync(join(at, 'lang.json'), 'utf8')); } catch { why.push(`${code}/lang.json: missing or not JSON`); }
+    if (meta.source !== englishHash) stale.push(`${code}/lang.json`);
+    if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
+    for (const k of ['name', 'other', 'untranslated']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
+    for (const k of Object.keys(DRAWING_WORDS)) if (typeof meta.drawing?.[k] !== 'string' || !meta.drawing[k].trim()) why.push(`${code}/lang.json: no drawing.${k}`);
+    for (const slug of Object.keys(english.nav)) if (typeof meta.nav?.[slug] !== 'string' || !meta.nav[slug].trim()) why.push(`${code}/lang.json: no nav label for ${slug}`);
+    for (const [slug, head] of Object.entries(english.pages)) {
+      const h = meta.pages?.[slug];
+      for (const [k, v] of [['title', h?.title], ['description', h?.description], ...(head.pending?.description ? [['pending description', h?.pending?.description]] : [])]) {
+        if (typeof v !== 'string' || !v.trim()) { why.push(`${code}/lang.json: no ${k} for ${slug}`); continue; }
+        try { fill(v, `${code}/lang.json`); } catch (err) { why.push(err.message); }
+      }
+    }
+    for (const f of readdirSync(at)) if (f !== 'lang.json' && !TRANSLATED.some((slug) => f === `${slug}.md`)) why.push(`${code}/${f}: not lang.json or one of the pages ${TRANSLATED.join(', ')}`);
+    for (const slug of TRANSLATED) {
+      const f = join(at, `${slug}.md`);
+      if (!existsSync(f)) { why.push(`${code}/${slug}.md: missing`); continue; }
+      const text = readFileSync(f, 'utf8'), m = text.match(FRONT_RE);
+      if (!m) { why.push(`${code}/${slug}.md: does not begin with "---", "source: <sha256 of ${slug}.md>", "---"`); continue; }
+      if (m[1] !== sha256(md[slug])) stale.push(`${code}/${slug}.md`);
+      pages[slug] = text.slice(m[0].length);
+    }
+    why.push(...translationRefusals(code, md, pages));
+    return { ...meta, code, md: pages, stale, why };
+  });
+}
+// The hash a stale file needs once refreshed. → hex.
+export const freshSource = (file, md) => (file.endsWith('/lang.json') ? englishStringsHash() : sha256(md[file.split('/')[1].replace(/\.md$/, '')]));
 
 // The relay's numbers, as the pages write them. Days an identity's rows stay after its last use:
 // mailbox.mjs drops an account ACCOUNT_KEEP after its last login once its claims are gone, and an
@@ -545,20 +668,21 @@ const agentHead = (x) => `<rect class="art" x="${x - 45}" y="58" width="90" heig
   + `<circle class="art-dot" cx="${x - 16}" cy="92" r="6"></circle><circle class="art-dot" cx="${x + 16}" cy="92" r="6"></circle>`
   + `<path class="art" d="M${x - 15} 115 q15 10 30 0"></path>`;
 const envelope = (x, y) => `<rect class="art art-paper" x="${x}" y="${y}" width="54" height="36" rx="3"></rect><path class="art" d="M${x} ${y} l27 20 l27 -20"></path>`;
-export const DRAWINGS = {
-  relay: `<figure class="drawing"><svg class="art-svg" viewBox="0 0 640 200" role="img" aria-labelledby="drawing-relay-title">
-<title id="drawing-relay-title">Your agent sends an envelope to the sigelo relay, which passes it on to their agent.</title>
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// Its words are text in the page, so a language gives its own (lang.json `drawing`, as englishStrings).
+export const DRAWING_WORDS = { title: 'Your agent sends an envelope to the sigelo relay, which passes it on to their agent.', yours: 'your agent', relay: 'sigelo relay', theirs: 'their agent' };
+export const drawingRelay = (w) => `<figure class="drawing"><svg class="art-svg" viewBox="0 0 640 200" role="img" aria-labelledby="drawing-relay-title">
+<title id="drawing-relay-title">${esc(w.title)}</title>
 ${agentHead(95)}${agentHead(545)}
 <rect class="art" x="268" y="66" width="104" height="64" rx="12"></rect><line class="art" x1="290" y1="98" x2="350" y2="98"></line>
 <path class="art art-dash" d="M150 98 H258"></path><path class="art" d="M250 90 l8 8 l-8 8"></path>
 <path class="art art-dash" d="M382 98 H490"></path><path class="art" d="M482 90 l8 8 l-8 8"></path>
 ${envelope(177, 80)}
-<text class="art-label" x="95" y="186" text-anchor="middle">your agent</text>
-<text class="art-label" x="320" y="186" text-anchor="middle">sigelo relay</text>
-<text class="art-label" x="545" y="186" text-anchor="middle">their agent</text>
-</svg></figure>`,
-};
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+<text class="art-label" x="95" y="186" text-anchor="middle">${esc(w.yours)}</text>
+<text class="art-label" x="320" y="186" text-anchor="middle">${esc(w.relay)}</text>
+<text class="art-label" x="545" y="186" text-anchor="middle">${esc(w.theirs)}</text>
+</svg></figure>`;
+export const DRAWINGS = { relay: drawingRelay(DRAWING_WORDS) };
 const slugify = (text) => text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s_-]/gu, '').trim().replace(/\s/g, '-');
 const plain = (md) => md.replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1');
 
@@ -601,8 +725,9 @@ function splitRow(line) {
 const LIST = /^( *)([-*+]|\d{1,9}[.)]) +(.*)$/;
 const indentOf = (l) => l.match(/^ */)[0].length;
 
-export function render(md, link, ids = new Map()) {
+export function render(md, link, ids = new Map(), drawings = DRAWINGS) {
   const out = [];
+  ids.drawings = drawings;
   blocks(md.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'), out, link, ids);
   return out.join('\n');
 }
@@ -618,8 +743,9 @@ function blocks(lines, out, link, ids) {
     if (box) {
       flush();
       if (box[2] === 'svg') {
-        if (!DRAWINGS[box[3]]) throw new Error(`::: svg ${box[3]}: no such drawing (DRAWINGS in relay/site/build.mjs)`);
-        out.push(DRAWINGS[box[3]]); i++; continue;
+        const drawings = ids.drawings ?? DRAWINGS;
+        if (!drawings[box[3]]) throw new Error(`::: svg ${box[3]}: no such drawing (DRAWINGS in relay/site/build.mjs)`);
+        out.push(drawings[box[3]]); i++; continue;
       }
       const close = new RegExp(`^${box[1]}\\s*$`), body = []; i++;
       while (i < lines.length && !close.test(lines[i])) body.push(lines[i]), i++;
@@ -726,6 +852,11 @@ const linker = (ext) => (url) => {
   if (!m || !SLUGS.has(m[1])) return url;
   return (m[1] === 'index' && ext === 'html' ? '/' : `/${m[1]}.${ext}`) + (m[2] ?? '');
 };
+// A translated page links the pages of TRANSLATED in its own language, the others in English.
+const langLinker = (code) => (url) => {
+  const m = url.match(/^\/([\w-]+)\.html(#.*)?$/);
+  return m && TRANSLATED.includes(m[1]) ? `/${code}/${m[1]}.html${m[2] ?? ''}` : linker('html')(url);
+};
 // The same rewrite inside Markdown, leaving code alone.
 function rewriteMd(md, link) {
   let inFence = false;
@@ -771,6 +902,13 @@ nav a[aria-current="page"] { text-decoration: underline; text-decoration-thickne
 footer { border-top: 1px solid var(--line); margin-top: 4.5rem; }
 footer .bar { padding: 1.6rem 20px 2.4rem; color: var(--muted); font-size: .95rem; }
 footer .wordmark { font-size: 1.15rem; color: var(--muted); }
+footer summary { color: var(--muted); font-size: .98rem; cursor: pointer; list-style: none; }
+footer summary::-webkit-details-marker { display: none; }
+footer summary:hover, footer details[open] summary { color: var(--link); }
+footer li:has(> details[open]) { flex-basis: 100%; }
+footer details ul { margin-top: .5rem; }
+footer details span { color: var(--fg); font-size: .98rem; }
+main > .untranslated { color: var(--muted); font-size: .92rem; margin-top: 1.4rem; }
 
 /* the text column; cards and the drawing take more room */
 main { max-width: 62rem; margin: 0 auto; padding: 0 20px; }
@@ -851,27 +989,47 @@ main > .plans { max-width: 62rem; }
 `;
 
 // ---------------------------------------------------------------------------------------------
-// The footer, every page the same: the wordmark and the six links, nothing else (the Owner). The
-// twin ends with it as Markdown, the page as HTML, with the same links in the same order
-// (relay/site/test.mjs). The seller is named on privacy and terms; how to pay on contact.
+// The footer, every page the same: the wordmark, the eight links and "Other languages", nothing else
+// (the Owner, 2026-10-16). The twin ends with the links as Markdown, the page as HTML, with the same
+// links in the same order (relay/site/test.mjs). The seller is named on privacy and terms; how to pay
+// on contact. "Other languages" is a <details> (no script): open, it lists every language by its own
+// name, the current one unlinked; each links the same page in that language, or its home page where
+// the page is English only.
 export const FOOTER = PAGES.filter((p) => p.nav);
+export const HEADER = FOOTER.filter((p) => !p.foot);
 const href = (p) => (p.slug === 'index' ? '/' : `/${p.slug}.html`);
+// The page's address in a language (code; null: English); the English one for a page not TRANSLATED.
+const hrefIn = (p, code) => (code && TRANSLATED.includes(p.slug) ? `/${code}/${p.slug}.html` : href(p));
 const footerMd = () => ['sigelo', ...FOOTER.map((p) => `[${p.nav}](${href(p)})`)].join(' · ');
-const navList = (pages, page) => `<ul>${pages.map((p) => `<li><a href="${href(p)}"${p.slug === page.slug ? ' aria-current="page"' : ''}>${esc(p.nav)}</a></li>`).join('')}</ul>`;
+const navList = (pages, page, lang, more = '') => `<ul>${pages.map((p) => `<li><a href="${hrefIn(p, lang?.code)}"${p.slug === page.slug ? ' aria-current="page"' : ''}>${esc(lang ? lang.nav[p.slug] : p.nav)}</a></li>`).join('')}${more}</ul>`;
+const ENGLISH = { code: null, lang: 'en', name: 'English' };
+function languages(page, ctx, lang) {
+  const to = TRANSLATED.includes(page.slug) ? page : PAGES[0];
+  const items = [ENGLISH, ...ctx.langs].map((l) => (l.code === (lang?.code ?? null)
+    ? `<li><span lang="${l.lang}" aria-current="true">${esc(l.name)}</span></li>`
+    : `<li><a href="${hrefIn(to, l.code)}" hreflang="${l.lang}" lang="${l.lang}">${esc(l.name)}</a></li>`));
+  return `<li><details><summary>${esc(lang?.other ?? OTHER_LANGUAGES)}</summary><ul>${items.join('')}</ul></details></li>`;
+}
+// The head of a page in a language: lang.json's title and description (pending while Pro is coming soon).
+const langHead = (p, lang, pending) => ({ ...lang.pages[p.slug], ...(pending && lang.pages[p.slug].pending) });
+export const titleIn = (p, lang, pending = false) => (!lang ? titleOf(p, pending) : p.slug === 'index' ? langHead(p, lang, pending).title : `${langHead(p, lang, pending).title} — sigelo relay`);
+export const descriptionIn = (p, lang, pending = false) => (!lang ? descriptionOf(p, pending) : fillIn(langHead(p, lang, pending).description, `${lang.code}/lang.json`, lang));
 
 // JSON-LD (SEO spec §3.4): the WebSite everywhere, the page's WebPage, and on the home page the
 // hosted Service and the SoftwareApplication. The seller (provider) and the terms only in a final
 // build, the Pro offers only while Pro is on sale (final, and not VENDOR_PENDING): a draft offers
 // nothing. None on the not-found page. Every < is written as
 // <, so no text in it can close the script element.
-function jsonld(page, ctx) {
-  const url = pageUrl(page), service = `${ORIGIN}/#service`, software = `${ORIGIN}/#software`;
+// A translated page: the WebSite and its WebPage, in its language, about the Service defined on the
+// English home page.
+function jsonld(page, ctx, lang = null) {
+  const url = pageUrlIn(page, lang?.code), service = `${ORIGIN}/#service`, software = `${ORIGIN}/#software`;
   const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: `${MOTTO} ${DISCLOSURE}`, inLanguage: 'en' };
-  const webPage = { '@type': 'WebPage', '@id': `${url}#page`, url, name: titleOf(page, ctx.pending), description: descriptionOf(page, ctx.pending), isPartOf: { '@id': site['@id'] }, inLanguage: 'en' };
+  const webPage = { '@type': 'WebPage', '@id': `${url}#page`, url, name: titleIn(page, lang, ctx.pending), description: descriptionIn(page, lang, ctx.pending), isPartOf: { '@id': site['@id'] }, inLanguage: lang?.lang ?? 'en' };
   if (page.slug === 'index') Object.assign(webPage, { about: [{ '@id': service }, { '@id': software }], relatedLink: ['https://sigelo.io/'] });
   if (['connect', 'pro', 'enterprise', 'contact', 'agents'].includes(page.slug)) webPage.about = { '@id': service };
   const graph = [site, webPage];
-  if (page.slug === 'index') {
+  if (page.slug === 'index' && !lang) {
     const free = TIERS.free;
     const proOffer = (name, price, duration) => ({ '@type': 'Offer', name, url: `${ORIGIN}/pro.html`, eligibleCustomerType: 'http://purl.org/goodrelations/v1#Business',
       priceSpecification: { '@type': 'UnitPriceSpecification', price, priceCurrency: 'EUR', valueAddedTaxIncluded: true, billingDuration: duration } });
@@ -893,31 +1051,45 @@ function jsonld(page, ctx) {
   return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 1).replace(/</g, '\\u003c');
 }
 
-function htmlPage(page, body, ctx) {
-  const indexed = page.noindex ? '<meta name="robots" content="noindex">\n' : `<link rel="canonical" href="${pageUrl(page)}">\n`;
-  const ld = page.noindex ? '' : `<script type="application/ld+json">\n${jsonld(page, ctx)}\n</script>\n`;
+// The alternates of a TRANSLATED page (SEO: hreflang): English, every language, x-default English;
+// none while there is no other language.
+// A language whose translation of the page is stale (fallback) has none: its URL is the English page.
+export const alternatesOf = (p, all) => {
+  const langs = all.filter((l) => !l.fallback?.has(p.slug));
+  return TRANSLATED.includes(p.slug) && langs.length ? [['en', pageUrl(p)], ...langs.map((l) => [l.lang, pageUrlIn(p, l.code)]), ['x-default', pageUrl(p)]] : [];
+};
+// lang: null for an English page, else the language (readLanguages) the body is in.
+function htmlPage(page, body, ctx, lang = null, fallback = false) {
+  // fallback: the English page at a translated URL (its translation is stale): English head, the
+  // English URL canonical, no hreflang; the header, footer and the line saying so in the language.
+  const headLang = fallback ? null : lang;
+  const indexed = page.noindex ? '<meta name="robots" content="noindex">\n' : `<link rel="canonical" href="${pageUrlIn(page, headLang?.code)}">\n`;
+  const alternates = fallback ? '' : alternatesOf(page, ctx.langs).map(([h, u]) => `<link rel="alternate" hreflang="${h}" href="${u}">\n`).join('');
+  const twin = lang ? '' : `<link rel="alternate" type="text/markdown" href="/${page.slug}.md" title="This page as Markdown">\n`;
+  const ld = page.noindex ? '' : `<script type="application/ld+json">\n${jsonld(page, ctx, headLang)}\n</script>\n`;
+  const home = lang ? `/${lang.code}/index.html` : '/', chrome = fallback ? ` lang="${lang.lang}"` : '';
+  const note = fallback ? `<p class="untranslated" lang="${lang.lang}">${esc(lang.untranslated)}</p>\n` : '';
   return `<!doctype html>
-<html lang="en">
+<html lang="${headLang?.lang ?? 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>${esc(titleOf(page, ctx.pending))}</title>
-<meta name="description" content="${esc(descriptionOf(page, ctx.pending))}">
-${indexed}<link rel="alternate" type="text/markdown" href="/${page.slug}.md" title="This page as Markdown">
-<link rel="stylesheet" href="/style.css">
+<title>${esc(titleIn(page, headLang, ctx.pending))}</title>
+<meta name="description" content="${esc(descriptionIn(page, headLang, ctx.pending))}">
+${indexed}${alternates}${twin}<link rel="stylesheet" href="/style.css">
 ${ld}</head>
 <body>
-<header class="top"><div class="bar">
-<a class="wordmark" href="/"${page.slug === 'index' ? ' aria-current="page"' : ''}>sigelo</a>
-<nav aria-label="Pages">${navList(FOOTER.filter((p) => !p.foot), page)}</nav>
+<header class="top"${chrome}><div class="bar">
+<a class="wordmark" href="${home}"${page.slug === 'index' ? ' aria-current="page"' : ''}>sigelo</a>
+<nav aria-label="Pages">${navList(HEADER, page, lang)}</nav>
 </div></header>
 <main>
-${body}
+${note}${body}
 </main>
-<footer><div class="bar">
-<a class="wordmark" href="/">sigelo</a>
-<nav aria-label="Footer">${navList(FOOTER, page)}</nav>
+<footer${chrome}><div class="bar">
+<a class="wordmark" href="${home}">sigelo</a>
+<nav aria-label="Footer">${navList(FOOTER, page, lang, languages(page, ctx, lang))}</nav>
 </div></footer>
 </body>
 </html>
@@ -947,7 +1119,7 @@ ${MOTTO} ${DISCLOSURE}
 - [Relay](${ORIGIN}/index.md): plans
 - [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
 - [Agents](${ORIGIN}/agents.md): stolen key, Pro setup, data requests
-- [People](${ORIGIN}/you.md): \`ui\`, \`enrol\`
+- [About](${ORIGIN}/about.md): \`ui\`, \`enrol\`
 - [Index](${ORIGIN}/index.json): host, calls, limits
 - [Identity](https://sigelo.io/llms.txt): login identity
 
@@ -958,7 +1130,7 @@ ${MOTTO} ${DISCLOSURE}
 ## Optional
 
 - [Enterprise](${ORIGIN}/enterprise.md): teams, swarms
-- [Uses](${ORIGIN}/uses.md): examples
+- [Examples](${ORIGIN}/examples.md): uses
 - [Privacy](${ORIGIN}/privacy.md): what the relay keeps
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
 - [Source](${REPO}): AGPL-3.0
@@ -996,6 +1168,14 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     sellerRefusal(seller, md),
     !/^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/.test(vendor) && 'vendor DID: RELAY_VENDOR_DID is not a did:sigelo DID',
   ].filter(Boolean);
+  // The languages: a wrong one is wrong (--final refuses) and left out; a stale page falls back to
+  // the English (fallback: its slugs; all seven while lang.json is stale), with a warning.
+  const langs = readLanguages(site, md);
+  for (const l of langs) {
+    wrong.push(...l.why);
+    l.fallback = new Set(l.stale.includes(`${l.code}/lang.json`) ? TRANSLATED : l.stale.map((f) => f.split('/')[1].replace(/\.md$/, '')));
+  }
+  const live = langs.filter((l) => !l.why.length), stale = live.flatMap((l) => l.stale);
   if (final && (open.length || wrong.length)) throw new Error(`--final: ${[...open, ...wrong].join('; ')} (commercial/relay-pro-runbook.md §0)`);
   for (const p of PAGES) if (!/^# /.test(stripBoxes(md[p.slug]))) throw new Error(`${p.slug}.md: does not start with an H1 (containers aside)`);
 
@@ -1004,7 +1184,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   const discount = price ? price.discount : null;
   const [install, ...commands] = quickStart(md.connect);
   const onSale = final && !pending;   // a final build refuses an unset vendor DID unless pending
-  const ctx = { final, onSale, pending, seller, price };
+  const ctx = { final, onSale, pending, seller, price, langs: live };
   const version = PKG.version.split('.').slice(0, 2).join('.');
   const built = { commit: git('rev-parse', 'HEAD'), commit_date: git('log', '-1', '--format=%cI', 'HEAD'),
     dirty: git('status', '--porcelain', '--untracked-files=no', '--', '.') !== null };
@@ -1018,6 +1198,15 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     twins[p.slug] = rewriteMd(stripBoxes(text), linker('md'));
     put(`${p.slug}.md`, `${twins[p.slug].trimEnd()}\n\n---\n\n${rewriteMd(footerMd(), linker('md'))}\n`);
     put(`${p.slug}.html`, htmlPage(p, render(text, linker('html')), ctx));
+  }
+  for (const l of live) {
+    mkdirSync(join(out, l.code));
+    const drawings = { relay: drawingRelay(l.drawing) };
+    for (const p of PAGES.filter((x) => TRANSLATED.includes(x.slug))) {
+      put(`${l.code}/${p.slug}.html`, l.fallback.has(p.slug)
+        ? htmlPage(p, render(fill(md[p.slug], `${p.slug}.md`), langLinker(l.code)), ctx, l, true)
+        : htmlPage(p, render(fillIn(l.md[p.slug], `${l.code}/${p.slug}.md`, l), langLinker(l.code), new Map(), drawings), ctx, l));
+    }
   }
   put('style.css', STYLE);
 
@@ -1120,14 +1309,17 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   // not-found page or llms-full.txt (each repeats a page). lastmod: the last commit of the source, of
   // the constants it shows when it has {{values}}, and for a generated file of its newest input.
   const valueSources = ['allowance.mjs', 'mailbox.mjs', 'operator.mjs', 'park.mjs'].map((f) => join(RELAY, f));
+  // Every language of a TRANSLATED page, each with the page's alternates (hreflang).
   const locs = [
-    ...PAGES.filter((p) => !p.noindex).map((p) => [pageUrl(p), lastCommit(join(site, `${p.slug}.md`), ...(/\{\{/.test(md[p.slug]) ? valueSources : []))]),
-    [`${ORIGIN}/llms.txt`, lastCommit(fileURLToPath(import.meta.url), join(RELAY, 'package.json'))],
-    [`${ORIGIN}/index.json`, built.commit_date],   // it names its build commit, so every commit changes it
+    ...PAGES.filter((p) => !p.noindex).map((p) => [pageUrl(p), lastCommit(join(site, `${p.slug}.md`), ...(/\{\{/.test(md[p.slug]) ? valueSources : [])), alternatesOf(p, live)]),
+    ...live.flatMap((l) => PAGES.filter((p) => TRANSLATED.includes(p.slug) && !l.fallback.has(p.slug)).map((p) => [pageUrlIn(p, l.code),
+      lastCommit(join(site, I18N, l.code, `${p.slug}.md`), join(site, I18N, l.code, 'lang.json'), ...(/\{\{/.test(l.md[p.slug]) ? valueSources : [])), alternatesOf(p, live)])),
+    [`${ORIGIN}/llms.txt`, lastCommit(fileURLToPath(import.meta.url), join(RELAY, 'package.json')), []],
+    [`${ORIGIN}/index.json`, built.commit_date, []],   // it names its build commit, so every commit changes it
   ];
   put('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${locs.map(([l, d]) => `<url><loc>${l}</loc>${d ? `<lastmod>${d.slice(0, 10)}</lastmod>` : ''}</url>`).join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${locs.map(([l, d, alt]) => `<url><loc>${l}</loc>${d ? `<lastmod>${d.slice(0, 10)}</lastmod>` : ''}${alt.map(([h, u]) => `<xhtml:link rel="alternate" hreflang="${h}" href="${u}"/>`).join('')}</url>`).join('\n')}
 </urlset>
 `);
 
@@ -1141,7 +1333,7 @@ Policy: https://sigelo.io/security.html
 Policy: https://sigelo.io/security.html#official-channels
 Preferred-Languages: en
 `);
-  return { pages: PAGES.length, open, wrong, pending, built };
+  return { pages: PAGES.length, open, wrong, pending, built, languages: live.map((l) => l.code), stale };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -1157,11 +1349,23 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     }
     process.exit(why.length ? 1 : 0);
   }
+  if (process.argv.includes('--stale')) {
+    // The translations to refresh, each with the source hash to write once it is: then exit 1.
+    const md = readPages(), langs = readLanguages(SITE, md);
+    for (const l of langs) {
+      for (const f of l.stale) console.log(`stale: ${f} (source now ${freshSource(f, md)})`);
+      for (const w of l.why) console.log(`wrong: ${w}`);
+    }
+    const n = langs.reduce((k, l) => k + l.stale.length + l.why.length, 0);
+    if (!n) console.log(`relay/site/build --stale: none; ${langs.length} languages up to date (${langs.map((l) => l.code).join(', ')})`);
+    process.exit(n ? 1 : 0);
+  }
   try {
     const r = build({ final: process.argv.includes('--final') });
-    console.log(`relay/site/dist: ${r.pages} pages (+ .md twins) and the agent files, from ${r.built.commit?.slice(0, 12) ?? 'no git commit'}${r.built.dirty ? ' (relay/ has uncommitted changes)' : ''}`);
+    console.log(`relay/site/dist: ${r.pages} pages (+ .md twins)${r.languages.length ? `, ${TRANSLATED.length} in ${r.languages.join(', ')}` : ''} and the agent files, from ${r.built.commit?.slice(0, 12) ?? 'no git commit'}${r.built.dirty ? ' (relay/ has uncommitted changes)' : ''}`);
     const label = { DRAFT: "DRAFT — the terms' draft mark (terms.md)", SELLER: 'SELLER — the name the pages give the seller (relay/site/build.mjs)',
       'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
+    for (const f of r.stale) console.log(`warning: stale: ${f}: its URL serves the English page until refreshed (node relay/site/build.mjs --stale)`);
     if (r.pending) console.log('note: Pro is coming soon (pro.md says so): the vendor DID is not required, index.json and relay.json say not_yet_on_sale');
     for (const p of r.open) console.log(`open: ${PLACEHOLDERS[p] ? `${p} — ${PLACEHOLDERS[p]}` : label[p] ?? p}`);
     for (const w of r.wrong) console.log(`wrong: ${w}`);

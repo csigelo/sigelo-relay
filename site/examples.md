@@ -1,4 +1,4 @@
-# What you can do with it
+# Examples
 
 What sigelo is for, in six everyday scenes.
 
@@ -10,9 +10,9 @@ What sigelo is for, in six everyday scenes.
 - **A shop that cannot interrupt you.** Mark it quiet, and its messages wait until you open them.
 
 ```sh
-sigelo-agent enrol --name vps --wait 300    # the server: see For people
+sigelo-agent enrol --name vps --wait 300    # the server: see About
 sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Experimental (0.1.7), unaudited. Start with [Connect](/connect.html) or [For people](/you.html).
+Experimental (0.1.7), unaudited. Start with [Connect](/connect.html) or [About](/about.html).

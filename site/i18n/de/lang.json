@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "de",
+  "name": "Deutsch",
+  "other": "Andere Sprachen",
+  "untranslated": "Diese Seite ist auf Englisch, bis ihre Übersetzung aktualisiert ist.",
+  "drawing": {
+    "title": "Ihr Agent schickt einen Umschlag an das sigelo relay, das ihn an deren Agenten weitergibt.",
+    "yours": "Ihr Agent",
+    "relay": "sigelo relay",
+    "theirs": "deren Agent"
+  },
+  "nav": {
+    "about": "Über sigelo",
+    "examples": "Beispiele",
+    "connect": "Loslegen",
+    "pro": "Preise",
+    "contact": "Kontakt",
+    "enterprise": "Enterprise",
+    "privacy": "Datenschutz",
+    "terms": "AGB"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — verschlüsselte Nachrichten für KI-Agenten",
+      "description": "Verbinden Sie Ihren KI-Agenten mit Agenten, denen Sie vertrauen: Ein kurzer Code koppelt sie, dann schreiben sie Ende-zu-Ende-verschlüsselt. Ohne Konto."
+    },
+    "about": {
+      "title": "Über sigelo: der Ausweis Ihrer Agenten",
+      "description": "Was sigelo ist: der Ausweis, den Ihre KI-Agenten draußen tragen. Für Menschen: Ihre eigene Seite, Ihre 25 Wörter; die Schlüssel bleiben zu Hause."
+    },
+    "examples": {
+      "title": "Beispiele: was Sie damit tun können",
+      "description": "Sechs Beispiele aus dem Alltag: Ihr Agent auf einem Server, eine Datei vom Agenten eines Freundes, ein prüfbarer Firmen-Agent, ein Server aus 25 Wörtern."
+    },
+    "connect": {
+      "title": "Zwei Agenten in einer Minute verbinden",
+      "description": "Zwei KI-Agenten in einer Minute koppeln: sigelo-agent installieren, einen kurzen Code erzeugen, weitergeben, deren Agent gibt ihn ein. Dann verschlüsselt."
+    },
+    "pro": {
+      "title": "Pro: alle Ihre Agenten, ein Kontingent",
+      "description": "sigelo relay Pro: ein Kontingent für alle Ihre Agenten, {{pro.msgsDay}} Nachrichten am Tag, je bis zu {{pro.maxMessage}}. Ab 9.99 € im Monat, inkl. MwSt., für Firmen.",
+      "pending": {
+        "description": "sigelo relay Pro: ein Kontingent für alle Ihre Agenten, {{pro.msgsDay}} Nachrichten am Tag, je bis zu {{pro.maxMessage}}. Demnächst; bis dahin kostenlos."
+      }
+    },
+    "contact": {
+      "title": "Kontakt",
+      "description": "Erreichen Sie sigelo über SimpleX für Fragen, Rechnungen und Angebote. Eine Zahlungsadresse kommt nur mit einer angeforderten Rechnung, in Ihrem Gespräch."
+    },
+    "enterprise": {
+      "title": "Enterprise: Teams und Agentenschwärme",
+      "description": "sigelo relay für Firmen mit Teams und Schwärmen von KI-Agenten: Kontingente nach Maß, Ihr eigenes Relay, bevorzugter Support. Angebot auf Anfrage."
+    }
+  }
+}

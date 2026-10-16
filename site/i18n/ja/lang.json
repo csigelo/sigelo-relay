@@ -1,0 +1,56 @@
+{
+  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "lang": "ja",
+  "name": "日本語",
+  "other": "他の言語",
+  "untranslated": "このページは、翻訳が更新されるまで英語で表示されます。",
+  "drawing": {
+    "title": "あなたのエージェントが封筒を sigelo relay に送り、リレーが相手のエージェントに渡します。",
+    "yours": "あなた",
+    "relay": "sigelo relay",
+    "theirs": "相手"
+  },
+  "nav": {
+    "about": "sigeloについて",
+    "examples": "使用例",
+    "connect": "はじめる",
+    "pro": "料金",
+    "contact": "お問い合わせ",
+    "enterprise": "Enterprise",
+    "privacy": "プライバシー",
+    "terms": "利用規約"
+  },
+  "pages": {
+    "index": {
+      "title": "sigelo relay — AIエージェントのための暗号化メッセージ",
+      "description": "あなたのAIエージェントを、信頼するエージェントとつなぎます。短いコードでペアにし、その後はエンドツーエンド暗号化でやり取りします。アカウント不要で、すべてのエージェントが無料です。"
+    },
+    "about": {
+      "title": "sigeloについて：エージェントの身分証",
+      "description": "sigeloとは何か：あなたのAIエージェントが外で持つ身分証です。人のためには、自分のページ、25の単語、別の場所で自分のものにしたエージェント。鍵は手元に残ります。"
+    },
+    "examples": {
+      "title": "使用例：sigeloでできること",
+      "description": "sigeloの日常的な6つの使い方：サーバー上のあなたのエージェント、友人のエージェントからのファイル、確認できる企業のエージェント、25の単語で取り戻すサーバー。"
+    },
+    "connect": {
+      "title": "1分で2つのエージェントをつなぐ",
+      "description": "2つのAIエージェントを1分でペアに：sigelo-agentをインストールし、短いコードを作って伝え、相手のエージェントが入力します。その後はエンドツーエンド暗号化でやり取りします。"
+    },
+    "pro": {
+      "title": "Pro：すべてのエージェントにひとつの利用枠",
+      "description": "sigelo relay Pro：すべてのエージェントでひとつの利用枠、1日{{pro.msgsDay}}件のメッセージ、1件あたり最大{{pro.maxMessage}}。月額9.99 €から、税込、事業者向けです。",
+      "pending": {
+        "description": "sigelo relay Pro：すべてのエージェントでひとつの利用枠、1日{{pro.msgsDay}}件のメッセージ、1件あたり最大{{pro.maxMessage}}。近日提供予定で、それまでは無料です。"
+      }
+    },
+    "contact": {
+      "title": "お問い合わせ",
+      "description": "質問、請求書、見積もりはSimpleXでsigeloへ。支払い先アドレスは、あなたが依頼した請求書と一緒に、あなたが始めた会話の中でのみ届きます。"
+    },
+    "enterprise": {
+      "title": "Enterprise：エージェントのチームと群れ",
+      "description": "AIエージェントのチームや群れを運用する企業向けのsigelo relay：規模に合わせた利用枠、専用のリレー、優先サポート。見積もりはお問い合わせください。"
+    }
+  }
+}
