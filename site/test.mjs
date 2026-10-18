@@ -71,7 +71,7 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
 // Every {{value}} filled: a size is two words ("50 MB"), so the source's count (docs-test/check-budgets.mjs)
-// is too low. Two budgets. The prose (the Owner's, 2026-10-14): the words a reader reads as text, so
+// is too low. Two budgets. The prose (set 2026-10-14): the words a reader reads as text, so
 // no table, no card (the home page's tier cards), no code block, no container line. The whole file:
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
@@ -206,7 +206,7 @@ PAGES.forEach((p, i) => {
 ok(new Set(titles).size === titles.length && new Set(descs).size === descs.length, 'titles and descriptions: each unique');
 ok(descs.every((d) => !/\bkept up to\b|\bretention\b/i.test(d)), 'descriptions: none promises a retention (a reader away over a week takes no new messages, whatever the tier)');
 // No head offers the Monero discount (runbook §7 Q5).
-// While Pro is coming soon, the pro and terms descriptions say so; no head names a date (the Owner).
+// While Pro is coming soon, the pro and terms descriptions say so; no head names a date.
 const SALE_HEADS = ['pro', 'terms'].map((slug) => PAGES.findIndex((p) => p.slug === slug));
 ok(![...titles, ...descs].some((t) => /discount|not on sale|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(t))
   && (!r.pending || SALE_HEADS.every((i) => /coming soon/i.test(descs[i]))),
