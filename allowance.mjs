@@ -97,14 +97,16 @@ const RELAY_FULL = 0.70;
 // row_totals), is charged half the room the relay has below relay_full, so free identities alone
 // cannot reach it and stop everyone. The room is
 // what the other files on the disk (the system, logs, the database's free pages and WAL) leave
-// below 70 %, measured at start as server.mjs measures use (statfs: blocks, bavail, bsize). What
+// below 70 %, measured at start as server.mjs measures use (statfs: blocks, bfree, bavail, bsize;
+// used = blocks - bfree, the whole = used + bavail, so root's reserved blocks count as neither). What
 // the ceiling counts (queued, the queue's charge and the rows) is added back, so a restart with a
 // full free tier does not move the ceiling.
 // A share of the whole disk let a disk already 40 % used reach relay_full on free messages alone.
 // No room left: 1, free readers take nothing. Files that keep growing after start are not seen:
 // set RELAY_FREE_QUEUE_MB on such a disk. → bytes.
-export function freeQueueOf({ blocks, bavail, bsize }, queued) {
-  const room = (RELAY_FULL * blocks - (blocks - bavail)) * bsize + queued;
+export function freeQueueOf({ blocks, bfree, bavail, bsize }, queued) {
+  const used = blocks - bfree;
+  const room = (RELAY_FULL * (used + bavail) - used) * bsize + queued;
   return Math.max(1, Math.floor(room / 2));
 }
 // Plan §1 "Abuse brakes": publishes, and topics subscribed, per identity: a token bucket each,

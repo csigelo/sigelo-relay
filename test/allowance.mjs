@@ -1338,8 +1338,9 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ the free tier's ceiling by default: half the room below relay_full
 {
-  // A disk of 1,000,000 blocks of 4 KiB; bavail: the blocks not in use (server.mjs: use = 1 - bavail / blocks).
-  const SIZE = 1e6 * 4096, disk = (bavail) => ({ blocks: 1e6, bavail, bsize: 4096 });
+  // A disk of 1,000,000 blocks of 4 KiB; bavail: the blocks not in use; reserved: root's reserved
+  // blocks (ext4's 5 %), free but not available, which server.mjs counts as neither used nor room.
+  const SIZE = 1e6 * 4096, disk = (bavail, reserved = 0) => ({ blocks: 1e6 + reserved, bfree: bavail + reserved, bavail, bsize: 4096 });
   ok(freeQueueOf(disk(1e6), 0) === Math.floor(FULL * SIZE / 2), `an empty disk: half of server.mjs's relay_full share (${FULL}) of it, so the two constants agree`);
   // The review's case: the disk is 40 % used before the relay starts. A ceiling of 35 % of the disk
   // let free messages alone take it to 75 %, past relay_full.
@@ -1348,6 +1349,7 @@ const fresh = (name, extra = {}) => {
     `a disk 40 % used by other files: the ceiling is half the 30 % left below relay_full (${c40} bytes), so free messages alone stop at ${((0.4 + c40 / SIZE) * 100).toFixed(0)} %`);
   ok(freeQueueOf(disk(600000 - c40 / 4096), c40) === c40, 'restarted with that free tier full (its charge now on the disk): the same ceiling, not a higher one');
   ok(freeQueueOf(disk(250000), 0) === 1 && freeQueueOf(disk(0), 0) === 1, 'other files at 75 % or 100 % of the disk: a ceiling of 1 byte, free readers take nothing');
+  ok(freeQueueOf(disk(600000, 50000), 0) === c40, 'the same disk with 50,000 blocks reserved for root (ext4 5 %): the same ceiling, reserved blocks are neither used nor room (review finding 2026-10-17)');
   // On a relay: no freeQueue configured, so it is measured from the database's own disk at start.
   const D = fresh('measured', { freeQueue: undefined });
   const R = await D.start();

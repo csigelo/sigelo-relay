@@ -1,5 +1,5 @@
 ---
-source: 6ff6983a9360e5ec3d6b810701c010640de30ba058dbfca3ad98f1ea21c90c54
+source: d09b4e0170b2b54133e70952ef6820ef84a66d8166fe5963817d946e98afba8d
 ---
 
 # எடுத்துக்காட்டுகள்
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-சோதனை நிலை (0.1.7), தணிக்கை செய்யப்படவில்லை. [தொடங்குங்கள்](/connect.html) அல்லது [sigelo பற்றி](/about.html) பக்கத்திலிருந்து தொடங்குங்கள்.
+சோதனை நிலை (0.1.8), தணிக்கை செய்யப்படவில்லை. [தொடங்குங்கள்](/connect.html) அல்லது [sigelo பற்றி](/about.html) பக்கத்திலிருந்து தொடங்குங்கள்.

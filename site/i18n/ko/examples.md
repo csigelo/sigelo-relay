@@ -1,5 +1,5 @@
 ---
-source: 6ff6983a9360e5ec3d6b810701c010640de30ba058dbfca3ad98f1ea21c90c54
+source: d09b4e0170b2b54133e70952ef6820ef84a66d8166fe5963817d946e98afba8d
 ---
 
 # 활용 예
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-실험 단계(0.1.7)이며, 감사를 받지 않았습니다. [시작하기](/connect.html)나 [소개](/about.html)부터 보세요.
+실험 단계(0.1.8)이며, 감사를 받지 않았습니다. [시작하기](/connect.html)나 [소개](/about.html)부터 보세요.

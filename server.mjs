@@ -232,12 +232,17 @@ class Capped extends Duplex {
   _destroy(err, cb) { this.done(); this.sock.destroy(); this.raw?.destroy(); cb(err); }
 }
 
+// statfs → the share in use, as df computes it (review finding, 2026-10-17; allowance.mjs freeQueueOf agrees).
+export const diskUse = ({ blocks, bfree, bavail }) => { const used = blocks - bfree; return used / (used + bavail) || 0; };
+
 const diskUsage = (dir, log) => {
   let at = 0, used = 0;
   return () => {
     if (Date.now() - at > 5000) {
       // Unreadable disk statistics count as full: refuse new work rather than fill a disk blind.
-      try { const s = statfsSync(dir); used = 1 - s.bavail / s.blocks; } catch { used = 1; log('disk statistics unreadable: treated as full'); }
+      // Use as df reports it: used / (used + available). blocks - bavail would count the blocks
+      // ext4 reserves for root (5 % by default) as used, and reach 70 % at 65 % real use.
+      try { used = diskUse(statfsSync(dir)); } catch { used = 1; log('disk statistics unreadable: treated as full'); }
       at = Date.now();
     }
     return used;

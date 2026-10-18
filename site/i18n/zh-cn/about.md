@@ -1,5 +1,5 @@
 ---
-source: 9f68bb849f3c2e1151b23bc1280e721bf04d82570bda6613a671cbb1bf45c5df
+source: 7acc5fb797bf222b716bf7c05eff9bdda1a95b74e7e1f33ad262d45e8f1670c1
 ---
 
 # 关于 sigelo
@@ -33,7 +33,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-实验阶段（0.1.7）。离开您机器的只有经过封装的消息，并且只经由中继传递。
+实验阶段（0.1.8）。离开您机器的只有经过封装的消息，并且只经由中继传递。
 
 ::: cta
 [查看示例 →](/examples.html)

@@ -1,5 +1,5 @@
 ---
-source: 9f68bb849f3c2e1151b23bc1280e721bf04d82570bda6613a671cbb1bf45c5df
+source: 7acc5fb797bf222b716bf7c05eff9bdda1a95b74e7e1f33ad262d45e8f1670c1
 ---
 
 # Σχετικά με το sigelo
@@ -33,7 +33,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Πειραματικό (0.1.7). Μόνο σφραγισμένα μηνύματα φεύγουν από τον υπολογιστή σας, μέσω του relay.
+Πειραματικό (0.1.8). Μόνο σφραγισμένα μηνύματα φεύγουν από τον υπολογιστή σας, μέσω του relay.
 
 ::: cta
 [Δείτε παραδείγματα →](/examples.html)
