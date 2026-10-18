@@ -432,7 +432,7 @@ ok(inFull.length === indexable.length - 1 && inFull.every((p) => full.includes(`
 ok(!full.includes(`Source: ${ORIGIN}/contact.md`) && !full.includes(PAYMENT_WORDS) && !full.includes(NOBODY) && !XMR_RE.test(full) && !PAYMENT_LINK_RE.test(full)
   && full.includes(`published only at ${PAYMENT_PLACES.slice(0, -1).join(', ')} and ${PAYMENT_PLACES.at(-1)}.`),
   'llms-full.txt: no copy of the contact page, no address or link, only where how to pay is published (a third copy would make the contact page untrue)');
-ok(![llms, full, ...Object.values(twin), ...Object.values(html)].some((t) => /not on sale/i.test(t)), 'nowhere "not on sale": Pro is "coming soon" (the Owner)');
+ok(![llms, full, ...Object.values(twin), ...Object.values(html)].some((t) => /not on sale/i.test(t)), 'nowhere "not on sale": Pro is "coming soon"');
 
 // ---- sitemap.xml, robots.txt, security.txt (A11–A13) -------------------------------------------
 const sitemap = read('sitemap.xml');
@@ -479,7 +479,7 @@ const mainOf = (h) => h.match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? '';
 const alternatesIn = (h) => [...h.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map((m) => [m[1], m[2]]);
 // The prices and percentages of a page, as values (each written in the page's locale) with their sign.
 const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(/(\p{Nd}[\p{Nd}.,\u00a0\u202f]*\p{Nd}|\p{Nd})[ \u00a0\u202f]?(€|%)/gu)].map((m) => `${parseIn(m[1], lang)} ${m[2]}`).sort().join();
-// The word for "card" in each language: the Owner's ban on the metaphor holds in every language (the
+// The word for "card" in each language: the ban on the metaphor holds in every language (the
 // English page says "sigelo is that ID", and so must each translation).
 const CARD_WORDS = { de: /karte/i, fr: /\bcartes?\b/i, es: /\btarjetas?\b/i, 'pt-br': /\bcart(?:ão|ões)\b/i, it: /\b(?:cart[ae]|tesser[ae])\b/i, nl: /kaart/i, pl: /\bkart/i, ja: /カード/,
   'zh-cn': /卡/, 'zh-tw': /卡/, ru: /карт/i, uk: /карт/i, hi: /कार्ड/, bn: /কার্ড/, ta: /அட்டை|கார்டு/, ar: /بطاق/, ko: /카드/, th: /บัตร|การ์ด/,
@@ -519,7 +519,7 @@ for (const l of LANGS) {
     ok(!talk && !card && never.length === 0 && mails.every((m) => m === 'contact@sigelo.io') && !/not on sale/i.test(h),
       `${at}: no protocol talk, no word for "card", none of the words never written, no e-mail but contact@sigelo.io${never.length ? ` (${never.join('; ')})` : ''}`);
     if (!NO_SPACES.includes(l.code)) {
-      // Not counted against a budget; kept near the English (the Owner: within about 1.3×). Japanese, Chinese and Thai have no spaces to count.
+      // Not counted against a budget; kept near the English (within about 1.3×). Japanese, Chinese and Thai have no spaces to count.
       const n = words(fill(l.md[p.slug], at)), e = words(fill(src[p.slug], p.slug));
       ok(n <= Math.ceil(1.3 * e), `${at}: ${n} words, within 1.3× the English ${e}`);
     }
@@ -620,7 +620,7 @@ ok(priceLine && proPrice && same(index.tiers.pro.price.periods, proPrice.periods
   && same(proPrice.periods.map((p) => [p.months, p.month, p.period]), [[1, 14.99, 14.99], [6, 11.99, 71.94], [12, 9.99, 119.88]])
   && !/12\.39|9\.91|59\.45|8\.26|99\.07/.test(PAGES.map((p) => src[p.slug]).join('\n') + read('index.json') + read('relay.json') + read('llms-full.txt'))
   && !PAGES.some((p) => p.slug !== 'terms' && /\bnet\b/i.test(src[p.slug])),
-'index.json: the price is pro.md\'s; pro.md\'s table is the Owner\'s (2026-10-14): 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
+'index.json: the price is pro.md\'s; pro.md\'s table (2026-10-14): 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
 // relay_sees names what each row of privacy.md's table keeps (A14).
 const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Web access log': 'web access log of sigelo.ai and relay.sigelo.ai, for visit counts', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
   Backups: 'encrypted nightly backup, each copy kept 7 days' };
@@ -1320,7 +1320,7 @@ ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encry
   && /^TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"$/m.test(backupSh),
   'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
 ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key** (any site can obtain identity-key signatures), where the identity file and `recovery.key` are:'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
-// Where the servers are, as the Owner confirmed it (runbook §0): stated once, in the seller line.
+// Where the servers are (runbook §0): stated once, in the seller line.
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
 ok(src.privacy.includes('No accounts. This site sets no cookies and runs no scripts or trackers.'), 'privacy: no accounts, no cookies, no scripts or trackers (so no consent banner)');
