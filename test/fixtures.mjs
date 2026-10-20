@@ -24,7 +24,7 @@ export function identity(label) {
 // is unchanged, so a test can keep using the old key as a thief would.
 export function rotated(from, label2, reason = 'voluntary', iat = 1760000000) {
   const next = keygen({ seed: seed(label2), recovery: from.genesis.recovery, created: CREATED, nonce: seed(`${label2} nonce`).slice(0, 16) });
-  const r = rotate({ genesis: from.genesis, next_genesis: next.genesis, iat, reason, secret: reason === 'recovery' ? from.recovery : from.secret });
+  const r = rotate({ genesis: from.genesis, next_genesis: next.genesis, iat, reason, secret: reason === 'recovery' ? from.recovery : from.secret, next_secret: next.secret });
   return { ...from, label: label2, did: next.did, secret: next.secret, genesis: next.genesis, rotations: [...from.rotations, r] };
 }
 

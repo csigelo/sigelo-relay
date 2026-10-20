@@ -1,5 +1,5 @@
 ---
-source: d09b4e0170b2b54133e70952ef6820ef84a66d8166fe5963817d946e98afba8d
+source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
 ---
 
 # Ejemplos
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Experimental (0.1.8), sin auditar. Empieza por [Conectar](/connect.html) o [Acerca de](/about.html).
+Experimental (0.1.9), sin auditar. Empieza por [Conectar](/connect.html) o [Acerca de](/about.html).

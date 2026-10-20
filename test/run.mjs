@@ -28,6 +28,7 @@ import { CHECKS, MAX_BODY, MAX_OPERATOR, OPERATOR_CTX } from '../auth.mjs';
 import { relayPolicy } from '../allowance.mjs';
 import { mailboxes } from '../mailbox.mjs';
 import { solve } from '../pow.mjs';
+import { LOOKUPS_ALL, parking } from '../park.mjs';
 import { CREATED, bundleOf, clientId, identity, password, rotated, seed, selfSigned } from './fixtures.mjs';
 
 let n = 0, failed = 0;
@@ -390,14 +391,15 @@ let a, b;
   await closed(lt4.client);
   await end(lb61.client);
   // A thief holding opal's key before she ever logs in here puts a genesis of its own in front of
-  // hers (a voluntary rotation into it, carrying her recovery commitment, which is public), then
+  // hers (a voluntary rotation into it, carrying her recovery commitment, which is public, and
+  // countersigned with her stolen key, SPEC §7), then
   // rotates on to a key of its own. Opal takes her DID back with a recovery rotation from her
   // genesis, signed by the recovery key no thief of her key holds: from then on the thief's chain
   // is refused, with its bundle or without (its cached login is dropped). Her genesis alone takes
   // nothing back: else a key's genesis alone took it from the chain that holds it (below).
   const opal = identity('opal');
   const pstart = keygen({ seed: seed('opal thief start'), recovery: opal.origin.recovery, created: CREATED, nonce: seed('opal thief start nonce').slice(0, 16) });
-  const into = rotate({ genesis: pstart.genesis, next_genesis: opal.origin, iat: now - 300, reason: 'voluntary', secret: pstart.secret });
+  const into = rotate({ genesis: pstart.genesis, next_genesis: opal.origin, iat: now - 300, reason: 'voluntary', secret: pstart.secret, next_secret: opal.secret });
   const t1 = rotated({ ...opal, original: pstart.did, origin: pstart.genesis, rotations: [into] }, 'opal thief 1');
   everyone.push(opal, t1, { did: pstart.did, original: pstart.did });
   const lp0 = await login(t1);
@@ -435,7 +437,7 @@ let a, b;
   // holds: vera, logging in later, takes that key back with a recovery rotation from it.
   const vera = identity('vera'), v1 = rotated(vera, 'vera 1'), v2 = rotated(v1, 'vera 2'), v3 = rotated(v1, 'vera 3', 'recovery', now - 60);
   const vs = keygen({ seed: seed('vera thief start'), recovery: vera.origin.recovery, created: CREATED, nonce: seed('vera thief start nonce').slice(0, 16) });
-  const intoV1 = rotate({ genesis: vs.genesis, next_genesis: v1.genesis, iat: now - 300, reason: 'voluntary', secret: vs.secret });
+  const intoV1 = rotate({ genesis: vs.genesis, next_genesis: v1.genesis, iat: now - 300, reason: 'voluntary', secret: vs.secret, next_secret: v1.secret });
   const vt = rotated({ ...v1, original: vs.did, origin: vs.genesis, rotations: [intoV1] }, 'vera thief');
   everyone.push(vera, v1, v2, v3, vt, { did: vs.did, original: vs.did });
   const lvt = await login(vt);
@@ -1507,14 +1509,29 @@ function walStates(r, name, tag = name) {
   const fresh = await fetch(`${base(pr3)}/park`, { method: 'POST', body: JSON.stringify({ username: ivan.did, client_id: clientId(ivan), password: password(ivan, c3), code_hash: hashOf('88888888'), invite: longCode(ivan), exp: now + 600 }) }).then((x) => x.json());
   ok(fresh.ok === false && fresh.check === 'pow' && pr3.park.size() === 0, `a new identity that has proven no work parks nothing (${fresh.check})`);
   await pr3.close();
-  // The relay-wide brake: LOOKUPS_ALL across every network (here 3), the same 429 rate as a network's own.
-  const pr4 = await startRelay({ ...cfg, db: join(dir, 'park-all.db'), park: { lookupsAll: { n: 3, window: 600 } } });
+  // The relay-wide brake: LOOKUPS_ALL across every network (here 16: a network's share 2; 14 for
+  // any network, then a reserve of 2 for networks not seen this window), the same 429 as a network's own.
+  const pr4 = await startRelay({ ...cfg, db: join(dir, 'park-all.db'), park: { lookupsAll: { n: 16, window: 600 } } });
   const look4 = async (ip) => { const res = await fetch(`${base(pr4)}/park/${hashOf('99999999')}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') }; };
+  const hog = [];
+  for (let i = 0; i < 3; i++) hog.push(await look4('100.64.0.1'));
+  ok(hog.slice(0, 2).every((x) => x.status === 404) && hog[2].status === 429 && hog[2].json.check === 'rate' && /its share of this relay's/.test(hog[2].json.detail),
+    `lookups: no network takes more than 1/8 of LOOKUPS_ALL, under its own brake or not (${hog.map((x) => x.status).join()}; ${hog[2].json.detail})`);
   const spread = [];
-  for (let i = 0; i < 4; i++) spread.push(await look4(`100.64.${i}.1`));
-  ok(spread.slice(0, 3).every((x) => x.status === 404 && x.json.check === 'park_unknown') && spread[3].status === 429 && spread[3].json.check === 'rate' && /on this relay/.test(spread[3].json.detail),
-    `lookups: at most LOOKUPS_ALL per 10 minutes across all networks, the next rate (429) from a network of its own (${spread.map((x) => x.status).join()}; ${spread[3].json.detail})`);
-  ok(spread[3].after === String(600 - (now % 600)) && spread.slice(0, 3).every((x) => x.after === null), `the relay-wide 429: Retry-After the seconds left in its 10 minutes, none on a 404 (${spread[3].after})`);
+  for (let i = 1; i < 7; i++) for (let j = 0; j < 2; j++) spread.push(await look4(`100.64.${i}.1`));
+  const lates = [await look4('100.64.20.1'), await look4('100.64.20.1'), await look4('100.64.21.1'), await look4('100.64.22.1')];
+  ok(spread.every((x) => x.status === 404) && lates[0].status === 404 && lates[1].status === 429 && lates[2].status === 404 && lates[3].status === 429 && /on this relay/.test(lates[3].json.detail),
+    `lookups: past LOOKUPS_ALL a network not seen this window still gets one try, from a reserve of 1/8; then the relay-wide rate (429) (${lates.map((x) => x.status).join()}; ${lates[3].json.detail})`);
+  ok(lates[3].after === String(600 - (now % 600)) && spread.every((x) => x.after === null), `the relay-wide 429: Retry-After the seconds left in its 10 minutes, none on a 404 (${lates[3].after})`);
+  {
+    // At the defaults (600: 525 + a reserve of 75): 30 networks each at their own 20 spend the
+    // 525 (75 of their tries refused), and a never-seen network still gets its try.
+    const pk = parking({ host: 'relay.example', clock: () => now });
+    let refused = 0;
+    for (let i = 0; i < 30; i++) for (let j = 0; j < 20; j++) try { pk.charge('lookup', `198.18.${i}.0/24`, now); } catch { refused++; }
+    let fresh = 'ok'; try { pk.charge('lookup', '198.19.0.0/24', now); } catch (e) { fresh = e.detail; }
+    ok(refused === 72 && fresh === 'ok' && LOOKUPS_ALL.n === 600, `lookups at the defaults: 30 networks × 20 spend 525 of LOOKUPS_ALL (600), and a never-seen network still gets its try from the reserve of 75 (${refused} refused; ${fresh})`);
+  }
   now += 600;
   ok((await look4('100.64.9.1')).status === 404, 'lookups: the relay-wide count starts afresh the next 10 minutes');
   now -= 600;

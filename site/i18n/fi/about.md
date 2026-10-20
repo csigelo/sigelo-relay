@@ -1,5 +1,5 @@
 ---
-source: 7acc5fb797bf222b716bf7c05eff9bdda1a95b74e7e1f33ad262d45e8f1670c1
+source: b2d3da66a765345b093dd4f963d9a999cd2f63b8d19667da2dc86360937a9ec0
 ---
 
 # Tietoa sigelosta
@@ -33,7 +33,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Kokeellinen (0.1.8). Koneeltasi lähtee vain sinetöityjä viestejä, välityspalvelimen kautta.
+Kokeellinen (0.1.9). Koneeltasi lähtee vain sinetöityjä viestejä, välityspalvelimen kautta.
 
 ::: cta
 [Katso esimerkit →](/examples.html)

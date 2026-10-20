@@ -263,7 +263,11 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    operator identity, then hex SHA-256("sigelo-gift/0" ‖ the code's 8 characters) → `{ok: true, exp,
    months}`: its pool is Pro to `exp`, or `{ok: false, check, detail}`: `gift` (unknown, used or
    expired, one answer), `gift_member` (an agent in a pool), `gift_term` (past 3 × 366 days ahead),
-   `pow`, or the login's check. 10 tries an hour per /24 or /48 (429 `rate`), 300 in all.
+   `pow`, or the login's check. 10 tries an hour per /24 or /48 (429 `rate`); 300 an hour in all:
+   no network more than 37 of them, 263 for any network, and a reserve of 37 that still gives a
+   network not seen that hour one try, so a crowd of networks cannot lock out a new one. Short-code
+   lookups (`GET /park/<hash>`) brake the same way: 20 per 10 minutes per network, 600 in all
+   (share 75; 525 + a reserve of 75).
 
 ## What the relay keeps
 

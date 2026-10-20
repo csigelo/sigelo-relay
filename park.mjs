@@ -24,8 +24,11 @@
 // (with 2^40 codes and PARK_MAX parked at most, one network's guesses hit with odds of at most
 // 20 × PARK_MAX / 2^40 per 10 minutes: under 1 in a million), and PARKS parks an hour, counted
 // before the login is checked. Across all networks, LOOKUPS_ALL fetches per 10 minutes, charged after
-// the network's own brake passes (so many networks guess at most 600 × PARK_MAX / 2^40 per 10
-// minutes in all). PARK_MAX entries at once in all (park_full). Expired entries are
+// the network's own brake passes, with a fair share (`fairCeiling`: no network more than 75 of
+// it; 525 for any network, then a reserve of 75 that gives a network not seen this window one
+// try), so many networks guess at most 600 × PARK_MAX / 2^40 per 10 minutes in all (about 1 in
+// 37,000), and a crowd under its own brakes no longer locks out a new one (review 2026-10-19).
+// PARK_MAX entries at once in all (park_full). Expired entries are
 // purged at every sweep (server.mjs, each minute) and when the cap is reached.
 // A miss and a hit cost one Map lookup each; a malformed hash looks up the empty string, so every
 // miss takes one path.
@@ -46,6 +49,32 @@ export class ParkError extends Error { constructor(check, why) { super(`${check}
 const fail = (check, why) => { throw new ParkError(check, why); };
 // A brake's refusal, with the seconds until its window ends (auth.mjs retryAfter): the 429's Retry-After.
 const rated = (w, window, now, why) => { throw Object.assign(new ParkError('rate', why), { retryAfter: Math.max(1, Math.ceil((w + 1) * window - now)) }); };
+
+/**
+ * A relay-wide ceiling that one crowd of networks cannot pin (review 2026-10-19: ~30 networks,
+ * each under its own brake, held the hard global caps and denied every network never seen).
+ * Fixed windows of `window` seconds; `n` tries in all, never more (the last defence), split:
+ *   - no network takes more than `share` = n/8 (at least 1);
+ *   - n - n/8 tries for any network (at least 1);
+ *   - a reserve of n/8 (at least 1, when n > 1): once the rest is spent, a network not yet seen
+ *     this window still gets ONE try from it, so a crowd does not lock out a newcomer.
+ * → (prefix, now) => undefined (charged), or { over: 'share' | 'all', w, window, share }.
+ * Memory: one entry per network charged this window, at most n.
+ */
+export function fairCeiling({ n, window }) {
+  const share = Math.max(1, Math.floor(n / 8)), reserve = n > 1 ? Math.max(1, Math.floor(n / 8)) : 0, open = n - reserve;
+  const by = new Map();
+  let cur = -1, used = 0, spare = 0;
+  return (prefix, now) => {
+    const w = Math.floor(now / window);
+    if (w !== cur) { cur = w; used = 0; spare = 0; by.clear(); }
+    const mine = by.get(prefix) ?? 0;
+    if (mine >= share) return { over: 'share', w, window, share };
+    if (used < open) { used++; by.set(prefix, mine + 1); return undefined; }
+    if (mine === 0 && spare < reserve) { spare++; by.set(prefix, 1); return undefined; }
+    return { over: 'all', w, window, share };
+  };
+}
 
 // Only on a string of base58 digits whose length is bounded (decoding is quadratic).
 function b58decode(s) {
@@ -79,7 +108,7 @@ const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-
 export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL }) {
   const held = new Map();    // code_hash → { invite, exp }
   const rates = new Map();   // kind + prefix → { window, n }
-  const all = { window: -1, n: 0 };   // lookups from every network
+  const all = fairCeiling(lookupsAll);   // lookups from every network
 
   // Fixed windows per prefix, as auth.mjs charge. → throws rate.
   function charge(kind, prefix, now) {
@@ -96,9 +125,10 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
         : `more than ${rule.n} short codes parked from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`);
     }
     if (kind !== 'lookup') return;
-    const wa = Math.floor(now / lookupsAll.window);
-    if (all.window !== wa) { all.window = wa; all.n = 0; }
-    if (++all.n > lookupsAll.n) rated(wa, lookupsAll.window, now, `more than ${lookupsAll.n} short-code lookups on this relay in ${lookupsAll.window / 60} minutes: wait, or use the long code (invite --long)`);
+    const o = all(prefix, now);
+    if (o !== undefined) rated(o.w, o.window, now, o.over === 'share'
+      ? `more than ${o.share} short-code lookups from this network, its share of this relay's, in ${o.window / 60} minutes: wait, or use the long code (invite --long)`
+      : `more than ${lookupsAll.n} short-code lookups on this relay in ${o.window / 60} minutes: wait, or use the long code (invite --long)`);
   }
 
   function sweep(now = clock()) {

@@ -30,11 +30,14 @@
 //
 // Brakes, per /24 or /48 (auth.mjs prefixOf): TRIES redemptions an hour, counted before the login
 // or the code is checked; across all networks TRIES_ALL an hour, charged after the network's own
-// passes. With 2^40 codes and N loaded, one network's guesses hit with odds of at most
-// 10 × N / 2^40 an hour (N = 100,000: under 1 in a million), every network's at most 300 × N / 2^40.
+// passes, with park.mjs `fairCeiling`'s fair share (no network more than 37 of it; 263 for any
+// network, then a reserve of 37 that gives a network not seen this hour one try). With 2^40 codes
+// and N loaded, one network's guesses hit with odds of at most 10 × N / 2^40 an hour (N = 100,000:
+// under 1 in a million), every network's at most 300 × N / 2^40.
 import { DatabaseSync } from 'node:sqlite';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { fairCeiling } from './park.mjs';
 
 export const DAY = 86400;
 export const MONTHS = Object.freeze([1, 6, 12]);
@@ -136,7 +139,7 @@ export function giftStore(raw) {
 // The brakes (the header): fixed windows, as park.mjs. → charge(prefix, now), or throws
 // { check: 'rate', detail, retryAfter }.
 export function giftBrake({ tries = TRIES, triesAll = TRIES_ALL } = {}) {
-  const rates = new Map(), all = { window: -1, n: 0 };
+  const rates = new Map(), all = fairCeiling(triesAll);
   const rated = (w, window, now, detail) => { throw Object.assign(new Error(`rate: ${detail}`), { check: 'rate', detail, retryAfter: Math.max(1, Math.ceil((w + 1) * window - now)) }); };
   return (prefix, now) => {
     const w = Math.floor(now / tries.window);
@@ -147,9 +150,10 @@ export function giftBrake({ tries = TRIES, triesAll = TRIES_ALL } = {}) {
       rates.set(prefix, r);
     }
     if (++r.n > tries.n) rated(w, tries.window, now, `more than ${tries.n} gift codes tried from this network in ${tries.window / 60} minutes: wait`);
-    const wa = Math.floor(now / triesAll.window);
-    if (all.window !== wa) { all.window = wa; all.n = 0; }
-    if (++all.n > triesAll.n) rated(wa, triesAll.window, now, `more than ${triesAll.n} gift codes tried on this relay in ${triesAll.window / 60} minutes: wait`);
+    const o = all(prefix, now);
+    if (o !== undefined) rated(o.w, o.window, now, o.over === 'share'
+      ? `more than ${o.share} gift codes tried from this network, its share of this relay's, in ${o.window / 60} minutes: wait`
+      : `more than ${triesAll.n} gift codes tried on this relay in ${o.window / 60} minutes: wait`);
   };
 }
 

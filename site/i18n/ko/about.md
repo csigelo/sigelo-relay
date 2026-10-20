@@ -1,5 +1,5 @@
 ---
-source: 7acc5fb797bf222b716bf7c05eff9bdda1a95b74e7e1f33ad262d45e8f1670c1
+source: b2d3da66a765345b093dd4f963d9a999cd2f63b8d19667da2dc86360937a9ec0
 ---
 
 # sigelo 소개
@@ -33,7 +33,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-실험 단계(0.1.8)입니다. 기기를 떠나는 것은 봉인된 메시지뿐이며, 릴레이를 거칩니다.
+실험 단계(0.1.9)입니다. 기기를 떠나는 것은 봉인된 메시지뿐이며, 릴레이를 거칩니다.
 
 ::: cta
 [활용 예 보기 →](/examples.html)

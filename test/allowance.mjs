@@ -636,10 +636,11 @@ let annC, benC, K;
   const plain = await login(agc, { bundle: withVouch(agc, opc, vouch(opc, agc)) });
   ok(!plain.client && (await checkOf(plain.creds)).check === 'bundle', 'the thief with the stolen key and agent c\'s own genesis: bundle (the recovery kept here wins)');
   // The thief's own genesis, carrying agent c's recovery commitment (public), and a voluntary
-  // rotation from it into agent c's genesis: SPEC §7.3 accepts that chain, and before, the relay
-  // looked up the rotations it keeps by the first DID only, so the recovery was never merged.
+  // rotation from it into agent c's genesis, countersigned with the stolen key: SPEC §7.3 accepts
+  // that chain, and before, the relay looked up the rotations it keeps by the first DID only, so
+  // the recovery was never merged.
   const tk = keygen({ seed: seed('agent c thief start'), recovery: agc.origin.recovery, created: CREATED, nonce: seed('agent c thief start nonce').slice(0, 16) });
-  const into = rotate({ genesis: tk.genesis, next_genesis: agc.origin, iat: now - 300, reason: 'voluntary', secret: tk.secret });
+  const into = rotate({ genesis: tk.genesis, next_genesis: agc.origin, iat: now - 300, reason: 'voluntary', secret: tk.secret, next_secret: agc.secret });
   const prefixed = { ...agc, original: tk.did };   // agent c's stolen key and DID; the account of the thief's start
   const viaPrefix = (att) => ({ v: 'sigelo/0', typ: 'bundle', genesis: tk.genesis, rotations: [into], bindings: [], attestations: [att], issuers: [opc.genesis] });
   const lp = await login(prefixed, { pow: true, bundle: viaPrefix(vouch(opc, agc)) });
@@ -1476,7 +1477,8 @@ const fresh = (name, extra = {}) => {
   // free rows grew past the ceiling to relay_full, which refuses every publish, Pro's too; a pooled
   // new identity was checked against nothing. Now every login that grows an identity's rows
   // (db.mjs chainRowBytes) is checked: free ones against the ceiling, pooled ones with their pool's
-  // other identity rows against its storage (8,768 here). A chain edge is ~950 bytes.
+  // other identity rows against its storage (8,768 here). A chain edge is ~1,080 bytes (~980 before
+  // the countersign `sig_next`, the review of 2026-10-19).
   now += DAY;
   let S = fresh('chains', { freeQueue: 64 * MB });
   let R = await S.start();
@@ -1491,18 +1493,19 @@ const fresh = (name, extra = {}) => {
   ok(up.ok && /operator's pool holds .* more than its storage \(8768\): it stores no new agent/.test(wb) && R.db.account(accountOf(b9.original)) === undefined,
     `a new agent of the pool with 9 rotations: its rows and the operator's pass the pool's storage, refused relay_full, nothing stored (${wb})`);
   const la = await login(a7, { pow: true, bundle: withVouch(a7, op, vouch(op, identity('chain agent'))) }, R), wa = await why(la, R);
-  ok(wa === 'connected' && rowsOf(a7) > 7000 && S.tier(a7).pool === OP, `one with 7 rotations fits beside the operator's rows: stored, pooled (${rowsOf(a7)} bytes)`);
+  const a7rows = rowsOf(a7);
+  ok(wa === 'connected' && a7rows > 7000 && S.tier(a7).pool === OP, `one with 7 rotations fits beside the operator's rows: stored, pooled (${rowsOf(a7)} bytes)`);
   const la9 = await login(a9, { bundle: withVouch(a9, op, vouch(op, identity('chain agent'))) }, R), wa9 = await why(la9, R);
-  ok(/no longer chain of one/.test(wa9) && rowsOf(a7) < 7500, `it logs in again with 9: refused relay_full, its chain kept as it was (${wa9})`);
-  const room = R.db.rowBytes() + 1000;
+  ok(/no longer chain of one/.test(wa9) && rowsOf(a7) === a7rows, `it logs in again with 9: refused relay_full, its chain kept as it was (${wa9})`);
+  const room = R.db.rowBytes() + 1100;
   await R.close();
   S = fresh('chains', { freeQueue: room });
   R = await S.start();
   const g1 = rotated(g, 'chain grower 1'), g2 = rotated(g1, 'chain grower 2'), r0 = rowsOf(g);
   const l2 = await login(g2, {}, R), w2 = await why(l2, R);
-  ok(/free tier is full .* no longer chain of one/.test(w2) && rowsOf(g) === r0, `the ceiling 1,000 bytes above the rows: the free grower with 2 more rotations, refused relay_full, nothing written (${w2})`);
+  ok(/free tier is full .* no longer chain of one/.test(w2) && rowsOf(g) === r0, `the ceiling 1,100 bytes above the rows: the free grower with 2 more rotations, refused relay_full, nothing written (${w2})`);
   const l1 = await login(g1, {}, R), w1 = await why(l1, R);
-  ok(w1 === 'connected' && rowsOf(g1) === r0 + 978, `with 1, within the room: stored (${rowsOf(g1) - r0} bytes more)`);
+  ok(w1 === 'connected' && rowsOf(g1) === r0 + 1080, `with 1, within the room: stored (${rowsOf(g1) - r0} bytes more)`);
   const l2b = await login(g2, {}, R), w2b = await why(l2b, R);
   ok(/no longer chain of one/.test(w2b), `then the 2nd, past the ceiling: refused (${w2b})`);
   // Its key is stolen; the owner recovers from it. One recovery edge on a chain whose last edge is
@@ -1871,9 +1874,26 @@ const fresh = (name, extra = {}) => {
     `10 tries an hour from one network, then 429 "rate" with Retry-After (${tries[10].json.detail})`);
   ok((await redeem(gop, hashOf(codes[7]), { ip: '203.0.113.9' })).status === 429 && (await redeem(gop, hashOf(code()), { ip: '198.51.100.9' })).json.check === 'gift',
     'a good code from that network is refused too until the hour ends; another network is not touched');
-  const brake = giftBrake({ tries: { n: 100, window: 3600 }, triesAll: { n: 3, window: 3600 } });
-  const allRefused = (() => { for (let i = 0; i < 3; i++) brake(`net ${i}`, gnow); try { brake('net 9', gnow); return null; } catch (e) { return e; } })();
-  ok(allRefused?.check === 'rate' && /on this relay/.test(allRefused.detail), 'the brake across all networks refuses past its count, whatever the network');
+  // Across all networks (here 8: a network's share 1; 7 for any network, then a reserve of 1 for networks not seen this hour).
+  const brake = giftBrake({ tries: { n: 100, window: 3600 }, triesAll: { n: 8, window: 3600 } });
+  const tryNet = (p, t = gnow) => { try { brake(p, t); return 'ok'; } catch (e) { return e; } };
+  const fill = Array.from({ length: 7 }, (_, i) => tryNet(`net ${i}`));
+  const hogAgain = tryNet('net 0'), newcomer = tryNet('net 8'), second = tryNet('net 9');
+  ok(fill.every((x) => x === 'ok') && hogAgain?.check === 'rate' && /its share of this relay's/.test(hogAgain.detail),
+    `the brake across all networks: no network takes more than 1/8 of it (${hogAgain?.detail})`);
+  ok(newcomer === 'ok' && second?.check === 'rate' && /on this relay/.test(second.detail) && second.retryAfter > 0,
+    `past its count a network not seen this hour still gets one try, from a reserve of 1/8; then it refuses, whatever the network (${second?.detail})`);
+  ok(tryNet('net 9', gnow + 3600) === 'ok', 'the brake across all networks counts afresh the next hour');
+  {
+    // At the defaults (TRIES_ALL 300: 263 + a reserve of 37): 30 networks each at their own 10
+    // spend the 263; the 3 networks not yet seen get one try each from the reserve (34 refused);
+    // a never-seen network still tries.
+    const b = giftBrake();
+    let refused = 0;
+    for (let i = 0; i < 30; i++) for (let j = 0; j < 10; j++) try { b(`198.18.${i}.0/24`, gnow); } catch { refused++; }
+    let fresh = 'ok'; try { b('198.19.0.0/24', gnow); } catch (e) { fresh = e.detail; }
+    ok(refused === 34 && fresh === 'ok', `gift tries at the defaults: 30 networks × 10 spend 263 of TRIES_ALL (300), and a never-seen network still gets its try from the reserve of 37 (${refused}; ${fresh})`);
+  }
   // GET /stats: totals only, no campaign label; per campaign on the relay host (node gifts.mjs counts).
   const st = await (await fetch(`${base(G)}/stats`)).json();
   ok(JSON.stringify(st.gifts) === '{"issued":13,"redeemed":7}' && !JSON.stringify(st).includes('launch-26') && !JSON.stringify(st).includes('short-test'),

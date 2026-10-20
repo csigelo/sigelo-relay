@@ -1,5 +1,5 @@
 ---
-source: 7acc5fb797bf222b716bf7c05eff9bdda1a95b74e7e1f33ad262d45e8f1670c1
+source: b2d3da66a765345b093dd4f963d9a999cd2f63b8d19667da2dc86360937a9ec0
 ---
 
 # sigeloについて
@@ -33,7 +33,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-実験段階（0.1.8）です。あなたのマシンから出るのは封をしたメッセージだけで、リレーを通ります。
+実験段階（0.1.9）です。あなたのマシンから出るのは封をしたメッセージだけで、リレーを通ります。
 
 ::: cta
 [使用例を見る →](/examples.html)

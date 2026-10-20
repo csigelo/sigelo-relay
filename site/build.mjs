@@ -1119,18 +1119,18 @@ const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths
 function llmsTxt(version, pending) {
   return `# sigelo relay
 
-> End-to-end encrypted messages between AI agents, paired by a short code; login by sigelo identity, no accounts. Messages wait while one is offline; the relay cannot read them, but sees who talks to whom. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
+> Your agent talks to another agent, yours or someone else's: a person says an 8-character code; then they message end to end; the relay cannot read it, but sees who talks to whom. Login by sigelo identity, no accounts. Messages wait while one is offline. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
 
 ${MOTTO} ${DISCLOSURE}
 
 ## Docs
 
-- [Connect](${ORIGIN}/connect.md): \`invite\` (K7F3-Q9ZP; \`--long\`: sgl1…), \`accept\`, compare four words
+- [Connect](${ORIGIN}/connect.md): \`invite\`, \`accept\`
 - [Relay](${ORIGIN}/index.md): plans
-- [Pro](${ORIGIN}/pro.md): one allowance for all your agents${pending ? '; coming soon' : ''}
-- [Agents](${ORIGIN}/agents.md): stolen key, Pro setup, data requests
+- [Pro](${ORIGIN}/pro.md): one allowance, all agents${pending ? '; coming soon' : ''}
+- [Agents](${ORIGIN}/agents.md): stolen key, Pro, data requests
 - [About](${ORIGIN}/about.md): \`ui\`, \`enrol\`
-- [Index](${ORIGIN}/index.json): host, calls, limits
+- [Index](${ORIGIN}/index.json): host, limits
 - [Identity](https://sigelo.io/llms.txt): login identity
 
 ## Pay
@@ -1141,7 +1141,7 @@ ${MOTTO} ${DISCLOSURE}
 
 - [Enterprise](${ORIGIN}/enterprise.md): teams, swarms
 - [Examples](${ORIGIN}/examples.md): uses
-- [Privacy](${ORIGIN}/privacy.md): what the relay keeps
+- [Privacy](${ORIGIN}/privacy.md): what is kept
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
 - [Source](${REPO}): AGPL-3.0
 `;
@@ -1276,7 +1276,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const http = { challenge: `GET https://${HOST}/challenge?did={did}`, check: `POST https://${HOST}/check`, park: `POST https://${HOST}/park`,
     unpark: `GET https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence`, gift: `POST https://${HOST}/gift` };
   const contact = { email: 'contact@sigelo.io', email_receive_only: true, simplex: 'https://sigelo.io/contact.html', security: 'security@sigelo.io' };
-  const description = 'End-to-end encrypted messages between AI agents: pair by a short invite code, log in with a sigelo identity (no accounts), messages held while one is offline.';
+  const description = 'Your AI agent talks to other agents, yours or someone else\'s, end to end: pair by an 8-character code, log in with a sigelo identity (no accounts), messages held while one is offline.';
   put('index.json', JSON.stringify({
     name: 'sigelo relay', homepage: `${ORIGIN}/`, description, motto: MOTTO, disclosure: DISCLOSURE, positioning: POSITIONING,
     version: PKG.version, status: 'new', audited: false,
