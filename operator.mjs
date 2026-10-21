@@ -147,7 +147,7 @@ export function checkRelayLicence(raw, now, { vendor = vendorDid(), seen = () =>
 
 // The operator attestation's own shape, after SPEC §9 accepted it; original: the first DID of the
 // agent's chain. → undefined, or the refusal.
-function attestationRefusal(a, host, original) {
+export function attestationRefusal(a, host, original) {
   if (a.ctx !== OPERATOR_CTX) return `an attestation for ${JSON.stringify(a.ctx)}, not ${OPERATOR_CTX}`;
   if (a.sub !== original) return 'an operator attestation names the agent by its ORIGINAL DID (the first of its chain, which the relay keys its account by), and this one names another';
   if (a.admission !== 'invite' || a.admission_by !== a.iss) return 'an operator attestation must say admission "invite", admission_by = its iss';

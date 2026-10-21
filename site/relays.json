@@ -1,0 +1,49 @@
+{
+  "v": "sigelo/0",
+  "typ": "bundle",
+  "genesis": {
+    "v": "sigelo/0",
+    "typ": "genesis",
+    "key": "z6MkuQc6vnw76SvjAzU2qMTYSBW6iherJaKMtmkBTTCCEaDD",
+    "recovery": "sha256:844b15dbf22d565bb898aa0cd485e52d5666f083b2c998182a1fec51b32eac4c",
+    "created": "2026-10-02T15:25:29Z",
+    "nonce": "zJ2qhAJFPAZrAGKRz6b1ghu"
+  },
+  "rotations": [],
+  "bindings": [],
+  "attestations": [
+    {
+      "body": {
+        "v": "sigelo/0",
+        "typ": "attestation",
+        "iss": "did:sigelo:zE1ikihiqKQ7KoFL492kfFrJdUSzPeHNunGnMXLqgVfci",
+        "sub": "did:sigelo:zE1ikihiqKQ7KoFL492kfFrJdUSzPeHNunGnMXLqgVfci",
+        "iat": 1792582067,
+        "exp": 1824204467,
+        "ctx": "sigelo.ai/relays",
+        "admission": "open",
+        "claims": {
+          "relays": {
+            "48ZY": {
+              "host": "relay.sigelo.ai",
+              "tier": "public",
+              "note": "the public relay: its short codes have 8 characters",
+              "added": "2026-10-21"
+            }
+          }
+        }
+      },
+      "sig": "z7iDyxdn2zu7Ty9zuEpr5NaXef3tdBTqAdv27z1Cc6EirLFJPtk7RSQj1C64coys4CPoz8y9H9iiczaEWEkhpjMa"
+    }
+  ],
+  "issuers": [
+    {
+      "v": "sigelo/0",
+      "typ": "genesis",
+      "key": "z6MkuQc6vnw76SvjAzU2qMTYSBW6iherJaKMtmkBTTCCEaDD",
+      "recovery": "sha256:844b15dbf22d565bb898aa0cd485e52d5666f083b2c998182a1fec51b32eac4c",
+      "created": "2026-10-02T15:25:29Z",
+      "nonce": "zJ2qhAJFPAZrAGKRz6b1ghu"
+    }
+  ]
+}

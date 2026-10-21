@@ -559,7 +559,8 @@ let a, b;
   ok(costly.slice(0, 3).every((x) => x.ok) && costly[3].check === 'rate' && otherNet.ok, `bundles of 64 rotations from one /24: three a minute, the fourth refused rate; another /24 still logs in (${[...costly, otherNet].map((x) => x.check ?? 'ok').join()})`);
   await v.close();
   const named = new Set(lines.filter((l) => l.startsWith('refused ')).map((l) => l.split(' ')[2]));
-  ok(CHECKS.filter((c) => c !== 'rate').every((c) => named.has(c)), `every login check was hit and logged by name: ${[...named].sort().join(' ')}`);
+  // closed: a closed relay's (test/closed.mjs).
+  ok(CHECKS.filter((c) => c !== 'rate' && c !== 'closed').every((c) => named.has(c)), `every login check was hit and logged by name: ${[...named].sort().join(' ')}`);
 }
 
 // ================================================================ what M4's hooks see and set
@@ -971,13 +972,14 @@ const X = topic('i'), Y = topic('i');
 // ================================================================ GET /stats: counts, no identifier
 // stats.mjs: whole numbers of the relay as a whole; never a DID, account, client id, topic or
 // address. The shape is pinned key by key, so a field added later is a decision, not a leak.
-const STATS_KEYS = 'at,day,days,free_queue_used_pct,gifts,identities,logins_refused_today,logins_today,mailboxes_claimed,messages,pow_solved_today,pro_licences_active,sessions,v';
+const STATS_KEYS = 'at,closed,day,days,free_queue_used_pct,gifts,identities,logins_refused_today,logins_today,mailboxes_claimed,messages,pow_solved_today,pro_licences_active,sessions,v';
 const DAY_KEYS = 'day,delivered,identities,login_refused,logins,new_identities,pow_solved,refused,sessions_peak,stored';
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
 const named = (o) => o !== null && typeof o === 'object' && !Array.isArray(o) && Object.entries(o).every(([k, v]) => /^[a-z][a-z_]{0,31}$/.test(k) && whole(v) && v > 0);
 const statsShape = (s) => {
   const why = [];
   if (Object.keys(s).sort().join() !== STATS_KEYS) why.push(`keys ${Object.keys(s).sort().join()}`);
+  if (s.closed !== null) why.push('closed: null on an open relay');
   if (s.v !== 'sigelo-relay-stats/0' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(s.at) || !/^\d{4}-\d\d-\d\d$/.test(s.day)) why.push('v, at or day');
   if (Object.keys(s.identities ?? {}).sort().join() !== 'new_today,total' || !Object.values(s.identities).every(whole)) why.push('identities');
   if (Object.keys(s.sessions ?? {}).sort().join() !== 'now,peak_today' || !Object.values(s.sessions).every(whole)) why.push('sessions');

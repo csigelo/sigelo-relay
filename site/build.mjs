@@ -41,6 +41,8 @@ import { ACCOUNT_KEEP, IDLE_GRACE, INVITE_BYTES, INVITE_MESSAGES, INVITE_TTL, MA
 import { LICENCE_KEEP, OPERATOR_DAYS } from '../operator.mjs';
 import { LOOKUPS, PARK_MAX, PARKS, PARK_TTL } from '../park.mjs';
 import { DEV_VENDOR_DID, vendorDid } from '../licence.ts';   // as relay/allowance.mjs, from one level deeper
+import { canonicalize, parse } from 'sigelo';
+import { checkEntries, checkRegistry, RELEASE_DID } from './registry.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const RELAY = dirname(SITE);
@@ -1345,7 +1347,24 @@ Policy: https://sigelo.io/security.html
 Policy: https://sigelo.io/security.html#official-channels
 Preferred-Languages: en
 `);
-  return { pages: PAGES.length, open, wrong, pending, built, languages: live.map((l) => l.code), stale };
+  // relays.json (ROADMAP §9.4): the registry as sign-relays.mjs signed it, served when it verifies
+  // against the release identity and lists exactly relays.src.json's; else not served, and said.
+  const registry = registryStatus(site);
+  if (registry.ok) put('relays.json', registry.text);
+  return { pages: PAGES.length, open, wrong, pending, built, languages: live.map((l) => l.code), stale, registry };
+}
+
+/** relays.json beside the pages: { ok, text, why } — ok when it verifies (release identity, now) and lists relays.src.json's relays. */
+export function registryStatus(site = SITE, now = Math.floor(Date.now() / 1000), pin = RELEASE_DID) {
+  const at = join(site, 'relays.json');
+  let src;
+  try { src = JSON.parse(readFileSync(join(site, 'relays.src.json'), 'utf8')).relays; checkEntries(src); } catch (e) { return { ok: false, why: `relays.src.json: ${e.message}` }; }
+  if (!existsSync(at)) return { ok: false, why: 'relays.json is not signed yet: node relay/site/sign-relays.mjs <release identity file>' };
+  const text = readFileSync(at, 'utf8');
+  let r;
+  try { r = checkRegistry(parse(text), now, pin); } catch (e) { return { ok: false, why: `relays.json: ${e.message}` }; }
+  if (canonicalize(r.relays) !== canonicalize(src)) return { ok: false, why: 'relays.json does not list what relays.src.json lists: sign it again (sign-relays.mjs)' };
+  return { ok: true, text, relays: Object.keys(src).length };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -1378,6 +1397,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const label = { DRAFT: "DRAFT — the terms' draft mark (terms.md)", SELLER: 'SELLER — the name the pages give the seller (relay/site/build.mjs)',
       'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
     for (const f of r.stale) console.log(`warning: stale: ${f}: its URL serves the English page until refreshed (node relay/site/build.mjs --stale)`);
+    console.log(r.registry.ok ? `relays.json: ${r.registry.relays} relays, signed` : `warning: not served: ${r.registry.why}`);
     if (r.pending) console.log('note: Pro is coming soon (pro.md says so): the vendor DID is not required, index.json and relay.json say not_yet_on_sale');
     for (const p of r.open) console.log(`open: ${PLACEHOLDERS[p] ? `${p} — ${PLACEHOLDERS[p]}` : label[p] ?? p}`);
     for (const w of r.wrong) console.log(`wrong: ${w}`);

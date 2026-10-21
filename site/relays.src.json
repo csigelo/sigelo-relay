@@ -1,0 +1,10 @@
+{
+  "relays": {
+    "48ZY": {
+      "host": "relay.sigelo.ai",
+      "tier": "public",
+      "note": "the public relay: its short codes have 8 characters",
+      "added": "2026-10-21"
+    }
+  }
+}

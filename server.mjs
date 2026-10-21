@@ -24,6 +24,9 @@
 //     RELAY_VENDOR_DID, RELAY_PRO_STORAGE_MB, RELAY_POW_BITS, RELAY_POW_LOAD_BITS, RELAY_POW_LOAD,
 //     RELAY_POW_NETWORK_DAY, RELAY_FREE_QUEUE_MB   allowances, proof of work and licences:
 //                       allowance.mjs relayPolicyFromEnv
+//     RELAY_CLOSED_OPERATOR  a closed relay: the original DIDs of its operators, comma-separated
+//                       (at most 8). It admits them and the identities they attest for it, and
+//                       nobody else (closed.mjs); unset = open
 //
 // Logged: logins, refusals by check name, disconnects, each with the address cut to /24 or /48.
 // Never a DID, a client id, a topic or a payload.
@@ -41,6 +44,7 @@ import { mailboxes, MAX_TOPICS } from './mailbox.mjs';
 import { relayPolicyFromEnv } from './allowance.mjs';   // M4: allowances, proof of work, licences
 import { relayStats } from './stats.mjs';
 import { parking } from './park.mjs';
+import { closedOperators, closedRelay } from './closed.mjs';
 
 export { WS_PATH, prefixOf };
 
@@ -251,7 +255,8 @@ const diskUsage = (dir, log) => {
 
 // cfg: { host, db, tlsCert?, tlsKey?, tlsPort?, tcpPort?, httpPort, loginRate, verifyBudget?,
 // maxSessions?, maxPerPrefix?, unprovenSeconds?, frameMs?, partialPerPrefix?, partialMax?,
-// earlyPerPrefix?, earlyMax?, clock?, diskUsed?, log?, policy? }. Ports may be 0 (any). → the
+// earlyPerPrefix?, earlyMax?, clock?, diskUsed?, log?, policy?, closed? (operators' original DIDs:
+// a closed relay, closed.mjs) }. Ports may be 0 (any). → the
 // running relay; close() stops it.
 export async function startRelay(cfg) {
   if (typeof cfg.host !== 'string' || cfg.host === '') throw new Error('host: the relay\'s public name (the login body\'s relay)');
@@ -265,15 +270,16 @@ export async function startRelay(cfg) {
   const diskFull = () => diskUsed() >= FULL;
   const policy = typeof cfg.policy === 'function' ? cfg.policy({ db, host: cfg.host, clock, log }) : cfg.policy ?? {};   // M4: a factory gets the db
   let broker, a;
-  // GET /stats: counts only (stats.mjs); sessions read from auth once it exists.
-  const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy });
+  const closed = cfg.closed ? closedRelay({ db, host: cfg.host, operators: cfg.closed }) : null;
+  // GET /stats: counts only (stats.mjs), and a closed relay's operators; sessions read from auth once it exists.
+  const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy, closed: closed?.operators ?? null });
   // Short invite codes, in memory only (park.mjs); cfg.park: its limits, for tests.
   const park = parking({ host: cfg.host, clock, ...cfg.park });
   a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
-    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park });
+    unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park, closed });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -381,7 +387,7 @@ export async function startRelay(cfg) {
     m.close();
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, park, stats, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {
@@ -406,6 +412,9 @@ function fromEnv(env) {
   if (!Number.isInteger(cfg.loginRate) || cfg.loginRate < 1) die('RELAY_LOGIN_RATE: want a whole number of logins per minute, at least 1');
   for (const [k, name] of [['maxSessions', 'RELAY_MAX_SESSIONS'], ['maxPerPrefix', 'RELAY_MAX_PER_PREFIX']]) {
     if (!Number.isSafeInteger(cfg[k]) || cfg[k] < 1) die(`${name}: want a whole number of sessions, at least 1`);
+  }
+  if (env.RELAY_CLOSED_OPERATOR !== undefined && env.RELAY_CLOSED_OPERATOR !== '') {
+    try { cfg.closed = closedOperators(env.RELAY_CLOSED_OPERATOR); } catch (e) { die(`RELAY_CLOSED_OPERATOR: ${e.message}`); }
   }
   if (!cfg.tlsCert && cfg.tcpPort === undefined) die('no MQTT listener: set RELAY_TLS_CERT and RELAY_TLS_KEY (or RELAY_TCP_PORT, loopback, for tests)');
   return cfg;

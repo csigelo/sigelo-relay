@@ -26,7 +26,7 @@
 // first, then on the bundle as sent: a genesis with the username's DID), sig (under that key),
 // bundle (SPEC §9 over the bundle with the rotations this relay keeps merged in: it must resolve
 // to the username, and pass through a DID of another identity's chain here, its original
-// included, only by a recovery rotation from it), client_id, pow,
+// included, only by a recovery rotation from it), client_id, closed (a closed relay: closed.mjs), pow,
 // relay_full (disk), then the session caps (rate per network, relay_full in all: seat). A login
 // without a bundle fails bundle unless its signature verifies under a key cached from an earlier
 // login and its identity is stored here (a new one is stored with its chain). As in
@@ -54,7 +54,7 @@ export const TYP_LOGIN = 'relay-login';
 export const loginBody = (did, relay, nonce) => ({ v: V, typ: TYP_LOGIN, did, relay, nonce });
 export const TTL = 300, MAX_ITEMS = 64, MAX_BODY = 256 * 1024, WINDOW = 60;
 export const DID_RE = /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/;
-export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'client_id', 'pow', 'relay_full'];
+export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'client_id', 'closed', 'pow', 'relay_full'];
 // Plan §3 "Operator attestation": the only attestations the relay reads (M4), at most this many.
 export const OPERATOR_CTX = 'sigelo-relay/operator', MAX_OPERATOR = 4;
 // Signature checks bundles may cost per address prefix and minute: one bundle at its largest (64
@@ -170,14 +170,16 @@ function checkPow(pow, ctx, policy) {
 // of work a challenge states, by the network asking; powSpent: its nonce spent by a login; pow,
 // login, keep: whether a new identity's account and chain are stored), none by default (no work
 // asked, all stored).
-// log(line): never a DID or topic.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null }) {
+// log(line): never a DID or topic. closed: closed.mjs's, on a closed relay (null: open): a login it
+// does not admit is refused `closed`, and no challenge asks proof of work.
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
   const live = new Map();           // prefix → sessions connected from it
   const liveIds = new Map();        // client id → the Aedes client whose session it is
   const unproven = new Map();       // Aedes client of an identity with no proof of work → { prefix, timer }, oldest first
+  const ending = new WeakMap();     // Aedes client admitted to a closed relay until a time → the timer that closes it then
   let total = 0;
   // The cache of plan §3: current DID → account, account → { current, original, key }, for logins
   // without a bundle. Memory only. The rotations themselves are in the database (db.chainOf), so a
@@ -356,7 +358,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     // Spent once, here, whatever follows: the proof of work counts it as waiting no more (pow.mjs).
     // Told on every login, a known identity's too, or its challenges kept its network's new DIDs
     // at a higher difficulty until they expired.
-    policy.powSpent?.({ network: issued.network, exp: issued.exp, now });
+    if (!closed) policy.powSpent?.({ network: issued.network, exp: issued.exp, now });
     const challenge = loginBody(username, host, p.nonce);
     let original, key, chain, result, taken;
     if (p.bundle === undefined) {
@@ -382,8 +384,17 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const account = accountOf(original), want = clientIdOf(original);
     if (clientId !== want) fail('client_id', `want ${want} ("s" + 24 hex of SHA-256 of your original DID)`);
     if (clean !== false) fail('client_id', 'connect with clean session off: the relay keeps one persistent session per identity');
+    // closed: admitted by its operator's attestation (closed.mjs), read again at every login with
+    // a bundle; without one, as admitted at the last, while that holds. → when the admission ends.
+    let admitted;
+    if (closed) {
+      const held = p.bundle === undefined ? byAccount.get(account)?.admitted : undefined;
+      const a = held > now ? held : closed.admit(original, result);
+      if (typeof a !== 'number') fail('closed', a.why);
+      admitted = a;
+    }
     const isNew = db.account(account) === undefined;
-    checkPow(p.pow, { host, account, original, nonce: p.nonce, isNew, now, bits: issued.bits, network: issued.network }, policy);
+    checkPow(p.pow, { host, account, original, nonce: p.nonce, isNew, now, bits: issued.bits, network: issued.network, admitted: admitted !== undefined }, policy);
     if (isNew && diskFull()) fail('relay_full', 'this relay takes no new identities until disk use falls below 70 %');
     // Nothing durable for a new identity until policy.keep says so (M4: once it has proven work):
     // a login costs no work, so rows written for every fresh DID would let free identities alone
@@ -398,10 +409,10 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       for (const other of taken ?? []) forget(other);
       // A known account's day of login is kept in memory (db.mjs); a chain is written only when it
       // changed. Most logins write nothing.
-      db.tx(() => { db.touchAccount(account, now); if (chain) db.setChain(account, original, chain, result.chain); });
+      db.tx(() => { db.touchAccount(account, now); if (chain) db.setChain(account, original, chain, result.chain); closed?.record(account, admitted); });
     }
-    remember(account, { current: username, original, key });
-    return { account, clientId: want, durable, evict };
+    remember(account, { current: username, original, key, admitted });
+    return { account, clientId: want, durable, evict, admitted };
   }
 
   // The oldest session of an identity with no proof of work, from `prefix` (null: anywhere), or undefined.
@@ -456,6 +467,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   function detach(client) {
     const u = unproven.get(client);
     if (u) { clearTimeout(u.timer); unproven.delete(client); }
+    clearTimeout(ending.get(client)); ending.delete(client);
     const prefix = counted.get(client);
     if (prefix === undefined) return;
     counted.delete(client);
@@ -483,6 +495,13 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       timer.unref();
       unproven.set(client, { prefix, timer });
     }
+    // A closed relay's session ends with the attestation it was admitted by (a timer holds at most
+    // 2^31 - 1 ms, ~24.8 days: closed then, the client logs in again and is checked again).
+    if (Number.isSafeInteger(o.session.admitted)) {
+      const timer = setTimeout(() => client.close(), Math.min(Math.max(0, o.session.admitted - clock()) * 1000, 2 ** 31 - 1));
+      timer.unref();
+      ending.set(client, timer);
+    }
     log(`login ${prefix}`);
     stats?.count('logins'); stats?.sessions(total);
     cb(null, true);
@@ -497,9 +516,10 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const now = clock();
     try { charge('challenge', prefix, now, 1, loginRate, `more than ${loginRate} challenges a minute from this network: wait`); } catch (e) { throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
     // pow_bits: the difficulty a new identity must meet with this nonce (M4: by the network asking
-    // and what it holds unredeemed, pow.mjs, which counts this one from now on); 0 = none asked. A
+    // and what it holds unredeemed, pow.mjs, which counts this one from now on); 0 = none asked (a
+    // closed relay asks none: closed.mjs). A
     // policy answering anything else is the relay's fault: 500.
-    const network = networkOf(prefix), exp = nonceTime(now) + TTL, bits = policy.powBits?.({ network, exp, now }) ?? 0;
+    const network = networkOf(prefix), exp = nonceTime(now) + TTL, bits = closed ? 0 : policy.powBits?.({ network, exp, now }) ?? 0;
     if (!Number.isInteger(bits) || bits < 0 || bits > 64) throw new Error('policy.powBits: not a whole number of bits, 0 to 64');
     return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits };
   }

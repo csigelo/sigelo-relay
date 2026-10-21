@@ -3,8 +3,9 @@
 // which nginx serves as https://relay.sigelo.ai/stats (CORS open, cached 60 s).
 //
 // Every number is a count of the whole relay: no DID, account, client id, topic, address or prefix,
-// and no list of anything (deploy/README.md "Statistics"; test/run.mjs checks the shape and that no
-// identifier of the run reaches it). Read from the tables where they already hold the number
+// and no list of anything but a closed relay's operators, whom it names by choice (closed.mjs;
+// deploy/README.md "Statistics"; test/run.mjs checks the shape and that no identifier of the run
+// reaches it, test/closed.mjs that only the operators' DIDs do). Read from the tables where they already hold the number
 // (identities, mailboxes, messages queued, proofs of work, licences, the free tier's ceiling, gift
 // codes loaded and used over all campaigns, no label: gifts.mjs);
 // counted in memory where nothing else keeps it (logins, refusals by check or code, messages stored
@@ -46,9 +47,11 @@ function counted(json) {
 }
 
 // db: db.mjs; clock() → unix seconds; sessions() → sessions connected now (auth.mjs);
-// policy: allowance.mjs's (freeQueue, freeUsed, giftTotals), or {} without M4.
+// policy: allowance.mjs's (freeQueue, freeUsed, giftTotals), or {} without M4. closed: a closed
+// relay's operators, original DIDs (closed.mjs), or null: the one identifier the report holds,
+// public by the operator's choice (deploy/README.md "Closed relay").
 // → { count(kind, name?), sessions(n), flush(now), report(), close() }.
-export function relayStats({ db, clock, sessions = () => 0, policy = {} }) {
+export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed = null }) {
   const raw = db.raw;
   raw.exec(SCHEMA);
   const has = (t) => raw.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t) !== undefined;
@@ -121,6 +124,7 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {} }) {
       const body = {
         v: 'sigelo-relay-stats/0',
         at: new Date(now * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        closed: closed ? { operators: [...closed] } : null,
         day: iso(day),
         identities: { total: t.identities, new_today: t.new_identities },
         logins_today: today.logins,

@@ -20,6 +20,6 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/run.mjs && node test/ws.mjs"
+    "test": "node test/run.mjs && node test/ws.mjs && node test/closed.mjs"
   }
 }

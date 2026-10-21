@@ -63,7 +63,8 @@ const body = Object.fromEntries(PAGES.map((p) => [p.slug, twin[p.slug].slice(0, 
 const indexable = PAGES.filter((p) => !p.noindex);
 // The languages of i18n/ the build published (all of them: a stale or wrong one fails below).
 const LANGS = readLanguages(SITE).filter((l) => r.languages.includes(l.code));
-const AGENT_FILES = ['style.css', 'robots.txt', 'relay-robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'index.json', 'relay.json', '.well-known/security.txt'];
+const AGENT_FILES = ['style.css', 'robots.txt', 'relay-robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'index.json', 'relay.json', '.well-known/security.txt',
+  ...(existsSync(join(SITE, 'relays.json')) ? ['relays.json'] : [])]; // the registry, once the release identity signed it
 const expected = [...PAGES.flatMap((p) => [`${p.slug}.html`, `${p.slug}.md`]), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => `${l.code}/${slug}.html`)), ...AGENT_FILES];
 ok(expected.every((f) => files.has(f)) && files.size === expected.length,
   `dist: the ${PAGES.length} pages, their twins, the ${TRANSLATED.length} translated pages in each of ${LANGS.length} languages and ${AGENT_FILES.join(', ')}, nothing else (${files.size} files${[...files].filter((f) => !expected.includes(f)).map((f) => `; extra ${f}`).join('')})`);
@@ -1331,6 +1332,88 @@ ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a pa
 // Whoever holds an access request gets the data: SimpleX only (an erasure may come by e-mail).
 ok(erasure.includes('access requests over SimpleX only: whoever holds one gets the data.'),
   'privacy: an access request goes over SimpleX only, never by e-mail');
+
+// ---- the relay registry (ROADMAP §9.4): relays.json, registry-add.mjs, host-statement.mjs -------
+{
+  const reg = await load('./registry.mjs'), { registryStatus } = await load('./build.mjs');
+  const { spawn } = await import('node:child_process'), { createServer } = await import('node:http');
+  const run = (args, env = {}) => new Promise((res) => {
+    const c = spawn(process.execPath, args, { env: { ...process.env, ...env } }); let out = '', err = '';
+    c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { err += d; }); c.on('close', (status) => res({ status, stdout: out, stderr: err }));
+  });
+  ok(reg.relayTag('corp.example.com') === 'FNK5' && reg.TAG_LABEL === 'sigelo-relay-tag/0', 'registry: relay tag vector, corp.example.com → FNK5 (first 20 bits of SHA-256("sigelo-relay-tag/0" ‖ host))');
+  const short = join(ROOT, 'contact', 'short.mjs'), crel = join(ROOT, 'contact', 'relays.mjs');
+  if (existsSync(join(ROOT, 'contact', 'node_modules')) && existsSync(short)) {
+    const c = await load(short), cr = await load(crel), hosts = ['relay.sigelo.ai', 'corp.test', '127.0.0.1:8443', 'a.b.c.example'];
+    ok(hosts.every((h) => c.relayTag(h) === reg.relayTag(h)) && cr.RELEASE_DID === reg.RELEASE_DID, 'registry: relay tags and the release DID as contact/short.mjs and contact/relays.mjs have them');
+  }
+  const pinFile = join(ROOT, 'release', 'release-identity.json');
+  if (existsSync(pinFile)) ok(sigelo.did(JSON.parse(readFileSync(pinFile, 'utf8'))) === reg.RELEASE_DID, `registry: RELEASE_DID is release/release-identity.json's (${reg.RELEASE_DID})`);
+  const src = JSON.parse(readFileSync(join(SITE, 'relays.src.json'), 'utf8')).relays;
+  ok((() => { try { reg.checkEntries(src); return true; } catch { return false; } })() && src['48ZY']?.host === 'relay.sigelo.ai', 'registry: relays.src.json is well formed, relay.sigelo.ai keeps its tag 48ZY');
+  // The checked-in relays.json: verified against the published release identity, listing the source's.
+  const st = registryStatus(SITE);
+  if (existsSync(join(SITE, 'relays.json'))) ok(st.ok, `registry: relays.json verifies against ${reg.RELEASE_DID} and lists relays.src.json's (${st.why ?? 'ok'})`);
+  else ok(!st.ok && st.why.includes('not signed yet'), 'registry: relays.json not signed yet (the release identity signs it: sign-relays.mjs): the build says so and does not serve it');
+
+  const tmp = mkdtempSync(join(tmpdir(), 'sigelo-registry-'));
+  const identity = (label) => {
+    const seed = new Uint8Array(32).fill(label.length + 3), k = sigelo.keygen({ seed, recovery: 'sha256:' + 'a'.repeat(64), created: '2026-10-01T00:00:00Z', nonce: new Uint8Array(16).fill(label.charCodeAt(0)) });
+    const file = join(tmp, `${label}.local.json`);
+    writeFileSync(file, JSON.stringify({ v: 'sigelo/0', secret: Buffer.from(k.secret).toString('hex'), genesis: k.genesis, rotations: [], attestations: [], issuers: [] }));
+    writeFileSync(join(tmp, `${label}.genesis.json`), JSON.stringify(k.genesis));
+    return { file, did: k.did, genesis: join(tmp, `${label}.genesis.json`) };
+  };
+  try {
+    const rel = identity('stand-in release'), op = identity('operator'), other = identity('other');
+    const srcFile = join(tmp, 'relays.src.json'), outFile = join(tmp, 'relays.json'), env = { SIGELO_RELAYS_SRC: srcFile, SIGELO_RELAYS_OUT: outFile };
+    writeFileSync(srcFile, readFileSync(join(SITE, 'relays.src.json')));
+    // A relay's statement, served on loopback; registry-add fetches and lists it.
+    const host = 'corp.example.com', served = new Map();
+    const server = createServer((q, r) => { const b = served.get(q.url); r.writeHead(b ? 200 : 404, { 'content-type': 'application/json' }); r.end(b ?? '{}'); });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const hs = await run([join(RELAY, 'host-statement.mjs'), op.file, host]);
+      const stmt = hs.stdout;
+      ok(hs.status === 0 && reg.checkHostStatement(sigelo.parse(stmt), host, Math.floor(Date.now() / 1000)).did === op.did, `host-statement.mjs: a ${reg.HOST_CTX} statement for ${host}, signed by the relay identity (${hs.stderr.trim()})`);
+      served.set('/good', stmt);
+      const add = await run([join(SITE, 'registry-add.mjs'), host, '--from', `${base}/good`, '--tier', 'enterprise', '--note', 'run by sigelo'], env);
+      const listed = JSON.parse(readFileSync(srcFile, 'utf8')).relays.FNK5;
+      ok(add.status === 0 && listed?.host === host && listed.did === op.did && listed.tier === 'enterprise' && /^\d{4}-\d\d-\d\d$/.test(listed.added), `registry-add.mjs: fetched, checked, listed under FNK5 with the relay identity's DID, tier and note (${(add.stderr || add.stdout).trim()})`);
+      const twice = await run([join(SITE, 'registry-add.mjs'), host, '--from', `${base}/good`], env);
+      ok(twice.status === 1 && twice.stderr.includes('listed already'), 'registry-add.mjs: a host listed once only');
+      const wh = await run([join(SITE, 'registry-add.mjs'), 'other.example.com', '--from', `${base}/good`], env);
+      ok(wh.status === 1 && wh.stderr.includes('not other.example.com'), `registry-add.mjs: a statement naming another host is refused (${wh.stderr.trim()})`);
+      const forged = JSON.parse(stmt); forged.attestations[0].body.claims.host = 'evil.example.com'; served.set('/forged', JSON.stringify(forged));
+      const fg = await run([join(SITE, 'registry-add.mjs'), 'evil.example.com', '--from', `${base}/forged`], env);
+      ok(fg.status === 1 && fg.stderr.includes('host_statement'), 'registry-add.mjs: a statement changed after signing is refused');
+      // Two hosts, one tag: the first keeps it, the second is refused and the source is unchanged.
+      const seen = new Map(); let pair;
+      for (let i = 0; !pair; i++) { const h = `r${i}.example`, t = reg.relayTag(h); if (seen.has(t)) pair = [seen.get(t), h]; else seen.set(t, h); }
+      served.set('/first', (await run([join(RELAY, 'host-statement.mjs'), op.file, pair[0]])).stdout);
+      served.set('/second', (await run([join(RELAY, 'host-statement.mjs'), other.file, pair[1]])).stdout);
+      const first = await run([join(SITE, 'registry-add.mjs'), pair[0], '--from', `${base}/first`], env), before = readFileSync(srcFile, 'utf8');
+      const second = await run([join(SITE, 'registry-add.mjs'), pair[1], '--from', `${base}/second`], env);
+      ok(first.status === 0 && second.status === 1 && second.stderr.includes(`is ${pair[0]}'s, listed first: it keeps it`) && readFileSync(srcFile, 'utf8') === before,
+        `registry-add.mjs: ${pair[0]} and ${pair[1]} share tag ${reg.relayTag(pair[0])}: the first keeps it, the second is refused (${second.stderr.trim()})`);
+      ok((await run([join(SITE, 'registry-add.mjs'), host, '--from', 'http://example.com/x'], env)).status === 1, 'registry-add.mjs: http:// only to loopback');
+    } finally { server.close(); }
+    // sign-relays.mjs: the release identity signs (a stand-in pinned here); anyone else is refused.
+    const signed = await run([join(SITE, 'sign-relays.mjs'), rel.file], { ...env, SIGELO_RELEASE_GENESIS: rel.genesis });
+    const now = Math.floor(Date.now() / 1000), r = reg.checkRegistry(sigelo.parse(readFileSync(outFile, 'utf8')), now, rel.did);
+    ok(signed.status === 0 && r.relays.FNK5?.host === 'corp.example.com' && r.exp - r.iat === reg.REGISTRY_DAYS * 86400, `sign-relays.mjs: relays.json, a ${reg.REGISTRY_CTX} bundle of the release identity (${signed.stdout.trim()})`);
+    ok((() => { try { reg.checkRegistry(sigelo.parse(readFileSync(outFile, 'utf8')), now); return false; } catch (e) { return e.check === 'registry'; } })(), 'registry: a relays.json signed by anyone but the published release identity is refused');
+    const notPinned = await run([join(SITE, 'sign-relays.mjs'), op.file], { ...env, SIGELO_RELEASE_GENESIS: rel.genesis });
+    ok(notPinned.status === 1 && notPinned.stderr.includes('not the pinned release identity'), 'sign-relays.mjs: an identity other than the pinned release identity is refused');
+    const site2 = join(tmp, 'site'); mkdirSync(site2);
+    writeFileSync(join(site2, 'relays.src.json'), readFileSync(srcFile)); writeFileSync(join(site2, 'relays.json'), readFileSync(outFile));
+    ok(registryStatus(site2, now, rel.did).ok && !registryStatus(site2, now).ok, 'build: serves relays.json only when it verifies against the pinned identity');
+    const grown = JSON.parse(readFileSync(srcFile, 'utf8')); grown.relays[reg.relayTag('new.example')] = { host: 'new.example' };
+    writeFileSync(join(site2, 'relays.src.json'), JSON.stringify(grown));
+    ok(registryStatus(site2, now, rel.did).why?.includes('does not list what relays.src.json lists'), 'build: a relays.json behind relays.src.json is not served (sign it again)');
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+}
 
 // ---- the internal runbook's self-test (private tree only) --------------------------------------
 const runbook = join(ROOT, 'commercial', 'relay-pro-runbook.md');

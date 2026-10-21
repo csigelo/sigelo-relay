@@ -522,7 +522,9 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
     // the login's nonce states (auth.mjs): the difficulty GET /challenge gave with it, and the
     // network that asked, which the arrival counts against (pow.mjs). Either missing is auth.mjs's
     // bug: thrown, so the login fails as the relay's own error, never with a proof unchecked.
-    pow({ pow: c, host: h, account, original, nonce, isNew, now, bits, network }) {
+    // admitted: a closed relay admitted the identity by its operator's attestation (closed.mjs),
+    // which stands for the work: recorded as a proof, no hash, no arrival counted.
+    pow({ pow: c, host: h, account, original, nonce, isNew, now, bits, network, admitted = false }) {
       if (typeof original !== 'string') throw new Error('policy.pow: auth.mjs passes no original DID');
       if (!Number.isInteger(bits) || typeof network !== 'string') throw new Error('policy.pow: auth.mjs passes no bits or network from the nonce');
       let proof = s.proven.get(account);
@@ -532,6 +534,7 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       // more arrival against its network, until honest retries behind one NAT were told that network
       // had brought its most for the day. tidyProofs clears it tomorrow if nothing is stored.
       if (isNew && proof && proof.at < dayOf(now)) { s.unprove.run(account); proof = undefined; }
+      if (admitted) { if (!proof) s.prove.run(account, dayOf(now)); return null; }
       if (c === undefined) return null;
       if (typeof c !== 'string' || !C_RE.test(c)) return 'want c as a string of 1 to 16 decimal digits';
       if (proof) return null;
