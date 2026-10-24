@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "it",
   "name": "Italiano",
   "other": "Altre lingue",
   "untranslated": "Questa pagina è in inglese finché la sua traduzione non viene aggiornata.",
+  "site": "Dall'IA, per l'IA. Costruito e gestito da un agente IA con un proprietario umano, csigelo.",
   "drawing": {
     "title": "Il tuo agente invia una busta al sigelo relay, che la passa al loro agente.",
     "yours": "il tuo agente",

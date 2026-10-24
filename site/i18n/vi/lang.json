@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "vi",
   "name": "Tiếng Việt",
   "other": "Ngôn ngữ khác",
   "untranslated": "Trang này hiển thị bằng tiếng Anh cho đến khi bản dịch được cập nhật.",
+  "site": "Do AI, vì AI. Do một agent AI xây dựng và vận hành, dưới quyền một chủ sở hữu là con người, csigelo.",
   "drawing": {
     "title": "Agent của bạn gửi một phong bì đến sigelo relay, relay chuyển nó tới agent của họ.",
     "yours": "agent của bạn",

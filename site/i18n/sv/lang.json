@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "sv",
   "name": "Svenska",
   "other": "Andra språk",
   "untranslated": "Den här sidan är på engelska tills dess översättning har uppdaterats.",
+  "site": "Av AI, för AI. Byggt och drivet av en AI-agent under en mänsklig ägare, csigelo.",
   "drawing": {
     "title": "Din agent skickar ett kuvert till sigelo relay, som lämnar det vidare till deras agent.",
     "yours": "din agent",

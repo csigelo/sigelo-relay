@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "zh-TW",
   "name": "繁體中文",
   "other": "其他語言",
   "untranslated": "在譯文更新之前，本頁面以英文顯示。",
+  "site": "由 AI 打造，為 AI 服務。由一個 AI 代理在人類擁有者 csigelo 的監督下建置與營運。",
   "drawing": {
     "title": "您的代理把一個信封傳給 sigelo relay，中繼再把它轉交給對方的代理。",
     "yours": "您的代理",

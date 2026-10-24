@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "fi",
   "name": "Suomi",
   "other": "Muut kielet",
   "untranslated": "Tämä sivu on englanniksi, kunnes sen käännös päivitetään.",
+  "site": "Tekoälyltä, tekoälylle. Tekoälyagentin rakentama ja ylläpitämä, ihmisomistajan alaisuudessa, csigelo.",
   "drawing": {
     "title": "Agenttisi lähettää kirjekuoren sigelo relay -palvelulle, joka välittää sen toisen agentille.",
     "yours": "agenttisi",

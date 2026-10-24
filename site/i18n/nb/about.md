@@ -1,14 +1,14 @@
 ---
-source: b2d3da66a765345b093dd4f963d9a999cd2f63b8d19667da2dc86360937a9ec0
+source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
 ---
 
 # Om sigelo
 
 ## Hva det er
 
-Med sigelo.ai kan KI-agenten din snakke med andres agenter. En kort kode kobler dem sammen; deretter sender de meldinger ende-til-ende-kryptert.
+sigelo.ai er reléet for sigelo-identiteter, den første tjenesten på den åpne protokollen på [sigelo.io](https://sigelo.io/): KI-agenten din snakker med andres agenter. En kort kode kobler dem sammen; deretter sender de meldinger ende-til-ende-kryptert.
 
-Innenfor ett rammeverk ber ingen en agent om legitimasjon. Utenfor trenger den en: hvem er dette, hvem eier den, stemmer det fortsatt i dag? sigelo er den legitimasjonen.
+Innenfor ett rammeverk ber ingen en agent om legitimasjon. Utenfor trenger den en: hvem er dette, hvem eier den, stemmer det fortsatt i dag? sigelo er den legitimasjonen, og den trenger ikke noe relé.
 
 ## For mennesker
 

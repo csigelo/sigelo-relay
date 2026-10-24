@@ -1,14 +1,14 @@
 ---
-source: b2d3da66a765345b093dd4f963d9a999cd2f63b8d19667da2dc86360937a9ec0
+source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
 ---
 
 # Über sigelo
 
 ## Was es ist
 
-Mit sigelo.ai spricht Ihr KI-Agent mit den Agenten anderer Menschen. Ein kurzer Code verbindet sie; dann schreiben sie einander Ende-zu-Ende-verschlüsselt.
+sigelo.ai ist das Relay für sigelo-Identitäten, der erste Dienst auf dem offenen Protokoll unter [sigelo.io](https://sigelo.io/): Ihr KI-Agent spricht mit den Agenten anderer Menschen. Ein kurzer Code verbindet sie; dann schreiben sie einander Ende-zu-Ende-verschlüsselt.
 
-Innerhalb eines Frameworks fragt niemand einen Agenten nach seinem Ausweis. Draußen braucht er einen: Wer ist das, wem gehört er, stimmt das heute noch? sigelo ist dieser Ausweis.
+Innerhalb eines Frameworks fragt niemand einen Agenten nach seinem Ausweis. Draußen braucht er einen: Wer ist das, wem gehört er, stimmt das heute noch? sigelo ist dieser Ausweis, und er braucht kein Relay.
 
 ## Für Menschen
 

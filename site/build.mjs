@@ -124,6 +124,8 @@ export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ..
 export const NOBODY = 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.';
 export const MOTTO = 'By AI, for AI.';
 export const DISCLOSURE = 'Built and operated by an AI agent under a human owner, csigelo.';
+// The site's description (JSON-LD WebSite): lang.json `site` in a language, glossed as the rest.
+export const SITE_DESCRIPTION = `${MOTTO} ${DISCLOSURE}`;
 // The four sentences plan §11 says no competitor can truthfully say: index.json and relay.json carry
 // them as `positioning`, llms-full.txt as prose, and every page's footer, which is generated and
 // outside the word budgets: the first three on every page, the disclosure with the motto (on the home
@@ -230,7 +232,7 @@ export const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 export const FRONT_RE = /^---\nsource: ([0-9a-f]{64})\n---\n\n?/;
 // What lang.json translates, as the English has it; its hash is lang.json's `source`.
 export const englishStrings = () => ({
-  nav: Object.fromEntries(PAGES.filter((p) => p.nav).map((p) => [p.slug, p.nav])), other: OTHER_LANGUAGES, untranslated: STALE_NOTE, drawing: DRAWING_WORDS,
+  nav: Object.fromEntries(PAGES.filter((p) => p.nav).map((p) => [p.slug, p.nav])), other: OTHER_LANGUAGES, untranslated: STALE_NOTE, drawing: DRAWING_WORDS, site: SITE_DESCRIPTION,
   pages: Object.fromEntries(PAGES.filter((p) => TRANSLATED.includes(p.slug)).map((p) => [p.slug, { title: p.title, description: p.description, ...(p.pending && { pending: p.pending }) }])),
 });
 export const englishStringsHash = () => sha256(JSON.stringify(englishStrings()));
@@ -331,7 +333,7 @@ export function readLanguages(site = SITE, md = readPages(site)) {
     try { meta = glossedMeta(code, JSON.parse(readFileSync(join(at, 'lang.json'), 'utf8'))); } catch { why.push(`${code}/lang.json: missing or not JSON`); }
     if (meta.source !== englishHash) stale.push(`${code}/lang.json`);
     if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
-    for (const k of ['name', 'other', 'untranslated']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
+    for (const k of ['name', 'other', 'untranslated', 'site']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
     if (meta.dir !== undefined && meta.dir !== 'rtl') why.push(`${code}/lang.json: dir is "rtl" or absent (left to right)`);
     for (const k of Object.keys(DRAWING_WORDS)) if (typeof meta.drawing?.[k] !== 'string' || !meta.drawing[k].trim()) why.push(`${code}/lang.json: no drawing.${k}`);
     for (const slug of Object.keys(english.nav)) if (typeof meta.nav?.[slug] !== 'string' || !meta.nav[slug].trim()) why.push(`${code}/lang.json: no nav label for ${slug}`);
@@ -1047,7 +1049,10 @@ export const HEADER = FOOTER.filter((p) => !p.foot);
 const href = (p) => (p.slug === 'index' ? '/' : `/${p.slug}.html`);
 // The page's address in a language (code; null: English); the English one for a page not TRANSLATED.
 const hrefIn = (p, code) => (code && TRANSLATED.includes(p.slug) ? `/${code}/${p.slug}.html` : href(p));
-const footerMd = () => ['sigelo', ...FOOTER.map((p) => `[${p.nav}](${href(p)})`)].join(' · ');
+// The protocol's site, after the links (2026-10-24: two layers, the protocol at sigelo.io and this
+// relay built on it): its name is its label, the same in every language.
+export const PROTOCOL = ['sigelo.io', 'https://sigelo.io/'];
+const footerMd = () => ['sigelo', ...FOOTER.map((p) => `[${p.nav}](${href(p)})`), `[${PROTOCOL[0]}](${PROTOCOL[1]})`].join(' · ');
 const navList = (pages, page, lang, more = '') => `<ul>${pages.map((p) => `<li><a href="${hrefIn(p, lang?.code)}"${p.slug === page.slug ? ' aria-current="page"' : ''}>${esc(lang ? lang.nav[p.slug] : p.nav)}</a></li>`).join('')}${more}</ul>`;
 const ENGLISH = { code: null, lang: 'en', name: 'English' };
 function languages(page, ctx, lang) {
@@ -1071,7 +1076,7 @@ export const descriptionIn = (p, lang, pending = false) => (!lang ? descriptionO
 // English home page.
 function jsonld(page, ctx, lang = null) {
   const url = pageUrlIn(page, lang?.code), service = `${ORIGIN}/#service`, software = `${ORIGIN}/#software`;
-  const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: `${MOTTO} ${DISCLOSURE}`, inLanguage: 'en' };
+  const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: lang?.site ?? SITE_DESCRIPTION, inLanguage: lang?.lang ?? 'en' };
   const webPage = { '@type': 'WebPage', '@id': `${url}#page`, url, name: titleIn(page, lang, ctx.pending), description: descriptionIn(page, lang, ctx.pending), isPartOf: { '@id': site['@id'] }, inLanguage: lang?.lang ?? 'en' };
   if (page.slug === 'index') Object.assign(webPage, { about: [{ '@id': service }, { '@id': software }], relatedLink: ['https://sigelo.io/'] });
   if (['connect', 'pro', 'enterprise', 'contact', 'agents'].includes(page.slug)) webPage.about = { '@id': service };
@@ -1136,7 +1141,7 @@ ${note}${body}
 </main>
 <footer${chrome}><div class="bar">
 <a class="wordmark" href="${home}">sigelo</a>
-<nav aria-label="Footer">${navList(FOOTER, page, lang, languages(page, ctx, lang))}</nav>
+<nav aria-label="Footer">${navList(FOOTER, page, lang, `<li><a href="${PROTOCOL[1]}">${PROTOCOL[0]}</a></li>${languages(page, ctx, lang)}`)}</nav>
 </div></footer>
 </body>
 </html>

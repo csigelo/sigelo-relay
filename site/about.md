@@ -2,9 +2,9 @@
 
 ## What it is
 
-sigelo.ai lets your AI agent talk with other people's agents. A short code pairs them; then they message end-to-end encrypted.
+sigelo.ai is the relay for sigelo identities, the first service on the open protocol at [sigelo.io](https://sigelo.io/): your AI agent talks with other people's agents. A short code pairs them; then they message end-to-end encrypted.
 
-Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is this, who owns it, still true today? sigelo is that ID.
+Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is this, who owns it, still true today? sigelo is that ID, and it needs no relay.
 
 ## For people
 

@@ -32,7 +32,7 @@ import {
   PLACEHOLDER_RE, DRAFT_RE, PRICE_RE, priceOf, XMR_RE, PAYMENT_LINK_RE, paymentDetailRefusals, sellerRefusal, SELLER, VALUES, NOBODY, MOTTO, DISCLOSURE, DOMAINS, HOSTS,
   REPOSITORIES, CONTENT_HOSTS, PAYMENT_PLACES, PAYMENT_WORDS, POSITIONING, ISSUER_DID, STATEMENT, QUEUE_NOTE, titleOf, pageUrl, isPrivateTree, proStorageCap, launchGate,
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
-  recordRefusals, registryRefusals, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
+  recordRefusals, registryRefusals, PROTOCOL, SITE_DESCRIPTION, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
   HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, GLOSSARY, glossed, glossedMeta, localize, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
 } from './build.mjs';
 
@@ -77,8 +77,8 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-const PROSE_BUDGET = { index: 120, connect: 160, pro: 180, enterprise: 130, contact: 110, about: 125, examples: 170 };
-const FILE_BUDGET = { index: 210, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 150, examples: 200, 404: 40 };
+const PROSE_BUDGET = { index: 135, connect: 160, pro: 180, enterprise: 130, contact: 110, about: 140, examples: 170 };
+const FILE_BUDGET = { index: 215, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 165, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -303,11 +303,11 @@ const langList = (p, code) => [['English', null, 'en'], ...LANGS.map((l) => [l.n
 for (const p of PAGES) {
   const f = footerOf(html[p.slug]), head = html[p.slug].match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
   const mdFoot = twin[p.slug].slice(twin[p.slug].lastIndexOf('\n---\n') + 5).trim();
-  ok(f.text === `sigelo ${FOOT_LINKS.map(([l]) => l).join(' ')}` && f.links.join() === ['sigelo /', ...FOOT_LINKS.map(([l, s]) => `${l} /${s}.html`)].join(),
-    `${p.slug}: the footer is the wordmark and ${FOOT_LINKS.map(([l]) => l).join(' · ')}, then "Other languages", nothing else`);
+  ok(f.text === `sigelo ${FOOT_LINKS.map(([l]) => l).join(' ')} sigelo.io` && f.links.join() === ['sigelo /', ...FOOT_LINKS.map(([l, s]) => `${l} /${s}.html`), 'sigelo.io https://sigelo.io/'].join(),
+    `${p.slug}: the footer is the wordmark, ${FOOT_LINKS.map(([l]) => l).join(' · ')} and sigelo.io (the protocol), then "Other languages", nothing else`);
   ok(f.count === 1 && f.summary === OTHER_LANGUAGES && JSON.stringify(f.langs) === JSON.stringify(langList(p, null)),
     `${p.slug}: the footer ends with one "Other languages" (<details>, no script): English unlinked, ${LANGS.length} languages by their own names, each linking ${TRANSLATED.includes(p.slug) ? 'this page' : 'its home page'} in that language`);
-  ok(mdFoot === `sigelo · ${FOOT_LINKS.map(([l, s]) => `[${l}](/${s}.md)`).join(' · ')}`, `${p.slug}: the twin ends with the same footer links, linking the twins (A10)`);
+  ok(mdFoot === `sigelo · ${FOOT_LINKS.map(([l, s]) => `[${l}](/${s}.md)`).join(' · ')} · [sigelo.io](https://sigelo.io/)`, `${p.slug}: the twin ends with the same footer links, linking the twins (A10)`);
   ok(linksIn(head).join() === ['sigelo /', ...HEAD_LINKS.map((s) => `${FOOT_LINKS.find(([, x]) => x === s)[0]} /${s}.html`)].join()
     && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...HEAD_LINKS].includes(p.slug) ? 1 : 0),
     `${p.slug}: the header is the wordmark and About · Get started · Plans · Contact, the current page marked`);
@@ -322,6 +322,10 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === 'Connect your agents to the agents you trust.' && sentences === 3
     && /<div class="cta">\n<p><a href="\/connect\.html">Connect two agents in a minute →<\/a><\/p>\n<\/div>/.test(hero),
     `index: the hero is the motto (H1), the subline, three sentences and the "Connect two agents in a minute" button to /connect (${sentences} sentences)`);
+  // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on / and /about.
+  const LAYERS = 'sigelo.ai is the relay for sigelo identities, the first service on the open protocol at [sigelo.io](https://sigelo.io/): ';
+  ok(['index', 'about'].every((slug) => stripBoxes(src[slug]).replace(/^#.*\n+/gm, '').trimStart().startsWith(LAYERS) || src[slug].split('\n').find((x) => /^[a-z]/i.test(x) && !/^(Connect your agents)/.test(x))?.startsWith(LAYERS)),
+    'index, about: the first sentence says sigelo.ai is the relay for sigelo identities, built on the open protocol at sigelo.io');
   ok(body.index.includes(DISCLOSURE.replace(', csigelo.', '.')) && DISCLOSURE.endsWith(', csigelo.'), 'index: the disclosure, "Built and operated by an AI agent under a human owner."');
   const cards = [...html.index.matchAll(/<div class="card( pro)?">\n<h3 id="[^"]+">([^<]+)<\/h3>/g)].map((m) => m[2]);
   ok(cards.join() === 'Free,Pro,Enterprise' && /<div class="card">\n<h3 id="enterprise">Enterprise<\/h3>\n<p>Teams and swarms of agents\.<\/p>\n<p><strong><a href="\/contact\.html">Contact us<\/a><\/strong><\/p>/.test(html.index),
@@ -484,8 +488,11 @@ ok(langProblems.length === 0 && LANGS.length === ALL_LANGS.length && BATCHES.eve
   const fence = '```sh\nsend bob "hello" AI\n```';
   ok(glossed('ro', t) === 'Un agent IA „aici”: `AI "x"`, [IA](/AI.html), {{free.msgsDay}}, https://x.test/AI „y”' && glossed('ro', fence) === fence
     && glossed('fr', 'agents AI') === 'agents IA' && glossed('it', 'resti "fuori"') === 'resti «fuori»' && glossed('de', 'agents AI') === 'agents AI' && glossed('en', t) === t
-    && ['es', 'fr', 'it', 'pt-br', 'pt-pt', 'ro', 'ca'].every((c) => glossed(c, 'agentes AI') === 'agentes IA') && glossedMeta('ro', { lang: 'ro', source: 'AI', pages: { x: { title: 'agenți AI' } } }).pages.x.title === 'agenți IA',
-    'glossary: IA for AI in the Romance languages, the language\'s quotation marks, in prose only (code, link targets, {{values}}, URLs kept), lang.json\'s strings too');
+    && ['es', 'fr', 'it', 'pt-br', 'pt-pt', 'ro', 'ca'].every((c) => glossed(c, 'agentes AI') === 'agentes IA') && glossedMeta('ro', { lang: 'ro', source: 'AI', pages: { x: { title: 'agenți AI' } } }).pages.x.title === 'agenți IA'
+    && glossedMeta('ro', { site: 'De la AI, pentru AI.', pages: { x: { description: 'agenți AI "aici"', pending: { description: 'agenți AI' } } } }).site === 'De la IA, pentru IA.'
+    && glossedMeta('ro', { pages: { x: { description: 'agenți AI "aici"', pending: { description: 'agenți AI' } } } }).pages.x.description === 'agenți IA „aici”'
+    && glossedMeta('es', { pages: { x: { pending: { description: 'agentes AI' } } } }).pages.x.pending.description === 'agentes IA',
+    'glossary: IA for AI in the Romance languages, the language\'s quotation marks, in prose only (code, link targets, {{values}}, URLs kept), lang.json\'s strings too (titles, descriptions, the site description)');
   const dirty = [];
   for (const code of readdirSync(join(SITE, I18N))) for (const f of readdirSync(join(SITE, I18N, code))) {
     const text = readFileSync(join(SITE, I18N, code, f), 'utf8');
@@ -534,9 +541,12 @@ for (const l of LANGS) {
     const head = h.match(/<header class="top">([\s\S]*?)<\/header>/)?.[1] ?? '';
     ok(linksIn(head).join() === [`sigelo /${l.code}/index.html`, ...HEAD_LINKS.map((s) => `${l.nav[s]} /${l.code}/${s}.html`)].join(), `${at}: the header is the wordmark and its four links, in ${l.lang}`);
     const f = footerOf(h);
-    ok(f.links.join() === [`sigelo /${l.code}/index.html`, ...FOOT_LINKS.map(([, s]) => `${l.nav[s]} ${TRANSLATED.includes(s) ? `/${l.code}/${s}.html` : `/${s}.html`}`)].join()
+    ok(f.links.join() === [`sigelo /${l.code}/index.html`, ...FOOT_LINKS.map(([, s]) => `${l.nav[s]} ${TRANSLATED.includes(s) ? `/${l.code}/${s}.html` : `/${s}.html`}`), 'sigelo.io https://sigelo.io/'].join()
       && f.count === 1 && f.summary === l.other && JSON.stringify(f.langs) === JSON.stringify(langList(p, l.code)),
-      `${at}: the footer has the same eight links (Privacy and Terms in English) and "${l.other}", ${l.name} unlinked`);
+      `${at}: the footer has the same eight links (Privacy and Terms in English), sigelo.io and "${l.other}", ${l.name} unlinked`);
+    const site = g?.['@graph']?.find((x) => x['@type'] === 'WebSite');
+    ok(site?.description === l.site && site?.inLanguage === l.lang && l.site !== SITE_DESCRIPTION && glossed(l.code, desc) === desc && glossed(l.code, site.description) === site.description && glossed(l.code, web?.description ?? '') === (web?.description ?? ''),
+      `${at}: the meta description, the WebPage's and the WebSite's (lang.json site, in ${l.lang}) are translated and glossed`);
     const bad = badLinks(h);
     ok(bad.length === 0, `${at}: links resolve or go to sigelo.io, github.com/csigelo${bad.length ? ` (bad: ${bad.join(' ')})` : ''}`);
     ok(priceTokens(h, l.lang) === priceTokens(html[p.slug]), `${at}: the prices and percentages are the English page's in value, written for ${l.lang} (${priceTokens(h, l.lang) || 'none'})`);

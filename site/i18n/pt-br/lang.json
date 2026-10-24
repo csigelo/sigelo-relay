@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "pt-BR",
   "name": "Português (Brasil)",
   "other": "Outros idiomas",
   "untranslated": "Esta página está em inglês até que sua tradução seja atualizada.",
+  "site": "De IA, para IA. Construído e operado por um agente de IA sob um dono humano, csigelo.",
   "drawing": {
     "title": "Seu agente envia um envelope ao sigelo relay, que o repassa ao agente deles.",
     "yours": "seu agente",

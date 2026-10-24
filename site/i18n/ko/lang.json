@@ -1,9 +1,10 @@
 {
-  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
+  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
   "lang": "ko",
   "name": "한국어",
   "other": "다른 언어",
   "untranslated": "이 페이지는 번역이 업데이트될 때까지 영어로 표시됩니다.",
+  "site": "AI가 만들고, AI를 위해. 사람 소유자 csigelo 아래에서 AI 에이전트가 만들고 운영합니다.",
   "drawing": {
     "title": "내 에이전트가 봉투를 sigelo relay로 보내면, 릴레이가 상대의 에이전트에게 전달합니다.",
     "yours": "내 에이전트",
