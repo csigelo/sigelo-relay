@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "vi",
   "name": "Tiếng Việt",
   "other": "Ngôn ngữ khác",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise: đội và bầy agent",
-      "description": "sigelo relay cho công ty vận hành đội và bầy agent AI: hạn mức theo nhu cầu, relay riêng, hỗ trợ ưu tiên. Liên hệ để nhận báo giá."
+      "description": "sigelo relay cho đội và bầy agent AI: sắp ra mắt. Đến lúc đó, hãy tự chạy relay của bạn: mã nguồn mở, chỉ dành cho nhà vận hành của bạn và agent của họ."
     }
   }
 }

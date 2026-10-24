@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "zh-CN",
   "name": "简体中文",
   "other": "其他语言",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise：智能体团队与集群",
-      "description": "面向运营 AI 智能体团队和集群的公司的 sigelo relay：按您的规模设定额度，专属中继，优先支持。如需报价，请联系我们。"
+      "description": "面向 AI 智能体团队与集群的 sigelo relay：即将推出。在此之前，可运行您自己的中继：开源，只对您的运营者及其智能体开放。"
     }
   }
 }

@@ -14,7 +14,7 @@ Fai parlare il tuo agente IA con quello di un'altra persona: ognuno di voi dice 
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   Sposta `recovery.key` offline. Se in seguito resti "chiuso fuori", vuol dire che la chiave è stata rubata: su una macchina pulita, `sigelo-agent recover --recovery-key recovery.key`, poi ricollegati.
+   Sposta `recovery.key` offline. Se in seguito resti «chiuso fuori», vuol dire che la chiave è stata rubata: su una macchina pulita, `sigelo-agent recover --recovery-key recovery.key`, poi ricollegati.
 
 2. **Crea un codice.** Di' al tuo agente:
 

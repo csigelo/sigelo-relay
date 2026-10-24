@@ -33,7 +33,7 @@ import {
   REPOSITORIES, CONTENT_HOSTS, PAYMENT_PLACES, PAYMENT_WORDS, POSITIONING, ISSUER_DID, STATEMENT, QUEUE_NOTE, titleOf, pageUrl, isPrivateTree, proStorageCap, launchGate,
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
   recordRefusals, registryRefusals, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
-  HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
+  HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, GLOSSARY, glossed, glossedMeta, localize, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
 } from './build.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -177,7 +177,7 @@ const HEAD = (pending) => ({
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
     connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
     pro: `sigelo relay Pro: one allowance for all your agents, ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. ${pending ? 'Coming soon; free until then.' : 'From 9.99 € a month, VAT included, for businesses.'}`,
-    enterprise: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.',
+    enterprise: 'sigelo relay for teams and swarms of AI agents: coming soon. Until then, run your own relay: open source, closed to your operators and their agents.',
     contact: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.',
     privacy: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.',
     terms: pending
@@ -329,8 +329,10 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   ok(DRAWINGS.relay && html.index.includes(DRAWINGS.relay) && /<svg [^>]*role="img" aria-labelledby="drawing-relay-title">\n<title id="drawing-relay-title">[^<]{20,}<\/title>/.test(DRAWINGS.relay)
     && !/\s(?:style|on[a-z]+|href|xlink:href|src)=/.test(DRAWINGS.relay) && PAGES.every((p) => p.slug === 'index' || !html[p.slug].includes('<svg')),
     'index: one inline drawing, role img with a title, no style, handler or link in it; no other page has one');
-  ok(/::: cta\n\[Contact us →\]\(\/contact\.html\)\n:::\n?$/.test(src.enterprise) && src.enterprise.includes('Contact us for a quote.'),
-    'enterprise: ends with the Contact button; "Contact us for a quote."');
+  ok(/::: cta\n\[Contact us →\]\(\/contact\.html\)\n:::\n?$/.test(src.enterprise) && src.enterprise.includes('\n\nEnterprise is coming soon. Every agent runs free until then.\n\n')
+    && src.enterprise.includes('\n## Run your own relay\n') && src.enterprise.includes('(https://github.com/csigelo/sigelo-relay/blob/main/deploy/README.md)')
+    && src.enterprise.includes('RELAY_CLOSED_OPERATOR=') && src.enterprise.includes('`/.well-known/sigelo-relay.json`') && !/\d[ \u00a0]?€|\b20\d\d\b/.test(src.enterprise),
+    'enterprise: coming soon, as Pro; "Run your own relay" (the deploy README linked, a closed relay, the registry statement); no price, no year; ends with the Contact button');
 }
 // pro: the three plans side by side (2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
 // /contact; the 12-month one highlighted, "Best value"; under them one line, VAT included, no rate or reverse charge.
@@ -360,13 +362,13 @@ ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !ex
   `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
 // Gross prices, "VAT included", no rate and no reverse-charge wording anywhere (2026-10-14); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
-// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is quoted (2026-10-14).
+// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is coming soon (2026-10-24).
 ok(priceLineM && src.terms.includes('Prices as on [Pro](/pro.html), VAT included, billed up front for the period. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
   && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[1]} % off)`)
-  && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Contact us for a quote.')
+  && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Enterprise is coming soon.')
   && src.privacy.includes('Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet.')
   && !/Monero only|24 hours|excluding VAT|none on a reverse-charge|100 € a year|a month or a year|EU business with a VAT number|valid EU VAT number|reverse.charge|Belgi|\d %(?:\s|&nbsp;)*(?:Belgian )?VAT/i.test(src.terms + src.pro + src.agents + src.privacy + src.index + src.contact + PAGES.map((p) => p.description).join() + read('index.json') + read('relay.json') + read('llms.txt') + read('llms-full.txt')),
-'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise quoted; no "Monero only", no 24 hours');
+'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise coming soon; no "Monero only", no 24 hours');
 // No protocol talk on the pages a person reads first (2026-10-14): that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'about', 'examples'];
@@ -475,11 +477,34 @@ const ALL_LANGS = readLanguages(SITE);
 const langProblems = ALL_LANGS.flatMap((l) => [...l.stale.map((f) => `stale: ${f}`), ...l.why]);
 ok(langProblems.length === 0 && LANGS.length === ALL_LANGS.length && BATCHES.every((c) => LANGS.some((l) => l.code === c)) && LANGS.every((l) => (l.dir === 'rtl') === RTL.includes(l.code)),
   `languages: ${BATCHES.join(', ')} in i18n/ (${RTL.join(', ')} right to left), each fresh and well formed, so published${langProblems.length ? ` (${langProblems.join('; ')})` : ''}`);
+// The glossary: the Romance languages write IA, straight quotes in prose become the language's,
+// code, link targets, {{values}} and URLs untouched; i18n/ already carries it (--glossary).
+{
+  const t = 'Un agent AI "aici": `AI "x"`, [AI](/AI.html), {{free.msgsDay}}, https://x.test/AI "y"';
+  const fence = '```sh\nsend bob "hello" AI\n```';
+  ok(glossed('ro', t) === 'Un agent IA „aici”: `AI "x"`, [IA](/AI.html), {{free.msgsDay}}, https://x.test/AI „y”' && glossed('ro', fence) === fence
+    && glossed('fr', 'agents AI') === 'agents IA' && glossed('it', 'resti "fuori"') === 'resti «fuori»' && glossed('de', 'agents AI') === 'agents AI' && glossed('en', t) === t
+    && ['es', 'fr', 'it', 'pt-br', 'pt-pt', 'ro', 'ca'].every((c) => glossed(c, 'agentes AI') === 'agentes IA') && glossedMeta('ro', { lang: 'ro', source: 'AI', pages: { x: { title: 'agenți AI' } } }).pages.x.title === 'agenți IA',
+    'glossary: IA for AI in the Romance languages, the language\'s quotation marks, in prose only (code, link targets, {{values}}, URLs kept), lang.json\'s strings too');
+  const dirty = [];
+  for (const code of readdirSync(join(SITE, I18N))) for (const f of readdirSync(join(SITE, I18N, code))) {
+    const text = readFileSync(join(SITE, I18N, code, f), 'utf8');
+    if (f === 'lang.json' ? JSON.stringify(glossedMeta(code, JSON.parse(text))) !== JSON.stringify(JSON.parse(text)) : glossed(code, text.replace(FRONT_RE, '')) !== text.replace(FRONT_RE, '')) dirty.push(`${code}/${f}`);
+  }
+  ok(dirty.length === 0, `glossary: written into every translation (node relay/site/build.mjs --glossary)${dirty.length ? ` (not yet: ${dirty.join(', ')})` : ''}`);
+  const L = (lang) => ({ lang });
+  ok(localize('save 20 %', L('tr')) === 'save %20' && localize('save 20 %', L('de')) === 'save 20\u00a0%' && localize('save 20 %', L('it')) === 'save 20%' && localize('10 % off, 9.99 €', L('fr')) === '10\u00a0% off, 9,99 €'
+    && localize('20 %', undefined) === '20 %',
+    'localize: a percentage as the locale writes it (tr %20, de 20 %, it 20%), prices as before; English untouched');
+}
 const thtml = Object.fromEntries(LANGS.map((l) => [l.code, Object.fromEntries(TRANSLATED.map((slug) => [slug, files.has(`${l.code}/${slug}.html`) ? read(`${l.code}/${slug}.html`) : '']))]));
 const mainOf = (h) => h.match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? '';
 const alternatesIn = (h) => [...h.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map((m) => [m[1], m[2]]);
 // The prices and percentages of a page, as values (each written in the page's locale) with their sign.
-const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(/(\p{Nd}[\p{Nd}.,\u00a0\u202f]*\p{Nd}|\p{Nd})[ \u00a0\u202f]?(€|%)/gu)].map((m) => `${parseIn(m[1], lang)} ${m[2]}`).sort().join();
+// A percentage may lead with its sign (tr %20), and carry bidi marks (ar).
+const NUM = '(\\p{Nd}[\\p{Nd}.,\\u00a0\\u202f]*\\p{Nd}|\\p{Nd})';
+const PRICE_IN = new RegExp(`${NUM}[ \\u00a0\\u202f\\u200e\\u200f\\u061c]*(€|%)|%[\\u200e\\u200f\\u061c]*${NUM}`, 'gu');
+const priceTokens = (h, lang = 'en') => [...plainText(mainOf(h)).matchAll(PRICE_IN)].map((m) => (m[1] ? `${parseIn(m[1], lang)} ${m[2]}` : `${parseIn(m[3], lang)} %`)).sort().join();
 // The word for "card" in each language: the ban on the metaphor holds in every language (the
 // English page says "sigelo is that ID", and so must each translation).
 const CARD_WORDS = { de: /karte/i, fr: /\bcartes?\b/i, es: /\btarjetas?\b/i, 'pt-br': /\bcart(?:ão|ões)\b/i, it: /\b(?:cart[ae]|tesser[ae])\b/i, nl: /kaart/i, pl: /\bkart/i, ja: /カード/,
@@ -563,7 +588,7 @@ ok(LANGS.every((l) => { const ps = [...(thtml[l.code].index.match(/<section clas
     "hi":"sigelo relay — AI एजेंटों के लिए एन्क्रिप्टेड संदेश", "bn":"sigelo relay — AI এজেন্টদের জন্য এনক্রিপ্টেড বার্তা", "ta":"sigelo relay — AI ஏஜென்ட்களுக்கான மறையாக்கச் செய்திகள்",
     "ar":"sigelo relay — رسائل مشفّرة لوكلاء الذكاء الاصطناعي", "el":"sigelo relay — κρυπτογραφημένα μηνύματα για πράκτορες ΤΝ",
     "sv":"sigelo relay — krypterade meddelanden för AI-agenter", "da":"sigelo relay — krypterede beskeder til AI-agenter", "nb":"sigelo relay — krypterte meldinger for KI-agenter", "fi":"sigelo relay — salattua viestintää tekoälyagenteille",
-    "ro":"sigelo relay — mesaje criptate pentru agenți AI", "hu":"sigelo relay — titkosított üzenetek MI-ügynököknek", "pt-pt":"sigelo relay — mensagens cifradas para agentes de IA",
+    "ro":"sigelo relay — mesaje criptate pentru agenți IA", "hu":"sigelo relay — titkosított üzenetek MI-ügynököknek", "pt-pt":"sigelo relay — mensagens cifradas para agentes de IA",
     "tr":"sigelo relay — yapay zekâ ajanları için şifreli mesajlaşma", "id":"sigelo relay — pesan terenkripsi untuk agen AI", "vi":"sigelo relay — nhắn tin mã hóa cho agent AI", "th":"sigelo relay — ข้อความเข้ารหัสสำหรับเอเจนต์ AI"};
   const off = LANGS.filter((l) => headOf(thtml[l.code].index)[0] !== HOME_TITLE[l.code]).map((l) => `${l.code}: "${headOf(thtml[l.code].index)[0]}"`);
   ok(off.length === 0 && BATCHES.every((c) => HOME_TITLE[c]), `home page title in every language, as pinned${off.length ? ` (${off.join('; ')})` : ''}`);
@@ -977,7 +1002,7 @@ try {
     return launchRefusals(root);
   };
   const goodSecurity = `- Repositories: ${REPOSITORIES.join(' and ')}.\n- ${NOBODY}\n`;
-  const ioConf = (to, extra = '') => `server {\n    server_name sigelo.net www.sigelo.net;\n    return 301 https://${to}$request_uri;\n}\n${extra}`;
+  const ioConf = (to, extra = '') => `${DOMAINS.filter((d) => d.role === 'redirect' && d.live).map((d) => `server {\n    server_name ${d.name} www.${d.name};\n    return 301 https://${to}$request_uri;\n}\n`).join('')}${extra}`;
   ok(tree(goodSecurity, ioConf('sigelo.ai')).length === 0 && tree(null, null).length === 0, 'launch gate: SECURITY.md and sigelo.io\'s nginx as index.json says, or absent (the relay export): open nothing');
   {
     const root = join(scratch, `root-${++k}`);
@@ -1107,6 +1132,12 @@ try {
     ok(english.refused === null && LANGS.every((l) => english.r1.stale.includes(`${l.code}/pro.md`) && isFallback(at(english, `${l.code}/pro.html`), l, 'pro'))
       && alternatesIn(at(english, 'pro.html')).length === 0 && sameSet(alternatesIn(at(english, 'connect.html')), want('connect', LANGS)),
       'stale: an edit to the English pro.md makes every pro.md translation fall back to it, and /pro carries no hreflang; the other pages keep theirs');
+    // A stale page is not held to the English it no longer translates: a new code block in the
+    // English connect.md leaves every language published, its connect page falling back.
+    const fenced = both(copySite(edit('connect.md', 'sigelo-agent invite --name bob\n', 'sigelo-agent invite --name bob --days 1\n')));
+    ok(fenced.refused === null && LANGS.every((l) => fenced.r1.languages.includes(l.code) && fenced.r1.stale.includes(`${l.code}/connect.md`) && isFallback(at(fenced, `${l.code}/connect.html`), l, 'connect'))
+      && at(fenced, 'de/pro.html').startsWith('<!doctype html>\n<html lang="de">'),
+      'stale: a code block changed in the English connect.md: every language stays published, its connect page the English one');
     const head = both(copySite(edit(de('lang.json'), /"source": "([0-9a-f])/, (_, c) => `"source": "${c === '0' ? '1' : '0'}`)));
     ok(head.r1.stale.join() === 'de/lang.json' && TRANSLATED.every((slug) => isFallback(at(head, `de/${slug}.html`), deL, slug)), 'stale: a stale de/lang.json (English titles or labels changed since) makes all seven German URLs fall back');
     const price = both(copySite(edit(de('pro.md'), '**9.99 €**', '**8.99 €**')));

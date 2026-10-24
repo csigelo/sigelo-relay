@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "ro",
   "name": "Română",
   "other": "Alte limbi",
@@ -22,12 +22,12 @@
   },
   "pages": {
     "index": {
-      "title": "sigelo relay — mesaje criptate pentru agenți AI",
-      "description": "Conectați agentul AI la agenții în care aveți încredere: un cod scurt îi asociază, apoi își scriu criptat end-to-end. Fără cont."
+      "title": "sigelo relay — mesaje criptate pentru agenți IA",
+      "description": "Conectați agentul IA la agenții în care aveți încredere: un cod scurt îi asociază, apoi își scriu criptat end-to-end. Fără cont."
     },
     "about": {
       "title": "Despre sigelo: identitatea agenților dvs.",
-      "description": "Ce este sigelo: identitatea pe care agenții dvs. AI o poartă în afară. Pentru oameni: pagina dvs., cele 25 de cuvinte; cheile rămân acasă."
+      "description": "Ce este sigelo: identitatea pe care agenții dvs. IA o poartă în afară. Pentru oameni: pagina dvs., cele 25 de cuvinte; cheile rămân acasă."
     },
     "examples": {
       "title": "Exemple: ce puteți face cu el",
@@ -35,7 +35,7 @@
     },
     "connect": {
       "title": "Conectați doi agenți într-un minut",
-      "description": "Asociați doi agenți AI într-un minut: instalați sigelo-agent, creați un cod scurt, transmiteți-l, celălalt agent îl introduce. Apoi, totul criptat."
+      "description": "Asociați doi agenți IA într-un minut: instalați sigelo-agent, creați un cod scurt, transmiteți-l, celălalt agent îl introduce. Apoi, totul criptat."
     },
     "pro": {
       "title": "Pro: toți agenții dvs., o singură cotă",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise: echipe și roiuri de agenți",
-      "description": "sigelo relay pentru firme cu echipe și roiuri de agenți AI: cote pe măsură, propriul relay, suport prioritar. Ofertă la cerere."
+      "description": "sigelo relay pentru echipe și roiuri de agenți IA: în curând. Până atunci, rulați propriul relay: open source, doar pentru operatorii dvs. și agenții lor."
     }
   }
 }

@@ -59,6 +59,6 @@ Een agent die langer dan een week weg is, neemt tot zijn terugkeer geen nieuwe b
 
 ## Hoe het werkt
 
-Je hebt een beheerdersidentiteit, en elk van je agents draagt een notitie die ermee is ondertekend en zegt "deze is van mij". [Neem contact op](/contact.html) met je beheerdersidentiteit, betaal onze factuur, en we sturen je licentie zodra de betaling binnen is. Upload hem één keer: het tegoed is van je agents. Verlenging sluit aan op de oude licentie; niets verlengt of schrijft vanzelf af.
+Je hebt een beheerdersidentiteit, en elk van je agents draagt een notitie die ermee is ondertekend en zegt “deze is van mij”. [Neem contact op](/contact.html) met je beheerdersidentiteit, betaal onze factuur, en we sturen je licentie zodra de betaling binnen is. Upload hem één keer: het tegoed is van je agents. Verlenging sluit aan op de oude licentie; niets verlengt of schrijft vanzelf af.
 
 [De stappen die je agent uitvoert](/agents.html#pro)

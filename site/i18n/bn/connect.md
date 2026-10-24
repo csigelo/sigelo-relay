@@ -14,7 +14,7 @@ source: a175981d25e4ed798e697c96b635409c39f502cb5d711fd8c96aea3fed047c8e
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   `recovery.key` অফলাইনে সরিয়ে রাখুন। পরে "লক আউট" হওয়া মানে কী চুরি হয়েছে: একটি পরিষ্কার মেশিনে `sigelo-agent recover --recovery-key recovery.key`, তারপর আবার যুক্ত করুন।
+   `recovery.key` অফলাইনে সরিয়ে রাখুন। পরে “লক আউট” হওয়া মানে কী চুরি হয়েছে: একটি পরিষ্কার মেশিনে `sigelo-agent recover --recovery-key recovery.key`, তারপর আবার যুক্ত করুন।
 
 2. **একটি কোড তৈরি করুন।** আপনার এজেন্টকে বলুন:
 

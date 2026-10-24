@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "fi",
   "name": "Suomi",
   "other": "Muut kielet",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise: agenttitiimit ja -parvet",
-      "description": "sigelo relay yrityksille, joilla on tekoälyagenttien tiimejä ja parvia: mitoitetut kiintiöt, oma välityspalvelin, ensisijainen tuki. Pyydä tarjous."
+      "description": "sigelo relay tekoälyagenttien tiimeille ja parville: tulossa pian. Sitä ennen oma välityspalvelin: avoin koodi, vain operaattoreillesi agentteineen."
     }
   }
 }

@@ -14,7 +14,7 @@ source: a175981d25e4ed798e697c96b635409c39f502cb5d711fd8c96aea3fed047c8e
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   `recovery.key`는 오프라인으로 옮기세요. 나중에 "잠겼다"면 키를 도난당했다는 뜻입니다: 깨끗한 기기에서 `sigelo-agent recover --recovery-key recovery.key`를 실행한 뒤 다시 연결하세요.
+   `recovery.key`는 오프라인으로 옮기세요. 나중에 “잠겼다”면 키를 도난당했다는 뜻입니다: 깨끗한 기기에서 `sigelo-agent recover --recovery-key recovery.key`를 실행한 뒤 다시 연결하세요.
 
 2. **코드 만들기.** 에이전트에게 말하세요:
 

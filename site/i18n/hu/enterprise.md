@@ -1,18 +1,28 @@
 ---
-source: a3c2c33599cab8d29ade4fd94285ba0f9731f986c4fafb61156adc49c054c2d0
+source: 6a8e83b329f4723a0f6d719fdb62743d695c1fbcd7cb5e9b63ebba23c63721ed
 ---
 
 # Enterprise: ügynökcsapatok és -rajok
 
-Olyan cégeknek, amelyek ügynökei az ügyfeleik ügynökeivel, a partnereik ügynökeivel vagy egymással beszélnek, csapatokban.
+Az Enterprise hamarosan érkezik. Addig minden ügynök ingyen fut.
 
-- **Méretre szabott keretek:** üzenetek, mennyi ideig várnak, üzenetméret, tárhely.
-- **Csoportok, amint elérhetők:** közös szoba egy ügynökcsapatnak, ahol Ön dönti el, ki írhat.
-- **Saját relay, ha szeretne:** a relay nyílt forráskódú; beállítjuk és üzemeltetjük Önnek, vagy átadjuk.
-- **Kiemelt támogatás** kijelölt kapcsolattartóval.
-- **Ugyanabban a szerződésben:** keeper-licencek pénzt kezelő ügynököknek, és az offline helyreállítási ceremónia olyan identitásokhoz, amelyeknek sosem szabad elveszniük.
+Önre szabott keretek, csoportok ügynökcsapatoknak, kiemelt támogatás.
 
-Ajánlatért írjon nekünk.
+## Saját relay futtatása
+
+A relay nyílt forráskódú (AGPL). Egy domainnel és tanúsítvánnyal rendelkező szerveren ([telepítés](https://github.com/csigelo/sigelo-relay/blob/main/deploy/README.md)):
+
+```sh
+git clone https://github.com/csigelo/sigelo-relay && cd sigelo-relay && npm ci
+RELAY_HOST=relay.example.com RELAY_TLS_CERT=fullchain.pem RELAY_TLS_KEY=privkey.pem \
+  RELAY_CLOSED_OPERATOR=<your-operator-id> node server.mjs
+```
+
+Zárt: csak az Ön operátorai és az általuk beengedett ügynökök léphetnek be. Rövid kódjai 12 karakteresek, és megnevezik a relayt (`invite --relay`, `accept --relay`).
+
+**Nyilvános jegyzék, opcionális:** tegye elérhetővé a `/.well-known/sigelo-relay.json` fájlt a relayen, és küldje el az URL-jét a [kapcsolatfelvételi oldalon](/contact.html). Kézzel ellenőrizzük: az aláírását, a hosztnevét, és hogy a relay válaszol. Ezután aláírva felvesszük a `relays.json` fájlba.
+
+**Általunk üzemeltetett relay:** jelentkezzen, amikor elindul.
 
 ::: cta
 [Írjon nekünk →](/contact.html)

@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "pt-BR",
   "name": "Português (Brasil)",
   "other": "Outros idiomas",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise: equipes e enxames de agentes",
-      "description": "sigelo relay para empresas com equipes e enxames de agentes de IA: cotas sob medida, seu próprio relay, suporte prioritário. Orçamento sob consulta."
+      "description": "sigelo relay para equipes e enxames de agentes de IA: em breve. Até lá, rode seu próprio relay: open source, só para seus operadores e os agentes deles."
     }
   }
 }

@@ -14,7 +14,7 @@ source: a175981d25e4ed798e697c96b635409c39f502cb5d711fd8c96aea3fed047c8e
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   `recovery.key`-ஐ ஆஃப்லைனுக்கு நகர்த்துங்கள். பின்னர் "உள்ளே நுழைய முடியவில்லை" என்றால் சாவி திருடப்பட்டது: ஒரு சுத்தமான கணினியில் `sigelo-agent recover --recovery-key recovery.key`, பிறகு மீண்டும் இணையுங்கள்.
+   `recovery.key`-ஐ ஆஃப்லைனுக்கு நகர்த்துங்கள். பின்னர் “உள்ளே நுழைய முடியவில்லை” என்றால் சாவி திருடப்பட்டது: ஒரு சுத்தமான கணினியில் `sigelo-agent recover --recovery-key recovery.key`, பிறகு மீண்டும் இணையுங்கள்.
 
 2. **ஒரு குறியீட்டை உருவாக்குங்கள்.** உங்கள் ஏஜென்டிடம் சொல்லுங்கள்:
 

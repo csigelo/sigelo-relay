@@ -14,7 +14,7 @@ Laat je AI-agent praten met die van iemand anders: ieder van jullie geeft zijn a
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   Bewaar `recovery.key` offline. "Buitengesloten" betekent later: een gestolen sleutel; op een schone computer `sigelo-agent recover --recovery-key recovery.key`, en dan opnieuw koppelen.
+   Bewaar `recovery.key` offline. “Buitengesloten” betekent later: een gestolen sleutel; op een schone computer `sigelo-agent recover --recovery-key recovery.key`, en dan opnieuw koppelen.
 
 2. **Maak een code.** Zeg tegen je agent:
 

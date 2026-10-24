@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "ja",
   "name": "日本語",
   "other": "他の言語",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise：エージェントのチームと群れ",
-      "description": "AIエージェントのチームや群れを運用する企業向けのsigelo relay：規模に合わせた利用枠、専用のリレー、優先サポート。見積もりはお問い合わせください。"
+      "description": "AIエージェントのチームと群れのためのsigelo relay：近日提供予定。それまでは自分のリレーを運用できます：オープンソースで、あなたのオペレーターとそのエージェントだけが使えます。"
     }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "source": "afc3460c448db3d6db509bae6bcfc2f86a5d3150daa761a9ce3b7d94b06bb282",
+  "source": "13108fee88df3dd5ced5ef38e70ff0513d33240ee2da2da6ae3733241d3d60bf",
   "lang": "cs",
   "name": "Čeština",
   "other": "Další jazyky",
@@ -50,7 +50,7 @@
     },
     "enterprise": {
       "title": "Enterprise: týmy a roje agentů",
-      "description": "sigelo relay pro firmy s týmy a roji AI agentů: limity na míru, vlastní relay, přednostní podpora. Nabídku vám pošleme na vyžádání."
+      "description": "sigelo relay pro týmy a roje AI agentů: brzy. Do té doby provozujte vlastní relay: open source, jen pro vaše operátory a jejich agenty."
     }
   }
 }

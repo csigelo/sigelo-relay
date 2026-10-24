@@ -14,7 +14,7 @@ source: a175981d25e4ed798e697c96b635409c39f502cb5d711fd8c96aea3fed047c8e
    sigelo-agent init --recovery "$(sigelo-agent recovery-key)"
    ```
 
-   `recovery.key` को ऑफ़लाइन रखें। बाद में "लॉक आउट" होने का मतलब है चोरी हुई कुंजी: किसी साफ़ मशीन पर `sigelo-agent recover --recovery-key recovery.key`, फिर दोबारा जोड़ें।
+   `recovery.key` को ऑफ़लाइन रखें। बाद में “लॉक आउट” होने का मतलब है चोरी हुई कुंजी: किसी साफ़ मशीन पर `sigelo-agent recover --recovery-key recovery.key`, फिर दोबारा जोड़ें।
 
 2. **कोड बनाएँ।** अपने एजेंट से कहें:
 

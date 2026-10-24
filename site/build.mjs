@@ -5,6 +5,7 @@
 //   node relay/site/build.mjs           build, and list what is still open before a deploy
 //   node relay/site/build.mjs --final   refuse while anything is open or wrong (the deploy gate)
 //   node relay/site/build.mjs --stale   the translations whose English page changed since (i18n/)
+//   node relay/site/build.mjs --glossary  write the glossary (GLOSSARY) into the translations of i18n/
 //   node relay/site/build.mjs --launch  in the private tree: the official statement, then what npm
 //                                       serves; writes relay/site/launch.json when both pass (launchGate)
 //
@@ -109,8 +110,8 @@ export const DOMAINS = [
   { name: 'sigelo.io', role: 'content', what: 'protocol' },
   { name: 'sigelo.ai', role: 'content', what: 'relay and front page' },
   { name: 'sigelo.net', role: 'redirect', to: 'sigelo.ai', live: true },
-  { name: 'sigelo.online', role: 'redirect', to: 'sigelo.ai', live: false },
-  { name: 'sigelo.dev', role: 'redirect', to: 'sigelo.io', live: false },
+  { name: 'sigelo.online', role: 'redirect', to: 'sigelo.ai', live: true },
+  { name: 'sigelo.dev', role: 'reserved', what: 'code forge, planned' },
   { name: 'sigelo.org', role: 'parked' },
 ];
 export const HOSTS = [{ name: HOST, what: 'relay broker' }];
@@ -181,7 +182,7 @@ export const PAGES = [
   { slug: 'contact', nav: 'Contact', title: 'Contact',
     description: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.' },
   { slug: 'enterprise', nav: 'Enterprise', foot: true, title: 'Enterprise: teams and swarms of agents',
-    description: 'sigelo relay for companies running teams and swarms of AI agents: allowances sized to you, your own relay, priority support. Contact us for a quote.' },
+    description: 'sigelo relay for teams and swarms of AI agents: coming soon. Until then, run your own relay: open source, closed to your operators and their agents.' },
   { slug: 'privacy', nav: 'Privacy', foot: true, title: 'Privacy: what the relay keeps',
     description: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.' },
   { slug: 'terms', nav: 'Terms', foot: true, title: 'Terms of service',
@@ -233,14 +234,18 @@ export const englishStrings = () => ({
   pages: Object.fromEntries(PAGES.filter((p) => TRANSLATED.includes(p.slug)).map((p) => [p.slug, { title: p.title, description: p.description, ...(p.pending && { pending: p.pending }) }])),
 });
 export const englishStringsHash = () => sha256(JSON.stringify(englishStrings()));
-// A translation's numbers in its locale: every {{value}}'s digits (not the SimpleX address), and each
-// price (n.nn followed by €) and whole amount or percentage, with the € sign kept where English has it. English text is untouched.
+// A translation's numbers in its locale: every {{value}}'s digits (not the SimpleX address), each
+// price (n.nn followed by €) and whole amount, with the € sign kept where English has it, and each
+// percentage with the sign where the locale puts it. English text is untouched.
 export function localize(text, lang) {
   if (!lang) return text;
   const cents = new Intl.NumberFormat(lang.lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // Whole amounts and percentages too ("0 €", "10 %"): the same digits in Latin script, a locale's own elsewhere (bn).
   const whole = new Intl.NumberFormat(lang.lang, { useGrouping: false });
-  return text.replace(/\d+\.\d\d(?=[ \u00a0]?€)|\b\d+(?=[ \u00a0]?[€%])/g, (n) => (n.includes('.') ? cents.format(Number(n)) : whole.format(Number(n))));
+  // A percentage as the locale writes it (CLDR, Intl): tr %20, de 20 %, it 20%.
+  const pct = new Intl.NumberFormat(lang.lang, { style: 'percent', useGrouping: false });
+  return text.replace(/\d+\.\d\d(?=[ \u00a0]?€)|\b\d+(?=[ \u00a0]?€)/g, (n) => (n.includes('.') ? cents.format(Number(n)) : whole.format(Number(n))))
+    .replace(/\b(\d+)[ \u00a0]?%/g, (_, n) => pct.format(Number(n) / 100));
 }
 export function fillIn(text, where, lang) {
   if (!lang) return fill(text, where);
@@ -285,6 +290,34 @@ export function translationRefusals(code, en, tr) {
   }
   return [...why, ...paymentDetailRefusals(Object.fromEntries(Object.entries(tr).map(([slug, t]) => [`${code}/${slug}.md`, t])))];
 }
+// The glossary (2026-10-24): locale conventions a translation is held to, applied to every
+// translated string as the build reads it (readLanguages), so a translation written again gets them
+// too; `node relay/site/build.mjs --glossary` writes them back into i18n/. Per language, [pattern,
+// replacement] over the prose only: code, link targets, {{values}} and URLs stay as written.
+// Percentages are localize()'s (Intl). A rule goes in only where the convention is certain.
+const IA = [[/\bAI\b/g, 'IA']]; // the Romance languages abbreviate their own words: IA
+const quotes = (open, close) => [[/"([^"\n]+)"/g, `${open}$1${close}`]]; // straight quotes in prose
+export const GLOSSARY = {
+  ca: IA, es: [...IA, ...quotes('«', '»')], fr: [...IA, ...quotes('« ', ' »')], it: [...IA, ...quotes('«', '»')], 'pt-br': [...IA, ...quotes('“', '”')],
+  'pt-pt': [...IA, ...quotes('“', '”')], ro: [...IA, ...quotes('„', '”')],
+  de: quotes('„', '“'), cs: quotes('„', '“'), pl: quotes('„', '”'), hu: quotes('„', '”'), ru: quotes('«', '»'), uk: quotes('«', '»'), el: quotes('«', '»'),
+  nb: quotes('«', '»'), da: quotes('»', '«'), sv: quotes('”', '”'), fi: quotes('”', '”'), ja: quotes('「', '」'), 'zh-tw': quotes('「', '」'),
+  'zh-cn': quotes('“', '”'), ko: quotes('“', '”'), nl: quotes('“', '”'), hi: quotes('“', '”'), bn: quotes('“', '”'), ta: quotes('“', '”'),
+  tr: quotes('“', '”'), id: quotes('“', '”'), vi: quotes('“', '”'), th: quotes('“', '”'),
+};
+const KEEP_RE = /^( *)```[^\n]*\n[\s\S]*?\n\1```$|`[^`\n]+`|\]\([^)\s]+\)|\{\{[\w.]+\}\}|https?:\/\/[^\s)]+/gm;
+// A translated text with its language's glossary applied. → text.
+export function glossed(code, text) {
+  const rules = GLOSSARY[code];
+  if (!rules) return text;
+  const prose = (t) => rules.reduce((x, [re, to]) => x.replace(re, to), t);
+  let out = '', at = 0;
+  for (const m of text.matchAll(KEEP_RE)) { out += prose(text.slice(at, m.index)) + m[0]; at = m.index + m[0].length; }
+  return out + prose(text.slice(at));
+}
+// lang.json with the glossary applied to what it translates (not its tag, own name or source hash).
+export const glossedMeta = (code, meta, key = '') => (typeof meta === 'string' ? (['source', 'lang', 'name', 'dir'].includes(key) ? meta : glossed(code, meta))
+  : meta && typeof meta === 'object' ? Object.fromEntries(Object.entries(meta).map(([k, v]) => [k, glossedMeta(code, v, k)])) : meta);
 // → the languages in i18n/, by code: { code, lang, name, other, nav, pages, md: { slug: body },
 // stale: [file …], why: [why …] }. md: the English pages (readPages).
 export function readLanguages(site = SITE, md = readPages(site)) {
@@ -295,7 +328,7 @@ export function readLanguages(site = SITE, md = readPages(site)) {
     const at = join(dir, code), stale = [], why = [], pages = {};
     if (!/^[a-z]{2}(?:-[a-z]{2})?$/.test(code)) why.push(`${code}: not a language tag as nginx.conf sends a folder to its home page: two letters, a region optional (de, pt-br)`);
     let meta = {};
-    try { meta = JSON.parse(readFileSync(join(at, 'lang.json'), 'utf8')); } catch { why.push(`${code}/lang.json: missing or not JSON`); }
+    try { meta = glossedMeta(code, JSON.parse(readFileSync(join(at, 'lang.json'), 'utf8'))); } catch { why.push(`${code}/lang.json: missing or not JSON`); }
     if (meta.source !== englishHash) stale.push(`${code}/lang.json`);
     if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
     for (const k of ['name', 'other', 'untranslated']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
@@ -316,9 +349,11 @@ export function readLanguages(site = SITE, md = readPages(site)) {
       const text = readFileSync(f, 'utf8'), m = text.match(FRONT_RE);
       if (!m) { why.push(`${code}/${slug}.md: does not begin with "---", "source: <sha256 of ${slug}.md>", "---"`); continue; }
       if (m[1] !== sha256(md[slug])) stale.push(`${code}/${slug}.md`);
-      pages[slug] = text.slice(m[0].length);
+      pages[slug] = glossed(code, text.slice(m[0].length));
     }
-    why.push(...translationRefusals(code, md, pages));
+    // A stale page is not compared with the English it no longer translates: it is not served (the
+    // English page is, at its URL), so its language stays published.
+    why.push(...translationRefusals(code, md, Object.fromEntries(Object.entries(pages).filter(([slug]) => !stale.includes(`${code}/${slug}.md`)))));
     return { ...meta, code, md: pages, stale, why };
   });
 }
@@ -540,7 +575,7 @@ export const everyDirective = (b) => [...b.directives, ...b.blocks.flatMap(every
 // (sigelo.io's host) no longer serves sigelo.ai, and each live redirect in DOMAINS answers 301 to its
 // target there. The file is read, not the live server: it is what the next deploy of sigelo.io
 // serves, so the record can be written before that deploy. A redirect marked live: false (its DNS
-// does not reach us yet: sigelo.online, sigelo.dev) is not required. And
+// does not reach us yet) is not required. And
 // the install line connect.md and index.json give works: the sigelo-agent package no longer refuses
 // the contact verbs when installed from npm. The private tree is the one with sigelo.io's
 // site/build.mjs beside relay/; there every file named here must be found. Elsewhere they are
@@ -1269,6 +1304,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     domains: DOMAINS.map((d) => d.name), content: CONTENT_HOSTS,
     roles: Object.fromEntries([...DOMAINS.filter((d) => d.role === 'content'), ...HOSTS].map((d) => [d.name, d.what])),
     redirects: redirects(true), redirects_pending_dns: redirects(false), parked: DOMAINS.filter((d) => d.role === 'parked').map((d) => d.name),
+    reserved: Object.fromEntries(DOMAINS.filter((d) => d.role === 'reserved').map((d) => [d.name, d.what])),
     repositories: REPOSITORIES, issuer_did: ISSUER_DID, vendor_did: vendorSet ? vendor : null, seller,
     payment_details_only_on: PAYMENT_PLACES,
     never_asks_for: ['seed', 'identity or wallet private key', 'token'],
@@ -1379,6 +1415,20 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       console.log(`relay/site/build --launch: ${checked} (${Object.entries(seen.npm).map(([k, v]) => `${k} ${v}`).join(', ')}); wrote relay/site/${LAUNCH_RECORD}: commit it, then export`);
     }
     process.exit(why.length ? 1 : 0);
+  }
+  if (process.argv.includes('--glossary')) {
+    // The glossary written into i18n/: each file that differs from its glossed self, rewritten.
+    const dir = join(SITE, I18N);
+    let n = 0;
+    for (const code of readdirSync(dir).filter((c) => GLOSSARY[c]).sort()) {
+      for (const f of readdirSync(join(dir, code)).sort()) {
+        const file = join(dir, code, f), text = readFileSync(file, 'utf8'), m = text.match(FRONT_RE);
+        const out = f === 'lang.json' ? `${JSON.stringify(glossedMeta(code, JSON.parse(text)), null, 2)}\n` : m ? m[0] + glossed(code, text.slice(m[0].length)) : text;
+        if (out !== text) { writeFileSync(file, out); n++; console.log(`glossary: ${code}/${f}`); }
+      }
+    }
+    console.log(`relay/site/build --glossary: ${n} files rewritten`);
+    process.exit(0);
   }
   if (process.argv.includes('--stale')) {
     // The translations to refresh, each with the source hash to write once it is: then exit 1.

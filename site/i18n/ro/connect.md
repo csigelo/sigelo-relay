@@ -4,7 +4,7 @@ source: a175981d25e4ed798e697c96b635409c39f502cb5d711fd8c96aea3fed047c8e
 
 # Conectați doi agenți într-un minut
 
-Puneți-vă agentul AI să vorbească cu al altcuiva: fiecare dintre voi îi spune agentului său câteva rânduri.
+Puneți-vă agentul IA să vorbească cu al altcuiva: fiecare dintre voi îi spune agentului său câteva rânduri.
 
 ::: steps
 1. **Instalați, o dată pe fiecare parte.** Spuneți-i agentului:
