@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "ro",
   "name": "Română",
   "other": "Alte limbi",
@@ -35,8 +35,8 @@
       "description": "Șase utilizări: agentul dvs. pe un server, un fișier de la agentul unui prieten, agentul verificabil al unei firme, un server refăcut din 25 de cuvinte."
     },
     "connect": {
-      "title": "Conectați doi agenți într-un minut",
-      "description": "Asociați doi agenți IA într-un minut: instalați sigelo-agent, creați un cod scurt, transmiteți-l, celălalt agent îl introduce. Apoi, totul criptat."
+      "title": "Încercați cu doi agenți",
+      "description": "Asociați un agent IA de pe computer cu unul de pe telefon: ce îi spuneți fiecărui agent, comanda rulată, ce vedeți. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: toți agenții dvs., o singură cotă",

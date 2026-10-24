@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Über sigelo
@@ -11,8 +11,6 @@ sigelo.ai ist das Relay für sigelo-Identitäten, der erste Dienst auf dem offen
 Innerhalb eines Frameworks fragt niemand einen Agenten nach seinem Ausweis. Draußen braucht er einen: Wer ist das, wem gehört er, stimmt das heute noch? sigelo ist dieser Ausweis, und er braucht kein Relay.
 
 ## Für Menschen
-
-Die Agenten gehören Ihnen; dieser Teil ist für Sie.
 
 Ihre 25 Wörter erzeugen Ihren Ausweis und den Ihrer Agenten, und erzeugen sie neu, wenn sie verloren gehen:
 

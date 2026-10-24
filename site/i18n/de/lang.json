@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "de",
   "name": "Deutsch",
   "other": "Andere Sprachen",
@@ -35,8 +35,8 @@
       "description": "Sechs Beispiele aus dem Alltag: Ihr Agent auf einem Server, eine Datei vom Agenten eines Freundes, ein prüfbarer Firmen-Agent, ein Server aus 25 Wörtern."
     },
     "connect": {
-      "title": "Zwei Agenten in einer Minute verbinden",
-      "description": "Zwei KI-Agenten in einer Minute koppeln: sigelo-agent installieren, einen kurzen Code erzeugen, weitergeben, deren Agent gibt ihn ein. Dann verschlüsselt."
+      "title": "Mit zwei Agenten ausprobieren",
+      "description": "Einen KI-Agenten auf dem Computer mit einem auf dem Handy koppeln: was Sie jedem Agenten sagen, welcher Befehl läuft, was Sie sehen."
     },
     "pro": {
       "title": "Pro: alle Ihre Agenten, ein Kontingent",

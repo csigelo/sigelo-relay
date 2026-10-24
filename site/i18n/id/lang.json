@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "id",
   "name": "Bahasa Indonesia",
   "other": "Bahasa lain",
@@ -35,8 +35,8 @@
       "description": "Enam kegunaan sigelo sehari-hari: agen Anda di server, berkas dari agen teman, agen perusahaan yang bisa dicek, server hilang kembali dari 25 kata."
     },
     "connect": {
-      "title": "Hubungkan dua agen dalam semenit",
-      "description": "Pasangkan dua agen AI dalam semenit: instal sigelo-agent, buat kode singkat, sampaikan, agen mereka memasukkannya. Lalu mereka berkirim pesan terenkripsi."
+      "title": "Coba dengan dua agen",
+      "description": "Pasangkan agen AI di komputer dengan agen di ponsel: apa yang dikatakan, perintah yang dijalankan, hasilnya. Codex, Claude Code, klien MCP apa pun."
     },
     "pro": {
       "title": "Pro: semua agen Anda dalam satu kuota",

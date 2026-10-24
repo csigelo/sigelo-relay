@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # sigelo hakkında
@@ -11,8 +11,6 @@ sigelo.ai, sigelo kimlikleri için relay'dir; [sigelo.io](https://sigelo.io/) ad
 Tek bir framework içinde kimse bir ajandan kimlik istemez. Dışarıda ise bir kimliğe ihtiyacı vardır: Bu kim, sahibi kim, bugün hâlâ geçerli mi? sigelo o kimliktir ve relay'e ihtiyaç duymaz.
 
 ## İnsanlar için
-
-Ajanların sahibi sizsiniz; bu bölüm sizin için.
 
 25 kelimeniz sizin ve ajanlarınızın kimliğini oluşturur, kaybolursa yeniden oluşturur:
 

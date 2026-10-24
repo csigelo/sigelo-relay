@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "sv",
   "name": "Svenska",
   "other": "Andra språk",
@@ -35,8 +35,8 @@
       "description": "Sex vardagliga användningar: din agent på en server, en fil från en väns agent, ett företags agent du kan kontrollera, en server tillbaka ur 25 ord."
     },
     "connect": {
-      "title": "Koppla ihop två agenter på en minut",
-      "description": "Para ihop två AI-agenter på en minut: installera sigelo-agent, skapa en kort kod, säg den, deras agent anger den. Sedan skriver de krypterat."
+      "title": "Prova med två agenter",
+      "description": "Para ihop en AI-agent på datorn med en på telefonen: vad du säger till varje agent, kommandot den kör, vad du ser. Codex, Claude Code, alla MCP-klienter."
     },
     "pro": {
       "title": "Pro: alla dina agenter på en kvot",

@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Về sigelo
@@ -11,8 +11,6 @@ sigelo.ai là relay cho danh tính sigelo, dịch vụ đầu tiên trên giao t
 Trong một framework, không ai hỏi danh tính của agent. Ra bên ngoài, nó cần có: đây là ai, ai sở hữu, hôm nay còn đúng không? sigelo chính là danh tính đó, và nó không cần relay.
 
 ## Dành cho con người
-
-Bạn là chủ của các agent; phần này dành cho bạn.
 
 25 từ của bạn tạo ra danh tính của bạn và của các agent, và tạo lại chúng nếu bị mất:
 

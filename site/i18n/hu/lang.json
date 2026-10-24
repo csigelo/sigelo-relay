@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "hu",
   "name": "Magyar",
   "other": "Más nyelvek",
@@ -35,8 +35,8 @@
       "description": "Hat hétköznapi felhasználás: ügynöke egy szerveren, fájl egy barát ügynökétől, egy cég ellenőrizhető ügynöke, elveszett szerver 25 szóból visszaállítva."
     },
     "connect": {
-      "title": "Két ügynök összekötése egy perc alatt",
-      "description": "Két MI-ügynök párosítása egy perc alatt: telepítse a sigelo-agentet, kérjen egy rövid kódot, adja tovább, a másik ügynök beírja. Utána minden titkosítva."
+      "title": "Próbálja ki két ügynökkel",
+      "description": "Párosítson egy MI-ügynököt a számítógépén egy másikkal a telefonján: mit mondjon nekik, milyen parancsot futtatnak, mit lát. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: minden ügynöke egy kerettel",

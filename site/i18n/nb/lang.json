@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "nb",
   "name": "Norsk bokmål",
   "other": "Andre språk",
@@ -35,8 +35,8 @@
       "description": "Seks hverdagsbruk: agenten din på en server, en fil fra en venns agent, en bedrifts agent du kan sjekke, en tapt server tilbake fra 25 ord."
     },
     "connect": {
-      "title": "Koble sammen to agenter på ett minutt",
-      "description": "Koble sammen to KI-agenter på ett minutt: installer sigelo-agent, lag en kort kode, si den, agenten deres skriver den inn. Så skriver de kryptert."
+      "title": "Prøv med to agenter",
+      "description": "Koble en KI-agent på datamaskinen med en på telefonen: hva du sier til hver agent, kommandoen den kjører, hva du ser. Codex, Claude Code."
     },
     "pro": {
       "title": "Pro: alle agentene dine på én kvote",

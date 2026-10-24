@@ -77,8 +77,8 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-const PROSE_BUDGET = { index: 135, connect: 160, pro: 180, enterprise: 130, contact: 110, about: 140, examples: 170 };
-const FILE_BUDGET = { index: 215, connect: 200, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 165, examples: 200, 404: 40 };
+const PROSE_BUDGET = { index: 135, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 140, examples: 170 };
+const FILE_BUDGET = { index: 215, connect: 450, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 165, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -159,7 +159,9 @@ for (const p of PAGES) {
 
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
-const H1 = { index: 'By AI, for AI.', connect: 'Connect two agents in a minute', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
+// The why (2026-10-24), the first paragraph of both sites' home pages: one scene a newcomer gets.
+const WHY = "Your agent books, buys and asks for you. To the other side it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID of its own that anyone can check, no server needed: it proves who it is, keeps what others said about it, and gets paid.";
+const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
   contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
 // takes its numbers from relay/allowance.mjs TIERS and names the largest message, not a retention: a
@@ -169,13 +171,13 @@ const sizeOf = (b) => (b % (1024 * 1024) === 0 ? `${b / 1024 / 1024} MB` : `${b 
 // or a link preview shows the title and description, not the page's first paragraph (X2 review).
 // HEAD(pending) → { TITLE, DESC }; the on-sale heads are checked on the --final build below.
 const HEAD = (pending) => ({
-  TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Connect two agents in a minute — sigelo relay',
+  TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Try it with two agents — sigelo relay',
     pro: 'Pro: all your agents on one allowance — sigelo relay', enterprise: 'Enterprise: teams and swarms of agents — sigelo relay', contact: 'Contact — sigelo relay',
     privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', agents: 'For agents: Pro setup and data requests — sigelo relay',
     about: "About sigelo: your agents' ID — sigelo relay", examples: 'Examples: what you can do with it — sigelo relay', 404: 'Not found — sigelo relay' },
   DESC: {
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
-    connect: 'Pair two AI agents in a minute: install sigelo-agent, make a short code, say it, their agent enters it. Then they message end-to-end encrypted.',
+    connect: 'Pair an AI agent on your computer with one on your phone: what to tell each agent, the command it runs, what you see. Codex, Claude Code, any MCP client.',
     pro: `sigelo relay Pro: one allowance for all your agents, ${thou(allowance?.TIERS.pro.msgsDay)} messages a day, up to ${sizeOf(allowance?.TIERS.pro.maxMessage)} each. ${pending ? 'Coming soon; free until then.' : 'From 9.99 € a month, VAT included, for businesses.'}`,
     enterprise: 'sigelo relay for teams and swarms of AI agents: coming soon. Until then, run your own relay: open source, closed to your operators and their agents.',
     contact: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.',
@@ -313,19 +315,22 @@ for (const p of PAGES) {
     `${p.slug}: the header is the wordmark and About · Get started · Plans · Contact, the current page marked`);
 }
 ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEADER.map((p) => p.slug).join() === HEAD_LINKS.join(), 'footer and header: build.mjs FOOTER is the eight links, HEADER the four, in order');
-// The home page: the motto as its one H1, the subline, three sentences, the button to /connect; the
-// disclosure in the body (without the handle: a reader does not know it).
+// The home page: the motto as its one H1, the why (2026-10-24: a newcomer asked "why does an agent
+// need an identity when going online?"), the two layers, the button to /connect; the disclosure in
+// the body (without the handle: a reader does not know it). The why is sigelo.io's first paragraph too, word for word.
 {
   const hero = html.index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '';
   const ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1]));
-  const sentences = ps[1]?.split(/(?<=\.) /).length;
-  ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === 'Connect your agents to the agents you trust.' && sentences === 3
-    && /<div class="cta">\n<p><a href="\/connect\.html">Connect two agents in a minute →<\/a><\/p>\n<\/div>/.test(hero),
-    `index: the hero is the motto (H1), the subline, three sentences and the "Connect two agents in a minute" button to /connect (${sentences} sentences)`);
-  // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on / and /about.
+  ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
+    && /<div class="cta">\n<p><a href="\/connect\.html">Try it with two agents →<\/a><\/p>\n<\/div>/.test(hero),
+    `index: the hero is the motto (H1), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
+  const io = join(ROOT, 'site', 'src', 'index.md');
+  if (existsSync(io)) ok(readFileSync(io, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').split('\n').find((x) => /^[A-Za-z]/.test(x)) === WHY, 'sigelo.io /: its first paragraph is the same why, word for word');
+  // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on /about, right after the why on /.
   const LAYERS = 'sigelo.ai is the relay for sigelo identities, the first service on the open protocol at [sigelo.io](https://sigelo.io/): ';
-  ok(['index', 'about'].every((slug) => stripBoxes(src[slug]).replace(/^#.*\n+/gm, '').trimStart().startsWith(LAYERS) || src[slug].split('\n').find((x) => /^[a-z]/i.test(x) && !/^(Connect your agents)/.test(x))?.startsWith(LAYERS)),
-    'index, about: the first sentence says sigelo.ai is the relay for sigelo identities, built on the open protocol at sigelo.io');
+  const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY);
+  ok(['index', 'about'].every((slug) => firstLines(slug)[0]?.startsWith(LAYERS)),
+    'index, about: the first sentence (after the why) says sigelo.ai is the relay for sigelo identities, built on the open protocol at sigelo.io');
   ok(body.index.includes(DISCLOSURE.replace(', csigelo.', '.')) && DISCLOSURE.endsWith(', csigelo.'), 'index: the disclosure, "Built and operated by an AI agent under a human owner."');
   const cards = [...html.index.matchAll(/<div class="card( pro)?">\n<h3 id="[^"]+">([^<]+)<\/h3>/g)].map((m) => m[2]);
   ok(cards.join() === 'Free,Pro,Enterprise' && /<div class="card">\n<h3 id="enterprise">Enterprise<\/h3>\n<p>Teams and swarms of agents\.<\/p>\n<p><strong><a href="\/contact\.html">Contact us<\/a><\/strong><\/p>/.test(html.index),
@@ -583,13 +588,10 @@ for (const l of LANGS) {
   ok(new Set(LANGS.map((l) => l.name)).size === LANGS.length && LANGS.every((l) => l.name !== 'English' && !/<|&/.test(l.name + l.other)),
     'languages: each named by its own name, once');
 }
-const FIRST_SENTENCE = { de: 'Verbinde', es: 'Conecta', fr: 'Connectez', it: 'Collega', ja: 'あなた', nl: 'Verbind', pl: 'Połącz', 'pt-br': 'Conecte',
-  'zh-cn': '把您的', 'zh-tw': '把您的', ko: '신뢰하는',
-  ru: 'Соедините', uk: "З'єднайте", cs: 'Propojte', hi: 'अपने एजेंटों', bn: 'আপনার এজেন্টদের', ta: 'நீங்கள் நம்பும்', ar: 'صِل وكلاءك', el: 'Συνδέστε τους',
-  sv: 'Koppla ihop', da: 'Forbind dine', nb: 'Koble agentene', fi: 'Yhdistä agenttisi', ro: 'Conectați', hu: 'Kösse', 'pt-pt': 'Ligue',
-  tr: 'Ajanlarınızı', id: 'Hubungkan', vi: 'Kết nối', th: 'เชื่อม' };
-ok(LANGS.every((l) => { const ps = [...(thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '').matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1])); return ps[0]?.startsWith(FIRST_SENTENCE[l.code] ?? '') && (l.code === 'th' || ps[1]?.split(/(?<=[.।]) |(?<=。)/).filter(Boolean).length === 3); }),
-  'home page in every language: the subline first (pinned per language), then three sentences, as the English (Thai, which ends a sentence with a space alone, not counted)');
+// The hero in every language as in English (2026-10-24): the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect.
+ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '', ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
+  return hero.includes(`<h1 id=`) && ps.length === 3 && !ps[0].includes('<a ') && ps[1].includes('<a href="https://sigelo.io/">') && ps[2].startsWith(`<a href="/${l.code}/connect.html">`); }),
+  'home page in every language: the motto, the why, the two layers linking sigelo.io, the button to its /connect, as the English');
 {
   // The home page's title in each language, pinned (the head a search result shows).
   const HOME_TITLE = {"de":"sigelo relay — verschlüsselte Nachrichten für KI-Agenten", "es":"sigelo relay — mensajes cifrados para agentes de IA", "fr":"sigelo relay — messagerie chiffrée pour agents IA", "it":"sigelo relay — messaggi cifrati per agenti IA", "ja":"sigelo relay — AIエージェントのための暗号化メッセージ", "nl":"sigelo relay — versleutelde berichten voor AI-agents", "pl":"sigelo relay — szyfrowane wiadomości dla agentów AI", "pt-br":"sigelo relay — mensagens criptografadas para agentes de IA",
@@ -1144,7 +1146,7 @@ try {
       'stale: an edit to the English pro.md makes every pro.md translation fall back to it, and /pro carries no hreflang; the other pages keep theirs');
     // A stale page is not held to the English it no longer translates: a new code block in the
     // English connect.md leaves every language published, its connect page falling back.
-    const fenced = both(copySite(edit('connect.md', 'sigelo-agent invite --name bob\n', 'sigelo-agent invite --name bob --days 1\n')));
+    const fenced = both(copySite(edit('connect.md', 'sigelo-agent invite --name phone\n', 'sigelo-agent invite --name phone --days 1\n')));
     ok(fenced.refused === null && LANGS.every((l) => fenced.r1.languages.includes(l.code) && fenced.r1.stale.includes(`${l.code}/connect.md`) && isFallback(at(fenced, `${l.code}/connect.html`), l, 'connect'))
       && at(fenced, 'de/pro.html').startsWith('<!doctype html>\n<html lang="de">'),
       'stale: a code block changed in the English connect.md: every language stays published, its connect page the English one');
@@ -1178,14 +1180,23 @@ try {
 // The install line is the sidecar package that carries the contact verbs from release 0.1.2. On
 // /connect each step's lines sit in its own code block, under the step, framed as what you tell your
 // agent; quickStart() reads them back in order.
-const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name bob', 'sigelo-agent accept K7F3-Q9ZP --name alice',
-  'sigelo-agent inbox', 'sigelo-agent send bob "hello"'];
-const steps4 = [...src.connect.matchAll(/^(\d)\. \*\*([^*]+)\*\*/gm)].map((m) => `${m[1]} ${m[2]}`);
-ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps4.join() === '1 Install, once on each side.,2 Make a code.,3 They enter it.,4 Talk.'
-  && (src.connect.match(/^ {3}```sh$/gm) ?? []).length === 4 && /::: steps\n1\. /.test(src.connect) && (src.connect.match(/[Tt]ells? (?:your|their) agent/g) ?? []).length >= 4,
-  `connect: four numbered steps, each with its command block (install and recovery key, invite --name, accept, inbox and send), framed as what you tell your agent (${steps4.join('; ')})`);
-ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 4 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 4,
-  'connect: the steps render as one numbered list, four items, a code block in each');
+const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name phone', 'sigelo-agent accept K7F3-Q9ZP --name laptop',
+  'sigelo-agent inbox', 'sigelo-agent send phone "hello"', 'sigelo-agent inbox', 'sigelo-agent send laptop "hi back"'];
+// 2026-10-24 ("Try it with two agents"): a computer and a phone; each step one sentence to say and the command the agent runs, and what you see;
+// above them which agents can do it (a chat-only app cannot) and one box to paste to each agent (≤ 120 words).
+const steps5 = [...src.connect.matchAll(/^(\d)\. \*\*([^*]+)\*\*/gm)].map((m) => `${m[1]} ${m[2]}`);
+const pasteBox = src.connect.match(/^```text\n([\s\S]*?)\n```$/m)?.[1] ?? '';
+ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === '1 Install, on each side.,2 Make a code, on the computer.,3 Enter it, on the phone.,4 Finish, on the computer.,5 Talk.'
+  && (src.connect.match(/^ {3}```sh$/gm) ?? []).length === 5 && /::: steps\n1\. /.test(src.connect) && (src.connect.match(/[Ss]ay: "|: "[A-Z][^"]+\." /g) ?? []).length >= 5
+  && (src.connect.match(/You see /g) ?? []).length >= 3,
+  `connect: five numbered steps, each a sentence to say, its command block and what you see (${steps5.join('; ')})`);
+ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
+  `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
+ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /Android coming soon/.test(src.connect),
+  'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app; Android coming soon)');
+ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
+  'connect: the steps render as one numbered list, five items, a code block in each');
 // index.json's commands are build.mjs's: connect.md's blocks after the install line, line for line.
 // An agent reads index.json (the live test did): with `init --recovery <z…>` there and no way to
 // make the key, it was stuck where a reader of the page was not.

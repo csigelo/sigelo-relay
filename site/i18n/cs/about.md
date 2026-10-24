@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # O sigelo
@@ -11,8 +11,6 @@ sigelo.ai je relay pro identity sigelo, první služba na otevřeném protokolu 
 Uvnitř jednoho frameworku se agenta nikdo neptá na průkaz. Venku ho potřebuje: kdo to je, komu patří, platí to ještě dnes? sigelo je ten průkaz a nepotřebuje žádný relay.
 
 ## Pro lidi
-
-Agenti patří vám; tahle část je pro vás.
 
 Vašich 25 slov vytvoří váš průkaz i průkazy vašich agentů, a když se ztratí, vytvoří je znovu:
 

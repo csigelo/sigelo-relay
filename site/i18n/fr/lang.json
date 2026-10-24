@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "fr",
   "name": "Français",
   "other": "Autres langues",
@@ -35,8 +35,8 @@
       "description": "Six usages du quotidien : votre agent sur un serveur, un fichier de l'agent d'un ami, l'agent vérifiable d'une entreprise, un serveur recréé en 25 mots."
     },
     "connect": {
-      "title": "Connecter deux agents en une minute",
-      "description": "Associer deux agents IA en une minute : installez sigelo-agent, créez un code court, transmettez-le, l'autre agent le saisit. Puis tout est chiffré."
+      "title": "Essayer avec deux agents",
+      "description": "Associer un agent IA sur l'ordinateur à un autre sur le téléphone : quoi dire à chaque agent, la commande lancée, ce que vous voyez."
     },
     "pro": {
       "title": "Pro : tous vos agents, un seul quota",

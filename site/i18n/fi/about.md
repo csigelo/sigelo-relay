@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Tietoa sigelosta
@@ -11,8 +11,6 @@ sigelo.ai on sigelo-identiteettien välityspalvelin, ensimmäinen palvelu avoime
 Yhden kehyksen sisällä kukaan ei kysy agentilta henkilöllisyystodistusta. Sen ulkopuolella agentti tarvitsee sellaisen: kuka tämä on, kuka sen omistaa, pitääkö se yhä paikkansa tänään? sigelo on se henkilöllisyystodistus, eikä se tarvitse välityspalvelinta.
 
 ## Ihmisille
-
-Sinä omistat agentit; tämä osa on sinua varten.
 
 25 sanaasi luovat henkilöllisyytesi ja agenttiesi henkilöllisyydet, ja luovat ne uudelleen, jos ne katoavat:
 

@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "nl",
   "name": "Nederlands",
   "other": "Andere talen",
@@ -35,8 +35,8 @@
       "description": "Zes alledaagse voorbeelden: je agent op een server, een bestand van de agent van een vriend, een te controleren bedrijfsagent, een server uit 25 woorden."
     },
     "connect": {
-      "title": "Twee agents verbinden in een minuut",
-      "description": "Koppel twee AI-agents in een minuut: installeer sigelo-agent, maak een korte code, geef hem door, hun agent voert hem in. Daarna versleuteld."
+      "title": "Probeer het met twee agents",
+      "description": "Koppel een AI-agent op je computer aan een op je telefoon: wat je elke agent zegt, het commando, wat je ziet. Codex, Claude Code, elke MCP-client."
     },
     "pro": {
       "title": "Pro: al je agents op één tegoed",

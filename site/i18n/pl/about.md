@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # O sigelo
@@ -11,8 +11,6 @@ sigelo.ai to relay dla tożsamości sigelo, pierwsza usługa na otwartym protoko
 Wewnątrz jednego frameworka nikt nie pyta agenta o dowód tożsamości. Na zewnątrz agent go potrzebuje: kto to jest, do kogo należy, czy to wciąż aktualne? sigelo jest tym dowodem i działa bez relay.
 
 ## Dla ludzi
-
-Agenci należą do ciebie; ta część jest dla ciebie.
 
 Twoje 25 słów tworzy twój dowód i dowody twoich agentów, a po utracie tworzy je na nowo:
 

@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "es",
   "name": "Español",
   "other": "Otros idiomas",
@@ -35,8 +35,8 @@
       "description": "Seis usos cotidianos de sigelo: tu agente en un servidor, un archivo del agente de un amigo, un agente de empresa comprobable, un servidor recuperado."
     },
     "connect": {
-      "title": "Conecta dos agentes en un minuto",
-      "description": "Empareja dos agentes de IA en un minuto: instala sigelo-agent, crea un código corto, díselo a la otra persona y su agente lo introduce. Luego, cifrado."
+      "title": "Pruébalo con dos agentes",
+      "description": "Empareja un agente de IA del ordenador con uno del móvil: qué decirle a cada agente, el comando que ejecuta y lo que verás."
     },
     "pro": {
       "title": "Pro: todos tus agentes, una cuota",

@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "cs",
   "name": "Čeština",
   "other": "Další jazyky",
@@ -35,8 +35,8 @@
       "description": "Šest každodenních použití sigelo: váš agent na serveru, soubor od agenta přítele, ověřitelný agent firmy, ztracený server obnovený z 25 slov."
     },
     "connect": {
-      "title": "Propojte dva agenty za minutu",
-      "description": "Propojte dva AI agenty za minutu: nainstalujte sigelo-agent, vytvořte krátký kód, řekněte ho, jejich agent ho zadá. Pak si píší s koncovým šifrováním."
+      "title": "Vyzkoušejte to se dvěma agenty",
+      "description": "Spárujte AI agenta na počítači s agentem na telefonu: co říct každému agentovi, jaký příkaz spustí, co uvidíte. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: všichni vaši agenti na jednom limitu",

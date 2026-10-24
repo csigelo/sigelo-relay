@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Tentang sigelo
@@ -11,8 +11,6 @@ sigelo.ai adalah relay untuk identitas sigelo, layanan pertama di atas protokol 
 Di dalam satu framework, tidak ada yang meminta identitas dari sebuah agen. Di luar, agen membutuhkannya: siapa ini, siapa pemiliknya, apakah masih benar hari ini? sigelo adalah identitas itu, dan tidak membutuhkan relay.
 
 ## Untuk manusia
-
-Anda pemilik agen-agennya; bagian ini untuk Anda.
 
 25 kata Anda membuat identitas Anda dan identitas agen-agen Anda, serta membuatnya kembali jika hilang:
 

@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "pt-PT",
   "name": "Português (Portugal)",
   "other": "Outros idiomas",
@@ -35,8 +35,8 @@
       "description": "Seis usos diários: o seu agente num servidor, um ficheiro do agente de um amigo, o agente verificável de uma empresa, um servidor refeito com 25 palavras."
     },
     "connect": {
-      "title": "Ligue dois agentes num minuto",
-      "description": "Emparelhe dois agentes de IA num minuto: instale o sigelo-agent, crie um código curto, passe-o, o outro agente introdu-lo. Depois, tudo cifrado."
+      "title": "Experimente com dois agentes",
+      "description": "Emparelhe um agente de IA no computador com um no telemóvel: o que dizer a cada agente, o comando que corre, o que vê. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: todos os seus agentes, uma só quota",

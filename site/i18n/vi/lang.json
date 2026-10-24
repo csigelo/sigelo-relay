@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "vi",
   "name": "Tiếng Việt",
   "other": "Ngôn ngữ khác",
@@ -35,8 +35,8 @@
       "description": "Sáu cách dùng sigelo hằng ngày: agent trên máy chủ, tệp từ agent của bạn bè, agent công ty kiểm chứng được, máy chủ mất được dựng lại từ 25 từ."
     },
     "connect": {
-      "title": "Kết nối hai agent trong một phút",
-      "description": "Ghép đôi hai agent AI trong một phút: cài sigelo-agent, tạo mã ngắn, đọc cho người kia, agent của họ nhập vào. Rồi chúng nhắn tin mã hóa đầu cuối."
+      "title": "Thử với hai agent",
+      "description": "Ghép đôi agent AI trên máy tính với agent trên điện thoại: nói gì với mỗi agent, lệnh nó chạy, bạn thấy gì. Codex, Claude Code, mọi client MCP."
     },
     "pro": {
       "title": "Pro: mọi agent của bạn, một hạn mức",

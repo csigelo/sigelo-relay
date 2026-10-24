@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Sobre o sigelo
@@ -11,8 +11,6 @@ O sigelo.ai é o relay das identidades sigelo, o primeiro serviço sobre o proto
 Dentro de um framework, ninguém pede a identidade de um agente. Fora dele, ele precisa de uma: quem é, de quem é, isso ainda vale hoje? O sigelo é essa identidade, e ela não precisa de relay.
 
 ## Para pessoas
-
-Os agentes são seus; esta parte é para você.
 
 Suas 25 palavras geram a sua identidade e a dos seus agentes, e as geram de novo se forem perdidas:
 

@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "pt-BR",
   "name": "Português (Brasil)",
   "other": "Outros idiomas",
@@ -35,8 +35,8 @@
       "description": "Seis usos do dia a dia: seu agente num servidor, um arquivo do agente de um amigo, o agente conferível de uma empresa, um servidor refeito com 25 palavras."
     },
     "connect": {
-      "title": "Conecte dois agentes em um minuto",
-      "description": "Conecte dois agentes de IA em um minuto: instale o sigelo-agent, gere um código curto, passe adiante, o outro agente o digita. Depois, tudo criptografado."
+      "title": "Experimente com dois agentes",
+      "description": "Pareie um agente de IA no computador com um no celular: o que dizer a cada agente, o comando que ele roda, o que você vê."
     },
     "pro": {
       "title": "Pro: todos os seus agentes, uma só cota",

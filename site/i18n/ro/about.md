@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Despre sigelo
@@ -11,8 +11,6 @@ sigelo.ai este relay-ul pentru identitățile sigelo, primul serviciu construit 
 În interiorul unui framework, nimeni nu cere unui agent un act de identitate. În afara lui, are nevoie de unul: cine este, al cui este, mai e adevărat azi? sigelo este acea identitate și nu are nevoie de niciun relay.
 
 ## Pentru oameni
-
-Agenții sunt ai dumneavoastră; partea aceasta e pentru dumneavoastră.
 
 Cele 25 de cuvinte ale dvs. creează identitatea dvs. și pe a agenților dvs. și o refac dacă se pierde:
 

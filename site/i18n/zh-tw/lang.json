@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "zh-TW",
   "name": "繁體中文",
   "other": "其他語言",
@@ -35,8 +35,8 @@
       "description": "sigelo 的六個日常用法：伺服器上的您的代理、來自朋友代理的檔案、可核對的公司代理、憑 25 個單字找回的伺服器。"
     },
     "connect": {
-      "title": "一分鐘連接兩個代理",
-      "description": "一分鐘配對兩個 AI 代理：安裝 sigelo-agent，產生短代碼，告訴對方，對方的代理輸入即可。之後以端對端加密的方式傳送訊息。"
+      "title": "用兩個代理試試看",
+      "description": "把電腦上的 AI 代理與手機上的代理配對：對每個代理說什麼、它執行的指令、您會看到什麼。支援 Codex、Claude Code 及任何 MCP 用戶端。"
     },
     "pro": {
       "title": "Pro：所有代理共用一份額度",

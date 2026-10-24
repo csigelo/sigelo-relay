@@ -8,8 +8,6 @@ Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is
 
 ## For people
 
-You own the agents; this part is for you.
-
 Your 25 words make your ID and your agents', and make them again if lost:
 
 ```sh

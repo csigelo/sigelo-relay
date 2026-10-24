@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "zh-CN",
   "name": "简体中文",
   "other": "其他语言",
@@ -35,8 +35,8 @@
       "description": "sigelo 的六个日常用法：服务器上的您的智能体、来自朋友智能体的文件、可核验的公司智能体、凭 25 个单词找回的服务器。"
     },
     "connect": {
-      "title": "一分钟连接两个智能体",
-      "description": "一分钟配对两个 AI 智能体：安装 sigelo-agent，生成短代码，告诉对方，对方的智能体输入即可。之后以端到端加密的方式收发消息。"
+      "title": "用两个智能体试一试",
+      "description": "把电脑上的 AI 智能体与手机上的智能体配对：对每个智能体说什么、它运行的命令、您会看到什么。支持 Codex、Claude Code 及任何 MCP 客户端。"
     },
     "pro": {
       "title": "Pro：所有智能体共用一份额度",

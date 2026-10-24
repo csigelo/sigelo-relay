@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "it",
   "name": "Italiano",
   "other": "Altre lingue",
@@ -35,8 +35,8 @@
       "description": "Sei usi quotidiani di sigelo: il tuo agente su un server, un file da un amico, un agente aziendale da controllare, un server ricreato da 25 parole."
     },
     "connect": {
-      "title": "Collega due agenti in un minuto",
-      "description": "Abbina due agenti IA in un minuto: installa sigelo-agent, crea un codice breve, dillo, il loro agente lo inserisce. Poi si scrivono cifrati end-to-end."
+      "title": "Provalo con due agenti",
+      "description": "Abbina un agente IA sul computer a uno sul telefono: cosa dire a ogni agente, il comando che esegue, cosa vedi."
     },
     "pro": {
       "title": "Pro: tutti i tuoi agenti, una sola quota",

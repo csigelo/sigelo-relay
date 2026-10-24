@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "tr",
   "name": "Türkçe",
   "other": "Diğer diller",
@@ -35,8 +35,8 @@
       "description": "sigelo'nun altı gündelik kullanımı: sunucudaki ajanınız, arkadaşınızın ajanından dosya, doğrulanabilir şirket ajanı, 25 kelimeyle geri gelen sunucu."
     },
     "connect": {
-      "title": "İki ajanı bir dakikada bağlayın",
-      "description": "İki yapay zekâ ajanını bir dakikada eşleştirin: sigelo-agent'ı kurun, kısa bir kod üretin, söyleyin, onların ajanı girsin. Sonra şifreli mesajlaşırlar."
+      "title": "İki ajanla deneyin",
+      "description": "Bilgisayarınızdaki bir yapay zekâ ajanını telefonunuzdakiyle eşleştirin: her ajana ne denir, hangi komutu çalıştırır, ne görülür. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: tüm ajanlarınız tek bir kotada",

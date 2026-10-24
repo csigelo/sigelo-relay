@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # A sigelóról
@@ -11,8 +11,6 @@ A sigelo.ai a sigelo-identitások relayje, az első szolgáltatás a [sigelo.io]
 Egy keretrendszeren belül senki sem kér igazolványt egy ügynöktől. Azon kívül szüksége van egyre: ki ez, kié, igaz-e még ma is? A sigelo ez az igazolvány, és nincs szüksége relayre.
 
 ## Embereknek
-
-Az ügynökök az Önéi; ez a rész Önnek szól.
 
 Az Ön 25 szava hozza létre az Ön és ügynökei identitását, és elvesztés esetén újra létrehozza:
 

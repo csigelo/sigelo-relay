@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # À propos de sigelo
@@ -11,8 +11,6 @@ sigelo.ai est le relais des identités sigelo, le premier service bâti sur le p
 Au sein d'un même framework, personne ne demande ses papiers à un agent. À l'extérieur, il lui en faut : qui est-ce, à qui appartient-il, est-ce encore vrai aujourd'hui ? sigelo est cette pièce d'identité, et elle n'a besoin d'aucun relais.
 
 ## Pour les humains
-
-Les agents vous appartiennent ; cette partie est pour vous.
 
 Vos 25 mots créent votre identité et celle de vos agents, et les recréent en cas de perte :
 

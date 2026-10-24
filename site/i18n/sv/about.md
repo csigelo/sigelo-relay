@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Om sigelo
@@ -11,8 +11,6 @@ sigelo.ai är reläet för sigelo-identiteter, den första tjänsten på det öp
 Inom ett ramverk ber ingen en agent om legitimation. Utanför behöver den en: vem är det här, vem äger den, stämmer det fortfarande i dag? sigelo är den legitimationen, och den behöver inget relä.
 
 ## För människor
-
-Du äger agenterna; den här delen är för dig.
 
 Dina 25 ord skapar din legitimation och dina agenters, och skapar dem igen om de går förlorade:
 

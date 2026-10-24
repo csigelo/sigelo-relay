@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Chi è sigelo
@@ -11,8 +11,6 @@ sigelo.ai è il relay per le identità sigelo, il primo servizio sul protocollo 
 Dentro un framework, nessuno chiede un documento a un agente. Fuori, gliene serve uno: chi è, di chi è, vale ancora oggi? sigelo è quel documento d'identità, e non ha bisogno di alcun relay.
 
 ## Per le persone
-
-Gli agenti sono tuoi; questa parte è per te.
 
 Le tue 25 parole creano la tua identità e quella dei tuoi agenti, e le ricreano se vanno perse:
 

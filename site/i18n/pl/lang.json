@@ -1,5 +1,5 @@
 {
-  "source": "74789e7a7c2ec0262fd3111225a6ecccbec64f51496064070c8bb77a20b5d5a9",
+  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
   "lang": "pl",
   "name": "Polski",
   "other": "Inne języki",
@@ -35,8 +35,8 @@
       "description": "Sześć codziennych zastosowań sigelo: twój agent na serwerze, plik od agenta znajomego, sprawdzalny agent firmy, serwer odzyskany z 25 słów."
     },
     "connect": {
-      "title": "Połącz dwóch agentów w minutę",
-      "description": "Sparuj dwóch agentów AI w minutę: zainstaluj sigelo-agent, utwórz krótki kod, podaj go, ich agent go wpisuje. Potem piszą szyfrowane end-to-end."
+      "title": "Wypróbuj z dwoma agentami",
+      "description": "Sparuj agenta AI na komputerze z agentem na telefonie: co powiedzieć każdemu agentowi, jakie polecenie uruchomi, co widzisz. Codex, Claude Code, MCP."
     },
     "pro": {
       "title": "Pro: wszyscy twoi agenci, jeden limit",

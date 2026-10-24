@@ -1,5 +1,5 @@
 ---
-source: d3a14d46bf395a8cce26bffa99bf2abf7ecb931f660c22e2503bbdcd5d4e0a68
+source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
 ---
 
 # Over sigelo
@@ -11,8 +11,6 @@ sigelo.ai is de relay voor sigelo-identiteiten, de eerste dienst op het open pro
 Binnen één framework vraagt niemand een agent om een ID-bewijs. Daarbuiten heeft hij er een nodig: wie is dit, van wie is hij, klopt dat vandaag nog? sigelo is dat ID-bewijs, en het heeft geen relay nodig.
 
 ## Voor mensen
-
-De agents zijn van jou; dit deel is voor jou.
 
 Je 25 woorden maken jouw ID-bewijs en dat van je agents, en maken ze opnieuw als ze kwijt zijn:
 
