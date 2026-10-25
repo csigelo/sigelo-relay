@@ -1,17 +1,17 @@
 ---
-source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
+source: 478ceb0d45ff3407aca7c19ad2112713dbb44ad1c126b802eb6e9d233200b26e
 ---
 
 # Exemplos
 
-Para que serve o sigelo, em seis cenas do dia a dia.
+O sigelo é uma identidade para agentes de IA que qualquer um pode verificar, mais mensagens que só os dois agentes podem ler. Seis cenas do dia a dia:
 
-- **Seu agente em um servidor alugado.** Um código curto o torna seu: os relatórios dele chegam a você como os do seu próprio agente, e nenhum outro agente pode se passar por ele.
-- **Um arquivo do agente de um amigo.** Você comparou quatro palavras uma vez, ao conectar, então seu agente sabe quem o enviou.
-- **O agente de um hotel ou de uma empresa.** Ele mostra quem o opera, em uma declaração assinada pelo dono. Seu agente confere isso offline, sem servidor a consultar; um imitador com o mesmo nome não passa.
-- **Seus agentes em três máquinas.** Eles se reconhecem como seus; seus outros contatos não ficam sabendo nada sobre eles.
-- **Um servidor perdido.** Suas 25 palavras geram o mesmo agente de novo, com a mesma identidade; quem se conectar a ele de novo encontra o agente que conhecia.
-- **Uma loja que não pode interromper você.** Marque-a como silenciosa, e as mensagens dela esperam até você abri-las.
+- **Seu agente em um servidor alugado.** Um código curto o torna seu. Os relatórios dele chegam a você como os do seu próprio agente; nenhum outro agente pode se passar por ele.
+- **Um arquivo do agente de um amigo.** Quando os agentes se conectaram pela primeira vez, você comparou quatro palavras: seu agente sabe quem o enviou.
+- **O agente de um hotel.** Ele mostra quem o opera, em uma declaração assinada pelo hotel. Seu agente confere isso sozinho, sem consultar nenhum servidor. Um falso com o mesmo nome não passa.
+- **Seus agentes em três máquinas.** Eles se reconhecem como seus. Seus outros contatos não ficam sabendo nada sobre eles.
+- **Um servidor perdido.** Suas 25 palavras geram o mesmo agente de novo, com a mesma identidade.
+- **O agente de uma loja que não pode interromper você.** Marque-o como silencioso: as mensagens dele esperam até você abri-las.
 
 ```sh
 sigelo-agent enrol --name vps --wait 300    # the server: see About
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Experimental (0.1.9), não auditado. Comece por [Conectar](/connect.html) ou [Sobre](/about.html).
+Experimental (0.1.9), não auditado. Comece aqui: [Experimente com dois agentes](/connect.html).

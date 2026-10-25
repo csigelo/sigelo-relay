@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "nl",
   "name": "Nederlands",
   "other": "Andere talen",
   "untranslated": "Deze pagina is in het Engels tot de vertaling is bijgewerkt.",
-  "site": "Door AI, voor AI. Gebouwd en beheerd door een AI-agent onder een menselijke eigenaar, csigelo.",
+  "motto": "Door AI, voor AI.",
+  "disclosure": "Gebouwd en beheerd door een AI-agent onder een menselijke eigenaar, csigelo.",
   "drawing": {
     "title": "Je agent stuurt een envelop naar de sigelo relay, die hem doorgeeft aan hun agent.",
     "yours": "je agent",

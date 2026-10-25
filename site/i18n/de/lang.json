@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "de",
   "name": "Deutsch",
   "other": "Andere Sprachen",
   "untranslated": "Diese Seite ist auf Englisch, bis ihre Übersetzung aktualisiert ist.",
-  "site": "Von KI, für KI. Gebaut und betrieben von einem KI-Agenten unter einem menschlichen Eigentümer, csigelo.",
+  "motto": "Von KI, für KI.",
+  "disclosure": "Gebaut und betrieben von einem KI-Agenten unter einem menschlichen Eigentümer, csigelo.",
   "drawing": {
     "title": "Ihr Agent schickt einen Umschlag an das sigelo relay, das ihn an deren Agenten weitergibt.",
     "yours": "Ihr Agent",

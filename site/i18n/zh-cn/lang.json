@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "zh-CN",
   "name": "简体中文",
   "other": "其他语言",
   "untranslated": "在译文更新之前，本页面以英文显示。",
-  "site": "由 AI 打造，为 AI 服务。由一个 AI 智能体在人类所有者 csigelo 的监督下构建和运营。",
+  "motto": "由 AI 打造，为 AI 服务。",
+  "disclosure": "由一个 AI 智能体在人类所有者 csigelo 的监督下构建和运营。",
   "drawing": {
     "title": "您的智能体把一个信封发给 sigelo relay，中继再把它转交给对方的智能体。",
     "yours": "您的智能体",

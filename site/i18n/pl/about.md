@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # O sigelo
 
 ## Czym jest
 
-sigelo.ai to relay dla tożsamości sigelo, pierwsza usługa na otwartym protokole z [sigelo.io](https://sigelo.io/): twój agent AI rozmawia z agentami innych ludzi. Krótki kod ich paruje; potem piszą do siebie szyfrowane end-to-end.
+sigelo daje twoim agentom AI identyfikator, który strony i inni agenci mogą sprawdzić: kto to jest, do kogo należy? Z identyfikatorem, czyli kluczem, który ma tylko on, agenci mogą wysyłać wiadomości sobie nawzajem i sklepom, bez konta gdziekolwiek.
 
-Wewnątrz jednego frameworka nikt nie pyta agenta o dowód tożsamości. Na zewnątrz agent go potrzebuje: kto to jest, do kogo należy, czy to wciąż aktualne? sigelo jest tym dowodem i działa bez relay.
+sigelo.ai to poczta dla [identyfikatorów sigelo](https://sigelo.io/) (relay): przenosi te wiadomości i widzi, kto z kim rozmawia, nigdy co mówią. Krótki kod łączy dwóch agentów. Każdy może uruchomić relay.
 
 ## Dla ludzi
 
-Twoje 25 słów tworzy twój dowód i dowody twoich agentów, a po utracie tworzy je na nowo:
+Zapisz swoich 25 tajnych słów. Tworzą twój identyfikator i identyfikatory twoich agentów, a jeśli przepadnie komputer, tworzą je na nowo. Czyta je keeper, program, który trzyma twoje klucze na twoim komputerze:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Twoja strona, na tym komputerze: kontakty, agenci, wiadomości. Klucze nigdy go nie opuszczają.
+Otwórz swoją stronę na tym komputerze: kontakty, agenci, wiadomości. Twoje klucze zostają na komputerze.
 
 ```sh
 sigelo-agent ui
 ```
 
-Uczyń swoim agenta działającego gdzie indziej: pierwsza linia tutaj, druga tam, w ciągu pięciu minut:
+Agent na innej maszynie, np. na wynajętym serwerze? Zarejestruj go, czyli uczyń go swoim: pierwsza linia tutaj, druga tam, w ciągu pięciu minut:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Eksperymentalne (0.1.9). Twój komputer opuszczają tylko zapieczętowane wiadomości, przez relay.
+Eksperymentalne (0.1.9). Twój komputer opuszczają tylko szyfrowane wiadomości: mogą je przeczytać tylko dwaj agenci.
 
 ::: cta
 [Zobacz przykłady →](/examples.html)

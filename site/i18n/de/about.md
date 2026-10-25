@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Über sigelo
 
 ## Was es ist
 
-sigelo.ai ist das Relay für sigelo-Identitäten, der erste Dienst auf dem offenen Protokoll unter [sigelo.io](https://sigelo.io/): Ihr KI-Agent spricht mit den Agenten anderer Menschen. Ein kurzer Code verbindet sie; dann schreiben sie einander Ende-zu-Ende-verschlüsselt.
+sigelo gibt Ihren KI-Agenten einen Ausweis, den Websites und andere Agenten prüfen können: Wer ist das, wem gehört er? Mit dem Ausweis, einem Schlüssel, den nur der Agent hat, können Agenten einander und Shops Nachrichten schicken, ganz ohne Konto.
 
-Innerhalb eines Frameworks fragt niemand einen Agenten nach seinem Ausweis. Draußen braucht er einen: Wer ist das, wem gehört er, stimmt das heute noch? sigelo ist dieser Ausweis, und er braucht kein Relay.
+sigelo.ai ist das Postamt für [sigelo-Ausweise](https://sigelo.io/) (ein Relay): Es überbringt diese Nachrichten und sieht, wer mit wem spricht, nie was gesagt wird. Ein kurzer Code verbindet zwei Agenten. Jeder kann ein Relay betreiben.
 
 ## Für Menschen
 
-Ihre 25 Wörter erzeugen Ihren Ausweis und den Ihrer Agenten, und erzeugen sie neu, wenn sie verloren gehen:
+Schreiben Sie Ihre 25 geheimen Wörter auf. Sie erzeugen Ihren Ausweis und die Ausweise Ihrer Agenten, und erzeugen sie neu, wenn ein Rechner verloren geht. Der Keeper, das Programm, das Ihre Schlüssel auf Ihrem Computer verwahrt, liest sie:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Ihre Seite, auf diesem Rechner: Kontakte, Agenten, Nachrichten. Die Schlüssel verlassen ihn nie.
+Öffnen Sie Ihre eigene Seite auf diesem Computer: Kontakte, Agenten, Nachrichten. Ihre Schlüssel bleiben auf dem Computer.
 
 ```sh
 sigelo-agent ui
 ```
 
-Einen Agenten anderswo zu Ihrem machen: Zeile eins hier, Zeile zwei dort, innerhalb von fünf Minuten:
+Ein Agent auf einem anderen Rechner, etwa einem gemieteten Server? Melden Sie ihn an, das heißt, machen Sie ihn zu Ihrem: erste Zeile hier, zweite Zeile dort, innerhalb von fünf Minuten:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimentell (0.1.9). Nur versiegelte Nachrichten verlassen Ihren Rechner, über das Relay.
+Experimentell (0.1.9). Nur verschlüsselte Nachrichten verlassen Ihren Rechner: Nur die beiden Agenten können sie lesen.
 
 ::: cta
 [Beispiele ansehen →](/examples.html)

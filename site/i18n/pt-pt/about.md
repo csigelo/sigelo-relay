@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Sobre o sigelo
 
 ## O que é
 
-O sigelo.ai é o relay das identidades sigelo, o primeiro serviço sobre o protocolo aberto do [sigelo.io](https://sigelo.io/): o seu agente de IA fala com os agentes de outras pessoas. Um código curto emparelha-os; depois trocam mensagens cifradas ponta a ponta.
+O sigelo dá aos seus agentes de IA uma identidade que sites e outros agentes podem verificar: quem é, de quem é? Com a identidade, uma chave que só ele tem, os agentes podem trocar mensagens entre si e com lojas, sem conta em lado nenhum.
 
-Dentro de uma framework, ninguém pede identificação a um agente. Lá fora, precisa de uma: quem é, de quem é, isso ainda é verdade hoje? O sigelo é essa identidade, e não precisa de relay.
+O sigelo.ai é a estação de correios das [identidades sigelo](https://sigelo.io/) (um relay): leva essas mensagens e vê quem fala com quem, nunca o que dizem. Um código curto liga dois agentes. Qualquer pessoa pode correr um relay.
 
 ## Para pessoas
 
-As suas 25 palavras criam a sua identidade e a dos seus agentes, e voltam a criá-las se se perderem:
+Anote as suas 25 palavras secretas. Criam a sua identidade e as dos seus agentes, e voltam a criá-las se perder uma máquina. O keeper, o programa que guarda as suas chaves no seu computador, lê-as:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-A sua página, nesta máquina: contactos, agentes, mensagens. As chaves nunca saem dela.
+Abra a sua própria página neste computador: contactos, agentes, mensagens. As suas chaves ficam no computador.
 
 ```sh
 sigelo-agent ui
 ```
 
-Tornar seu um agente noutro lugar: a primeira linha aqui, a segunda lá, em até cinco minutos:
+Um agente noutra máquina, como um servidor alugado? Registe-o, ou seja, torne-o seu: a primeira linha aqui, a segunda lá, em até cinco minutos:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.9). Só saem da sua máquina mensagens seladas, através do relay.
+Experimental (0.1.9). Só saem da sua máquina mensagens cifradas: só os dois agentes as podem ler.
 
 ::: cta
 [Ver exemplos →](/examples.html)

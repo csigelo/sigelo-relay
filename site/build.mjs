@@ -53,6 +53,22 @@ export const DEPLOY = join(RELAY, 'deploy', 'nginx.conf');
 export const ORIGIN = 'https://sigelo.ai';
 export const HOST = 'relay.sigelo.ai';
 export const REPO = 'https://github.com/csigelo/sigelo-relay';
+// The brand: relay/site/brand/, a byte-identical copy of the files of assets/brand/ this site uses
+// (design/logo/make.py writes both; relay/ is published alone, so it carries its own). Served under
+// /brand/, the favicon and the PNG icons also at the root. The header's seal is seal.svg inline, its
+// fill left to the stylesheet (--seal: wax; seal-dark's #c8423f on a dark scheme), hidden from
+// assistive technology (the link says "sigelo").
+export const BRAND = join(SITE, 'brand');
+export const BRAND_FILES = ['favicon.svg', 'seal.svg', 'seal-dark.svg', 'icon-192.png', 'icon-512.png', 'lockup-ai.svg', 'og-ai.png'];
+export const SEAL_INLINE = readFileSync(join(BRAND, 'seal.svg'), 'utf8').trim()
+  .replace(' xmlns="http://www.w3.org/2000/svg"', '').replace(/ role="img" aria-label="[^"]*"/, ' class="seal" aria-hidden="true" focusable="false"').replace(/<title>[^<]*<\/title>/, '').replace(/ fill="#[0-9a-f]{6}"/, '');
+// Open Graph and Twitter on every indexed page: title, description, URL and the link-preview card
+// (brand/og-ai.png, 1200 x 630: the seal and "sigelo.ai" on paper). Not on a noindex page.
+export const OG_IMAGE = [['og:image', `${ORIGIN}/brand/og-ai.png`], ['og:image:type', 'image/png'], ['og:image:width', '1200'], ['og:image:height', '630'], ['og:image:alt', 'sigelo seal and sigelo.ai']];
+export const social = (title, description, url) => [['og:type', 'website'], ['og:site_name', 'sigelo'], ['og:title', title], ['og:description', description], ['og:url', url], ...OG_IMAGE]
+  .map(([k, v]) => `<meta property="${k}" content="${esc(v)}">\n`).join('') + '<meta name="twitter:card" content="summary_large_image">\n';
+export const ICON_LINKS = '<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">\n'
+  + '<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">\n<link rel="apple-touch-icon" href="/icon-192.png">\n';
 const PKG = JSON.parse(readFileSync(join(RELAY, 'package.json'), 'utf8'));
 
 // Who sells Pro and operates the relay, as the pages name it (footer, JSON-LD provider, index.json):
@@ -124,7 +140,9 @@ export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ..
 export const NOBODY = 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.';
 export const MOTTO = 'By AI, for AI.';
 export const DISCLOSURE = 'Built and operated by an AI agent under a human owner, csigelo.';
-// The site's description (JSON-LD WebSite): lang.json `site` in a language, glossed as the rest.
+// The site's description (JSON-LD WebSite). In a language (2026-10-25, Owner: the motto is the
+// project's, in every language): lang.json `motto` and `disclosure`, glossed as the rest; readLanguages
+// joins them into `site` as here. English is the fallback only where a language is stale.
 export const SITE_DESCRIPTION = `${MOTTO} ${DISCLOSURE}`;
 // The four sentences plan §11 says no competitor can truthfully say: index.json and relay.json carry
 // them as `positioning`, llms-full.txt as prose, and every page's footer, which is generated and
@@ -232,7 +250,7 @@ export const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 export const FRONT_RE = /^---\nsource: ([0-9a-f]{64})\n---\n\n?/;
 // What lang.json translates, as the English has it; its hash is lang.json's `source`.
 export const englishStrings = () => ({
-  nav: Object.fromEntries(PAGES.filter((p) => p.nav).map((p) => [p.slug, p.nav])), other: OTHER_LANGUAGES, untranslated: STALE_NOTE, drawing: DRAWING_WORDS, site: SITE_DESCRIPTION,
+  nav: Object.fromEntries(PAGES.filter((p) => p.nav).map((p) => [p.slug, p.nav])), other: OTHER_LANGUAGES, untranslated: STALE_NOTE, drawing: DRAWING_WORDS, motto: MOTTO, disclosure: DISCLOSURE,
   pages: Object.fromEntries(PAGES.filter((p) => TRANSLATED.includes(p.slug)).map((p) => [p.slug, { title: p.title, description: p.description, ...(p.pending && { pending: p.pending }) }])),
 });
 export const englishStringsHash = () => sha256(JSON.stringify(englishStrings()));
@@ -333,7 +351,10 @@ export function readLanguages(site = SITE, md = readPages(site)) {
     try { meta = glossedMeta(code, JSON.parse(readFileSync(join(at, 'lang.json'), 'utf8'))); } catch { why.push(`${code}/lang.json: missing or not JSON`); }
     if (meta.source !== englishHash) stale.push(`${code}/lang.json`);
     if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
-    for (const k of ['name', 'other', 'untranslated', 'site']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
+    for (const k of ['name', 'other', 'untranslated', 'motto', 'disclosure']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
+    if (meta.motto === MOTTO || /By AI, for AI|Built and operated by/i.test(`${meta.motto} ${meta.disclosure}`)) why.push(`${code}/lang.json: the motto or the disclosure is still English`);
+    if ('site' in meta) why.push(`${code}/lang.json: "site" is gone (2026-10-25): "motto" and "disclosure" instead`);
+    meta.site = `${meta.motto} ${meta.disclosure}`;
     if (meta.dir !== undefined && meta.dir !== 'rtl') why.push(`${code}/lang.json: dir is "rtl" or absent (left to right)`);
     for (const k of Object.keys(DRAWING_WORDS)) if (typeof meta.drawing?.[k] !== 'string' || !meta.drawing[k].trim()) why.push(`${code}/lang.json: no drawing.${k}`);
     for (const slug of Object.keys(english.nav)) if (typeof meta.nav?.[slug] !== 'string' || !meta.nav[slug].trim()) why.push(`${code}/lang.json: no nav label for ${slug}`);
@@ -917,11 +938,11 @@ function rewriteMd(md, link) {
 }
 
 // The stylesheet: paper, ink and a wax-red accent (the seal the logo will be), light by default,
-// dark by preference. No web font, no image: the drawing is inline SVG in the page.
+// dark by preference. No web font; the drawing and the header's seal are inline SVG in the page.
 const STYLE = `/* sigelo relay — one stylesheet: no web fonts, no scripts, nothing fetched. Paper, ink and wax. */
 :root {
   --bg: #f7f2e8; --paper: #fcf9f2; --fg: #1f1a17; --muted: #6b625a; --line: #e3d9c6; --code: #efe7d6;
-  --accent: #9b2226; --accent-hover: #7a1a1d; --on-accent: #fcf9f2; --link: #9b2226; --art: #9b2226;
+  --accent: #9b2226; --accent-hover: #7a1a1d; --on-accent: #fcf9f2; --link: #9b2226; --art: #9b2226; --seal: #9b2226;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -929,7 +950,7 @@ const STYLE = `/* sigelo relay — one stylesheet: no web fonts, no scripts, not
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #1d1916; --paper: #26211d; --fg: #efe7d8; --muted: #b5aa9b; --line: #3d3530; --code: #2e2823;
-    --accent: #9b2226; --accent-hover: #b4292e; --on-accent: #fcf9f2; --link: #ec8d8f; --art: #ec8d8f; }
+    --accent: #9b2226; --accent-hover: #b4292e; --on-accent: #fcf9f2; --link: #ec8d8f; --art: #ec8d8f; --seal: #c8423f; }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -940,8 +961,9 @@ a:hover { color: var(--fg); }
 
 /* header and footer */
 .top { border-bottom: 1px solid var(--line); }
-.bar { max-width: 62rem; margin: 0 auto; padding: 1rem 20px; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem 1.5rem; }
-.wordmark { font: 700 1.45rem/1 var(--serif); color: var(--fg); text-decoration: none; letter-spacing: .01em; }
+.bar { max-width: 62rem; margin: 0 auto; padding: 1rem 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 1.5rem; }
+.wordmark { font: 700 1.45rem/1 var(--serif); color: var(--fg); text-decoration: none; letter-spacing: .01em; display: inline-flex; align-items: center; gap: .35em; }
+.seal { width: 1.6em; height: 1.6em; fill: var(--seal); flex: none; }
 .wordmark:hover { color: var(--link); }
 nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
 nav a { color: var(--muted); text-decoration: none; font-size: .98rem; }
@@ -1115,7 +1137,8 @@ function htmlPage(page, body, ctx, lang = null, fallback = false) {
   // fallback: the English page at a translated URL (its translation is stale): English head, the
   // English URL canonical, no hreflang; the header, footer and the line saying so in the language.
   const headLang = fallback ? null : lang;
-  const indexed = page.noindex ? '<meta name="robots" content="noindex">\n' : `<link rel="canonical" href="${pageUrlIn(page, headLang?.code)}">\n`;
+  const indexed = page.noindex ? '<meta name="robots" content="noindex">\n' : `<link rel="canonical" href="${pageUrlIn(page, headLang?.code)}">\n`
+    + social(titleIn(page, headLang, ctx.pending), descriptionIn(page, headLang, ctx.pending), pageUrlIn(page, headLang?.code));
   const alternates = fallback ? '' : alternatesOf(page, ctx.langs).map(([h, u]) => `<link rel="alternate" hreflang="${h}" href="${u}">\n`).join('');
   const twin = lang ? '' : `<link rel="alternate" type="text/markdown" href="/${page.slug}.md" title="This page as Markdown">\n`;
   const ld = page.noindex ? '' : `<script type="application/ld+json">\n${jsonld(page, ctx, headLang)}\n</script>\n`;
@@ -1129,11 +1152,11 @@ function htmlPage(page, body, ctx, lang = null, fallback = false) {
 <meta name="color-scheme" content="light dark">
 <title>${esc(titleIn(page, headLang, ctx.pending))}</title>
 <meta name="description" content="${esc(descriptionIn(page, headLang, ctx.pending))}">
-${indexed}${alternates}${twin}<link rel="stylesheet" href="/style.css">
+${indexed}${alternates}${twin}${ICON_LINKS}<link rel="stylesheet" href="/style.css">
 ${ld}</head>
 <body>
 <header class="top"${chrome}><div class="bar">
-<a class="wordmark" href="${home}"${page.slug === 'index' ? ' aria-current="page"' : ''}>sigelo</a>
+<a class="wordmark" href="${home}"${page.slug === 'index' ? ' aria-current="page"' : ''}>${SEAL_INLINE}sigelo</a>
 <nav aria-label="Pages">${navList(HEADER, page, lang)}</nav>
 </div></header>
 <main>
@@ -1261,6 +1284,9 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     }
   }
   put('style.css', STYLE);
+  mkdirSync(join(out, 'brand'));
+  for (const f of BRAND_FILES) put(`brand/${f}`, readFileSync(join(BRAND, f)));
+  for (const f of ['favicon.svg', 'icon-192.png', 'icon-512.png']) put(f, readFileSync(join(BRAND, f)));
 
   // robots.txt (SEO spec §4.1): everything allowed; the AI crawlers named so the intent is explicit.
   const bots = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User',

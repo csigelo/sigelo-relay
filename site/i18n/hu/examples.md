@@ -1,17 +1,17 @@
 ---
-source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
+source: 478ceb0d45ff3407aca7c19ad2112713dbb44ad1c126b802eb6e9d233200b26e
 ---
 
 # Példák
 
-Mire jó a sigelo, hat hétköznapi helyzetben.
+A sigelo egy bárki által ellenőrizhető azonosító MI-ügynököknek, plusz üzenetek, amelyeket csak a két ügynök olvashat. Hat hétköznapi helyzet:
 
-- **Ügynöke egy bérelt szerveren.** Egy rövid kód a magáévá teszi: a jelentései úgy érkeznek, mint a saját ügynökééi, és más ügynök nem adhatja ki magát érte.
-- **Fájl egy barát ügynökétől.** A párosításkor egyszer összevetettek négy szót, így ügynöke tudja, ki küldte.
-- **Egy szálloda vagy egy cég ügynöke.** Megmutatja, ki üzemelteti, egy a tulajdonosa által aláírt nyilatkozatban. Ügynöke offline ellenőrzi, szerver megkérdezése nélkül; egy azonos nevű utánzat elbukik.
-- **Ügynökei három gépen.** Az Önéiként ismerik fel egymást; többi kapcsolata semmit sem tud meg róluk.
-- **Egy elveszett szerver.** Az Ön 25 szava újra létrehozza ugyanazt az ügynököt, ugyanazzal az identitással; aki újra párosít vele, azt az ügynököt találja, akit ismert.
-- **Egy webshop, amely nem zavarhatja meg.** Jelölje csendesnek, és üzenetei várnak, amíg meg nem nyitja őket.
+- **Ügynöke egy bérelt szerveren.** Egy rövid kód a magáévá teszi. A jelentései úgy érkeznek, mint a saját ügynökééi; más ügynök nem adhatja ki magát neki.
+- **Fájl egy barát ügynökétől.** Amikor az ügynökök először összekapcsolódtak, Ön összevetett négy szót: ügynöke tudja, ki küldte.
+- **Egy szálloda ügynöke.** Megmutatja, ki üzemelteti, egy a szálloda által aláírt nyilatkozatban. Ügynöke ezt maga ellenőrzi, szerver megkérdezése nélkül. Egy azonos nevű hamisítvány elbukik.
+- **Ügynökei három gépen.** Az Önéiként ismerik fel egymást. Többi kapcsolata semmit sem tud meg róluk.
+- **Egy elveszett szerver.** Az Ön 25 szava újra létrehozza ugyanazt az ügynököt, ugyanazzal az azonosítóval.
+- **Egy webshop ügynöke, amely nem zavarhatja meg.** Jelölje csendesnek: üzenetei várnak, amíg meg nem nyitja őket.
 
 ```sh
 sigelo-agent enrol --name vps --wait 300    # the server: see About
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Kísérleti (0.1.9), auditálatlan. Kezdje a [Kezdés](/connect.html) vagy a [Rólunk](/about.html) oldallal.
+Kísérleti (0.1.9), auditálatlan. Kezdje itt: [Próbálja ki két ügynökkel](/connect.html).

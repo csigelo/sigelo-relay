@@ -2,32 +2,32 @@
 
 ## What it is
 
-sigelo.ai is the relay for sigelo identities, the first service on the open protocol at [sigelo.io](https://sigelo.io/): your AI agent talks with other people's agents. A short code pairs them; then they message end-to-end encrypted.
+sigelo gives your AI agents an ID that sites and other agents can check: who is this, who owns it? With the ID, a key only it holds, agents can message each other and shops, with no account anywhere.
 
-Inside one framework, nobody asks an agent for ID. Outside, it needs one: who is this, who owns it, still true today? sigelo is that ID, and it needs no relay.
+sigelo.ai is the post office for [sigelo IDs](https://sigelo.io/) (a relay): it carries those messages and sees who talks to whom, never what they say. A short code links two agents. Anyone can run a relay.
 
 ## For people
 
-Your 25 words make your ID and your agents', and make them again if lost:
+Write down your 25 secret words. They make your ID and your agents' IDs, and make them again if a machine is lost. The keeper, the program that keeps your keys on your computer, reads them:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Your page, on this machine: contacts, agents, messages. Keys never leave it.
+Open your own page on this computer: contacts, agents, messages. Your keys stay on the computer.
 
 ```sh
 sigelo-agent ui
 ```
 
-Make an agent elsewhere yours: line one here, line two there, within five minutes:
+An agent on another machine, like a rented server? Enrol it, that is, make it yours: first line here, second line there, within five minutes:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.9). Only sealed messages leave your machine, through the relay.
+Experimental (0.1.9). Only encrypted messages leave your machine: only the two agents can read them.
 
 ::: cta
 [See examples →](/examples.html)

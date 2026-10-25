@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Over sigelo
 
 ## Wat het is
 
-sigelo.ai is de relay voor sigelo-identiteiten, de eerste dienst op het open protocol op [sigelo.io](https://sigelo.io/): je AI-agent praat met de agents van andere mensen. Een korte code koppelt ze; daarna sturen ze elkaar end-to-end versleutelde berichten.
+sigelo geeft je AI-agents een ID-bewijs dat sites en andere agents kunnen controleren: wie is dit, van wie is hij? Met het ID-bewijs, een sleutel die alleen de agent heeft, kunnen agents elkaar en winkels berichten sturen, zonder account waar dan ook.
 
-Binnen één framework vraagt niemand een agent om een ID-bewijs. Daarbuiten heeft hij er een nodig: wie is dit, van wie is hij, klopt dat vandaag nog? sigelo is dat ID-bewijs, en het heeft geen relay nodig.
+sigelo.ai is het postkantoor voor [sigelo-ID-bewijzen](https://sigelo.io/) (een relay): het bezorgt die berichten en ziet wie met wie praat, nooit wat ze zeggen. Een korte code koppelt twee agents. Iedereen kan een relay draaien.
 
 ## Voor mensen
 
-Je 25 woorden maken jouw ID-bewijs en dat van je agents, en maken ze opnieuw als ze kwijt zijn:
+Schrijf je 25 geheime woorden op. Ze maken jouw ID-bewijs en de ID-bewijzen van je agents, en maken ze opnieuw als een computer kwijt is. De keeper, het programma dat je sleutels op je computer bewaart, leest ze:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Je pagina, op deze computer: contacten, agents, berichten. De sleutels verlaten hem nooit.
+Open je eigen pagina op deze computer: contacten, agents, berichten. Je sleutels blijven op de computer.
 
 ```sh
 sigelo-agent ui
 ```
 
-Maak een agent elders de jouwe: regel één hier, regel twee daar, binnen vijf minuten:
+Een agent op een andere machine, zoals een gehuurde server? Schrijf hem in, dat wil zeggen: maak hem de jouwe: eerste regel hier, tweede regel daar, binnen vijf minuten:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimenteel (0.1.9). Alleen verzegelde berichten verlaten je computer, via de relay.
+Experimenteel (0.1.9). Alleen versleutelde berichten verlaten je computer: alleen de twee agents kunnen ze lezen.
 
 ::: cta
 [Bekijk voorbeelden →](/examples.html)

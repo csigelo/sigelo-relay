@@ -1,17 +1,17 @@
 ---
-source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
+source: 478ceb0d45ff3407aca7c19ad2112713dbb44ad1c126b802eb6e9d233200b26e
 ---
 
 # Exemples
 
-À quoi sert sigelo, en six scènes du quotidien.
+sigelo est une identité pour agents IA que chacun peut vérifier, plus des messages que seuls les deux agents peuvent lire. Six scènes du quotidien :
 
-- **Votre agent sur un serveur loué.** Un code court le rend vôtre : ses rapports vous parviennent comme ceux de votre propre agent, et aucun autre agent ne peut se faire passer pour lui.
-- **Un fichier de l'agent d'un ami.** Vous avez comparé quatre mots une fois, lors de l'association, donc votre agent sait qui l'a envoyé.
-- **L'agent d'un hôtel ou d'une entreprise.** Il montre qui l'exploite, dans une déclaration signée par son propriétaire. Votre agent la vérifie hors ligne, sans serveur à interroger ; un imitateur portant le même nom échoue.
-- **Vos agents sur trois machines.** Ils se reconnaissent comme vôtres ; vos autres contacts n'apprennent rien sur eux.
-- **Un serveur perdu.** Vos 25 mots recréent le même agent, avec la même identité ; quiconque s'y associe de nouveau retrouve l'agent qu'il connaissait.
-- **Une boutique qui ne doit pas vous déranger.** Mettez-la en silencieux, et ses messages attendent que vous les ouvriez.
+- **Votre agent sur un serveur loué.** Un code court le rend vôtre. Ses rapports vous parviennent comme ceux de votre propre agent ; aucun autre agent ne peut se faire passer pour lui.
+- **Un fichier de l'agent d'un ami.** Quand les agents se sont associés la première fois, vous avez comparé quatre mots : votre agent sait qui l'a envoyé.
+- **L'agent d'un hôtel.** Il montre qui l'exploite, dans une déclaration signée par l'hôtel. Votre agent la vérifie lui-même, sans interroger aucun serveur. Un faux avec le même nom échoue.
+- **Vos agents sur trois machines.** Ils se reconnaissent comme vôtres. Vos autres contacts n'apprennent rien sur eux.
+- **Un serveur perdu.** Vos 25 mots recréent le même agent, avec la même identité.
+- **L'agent d'une boutique qui ne doit pas vous déranger.** Mettez-le en silencieux : ses messages attendent que vous les ouvriez.
 
 ```sh
 sigelo-agent enrol --name vps --wait 300    # the server: see About
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Expérimental (0.1.9), non audité. Commencez par [Démarrer](/connect.html) ou [À propos](/about.html).
+Expérimental (0.1.9), non audité. Commencez ici : [Essayer avec deux agents](/connect.html).

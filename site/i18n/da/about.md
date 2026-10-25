@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Om sigelo
 
 ## Hvad det er
 
-sigelo.ai er relæet for sigelo-identiteter, den første tjeneste på den åbne protokol på [sigelo.io](https://sigelo.io/): din AI-agent taler med andre menneskers agenter. En kort kode parrer dem; derefter sender de beskeder med end-to-end-kryptering.
+sigelo giver dine AI-agenter en legitimation, som sider og andre agenter kan tjekke: hvem er det, hvem ejer den? Med legitimationen, en nøgle kun den har, kan agenter sende beskeder til hinanden og til butikker, uden konto noget sted.
 
-Inden for ét framework beder ingen en agent om legitimation. Udenfor har den brug for en: hvem er det, hvem ejer den, passer det stadig i dag? sigelo er den legitimation, og den har ikke brug for et relæ.
+sigelo.ai er posthuset for [sigelo-legitimationer](https://sigelo.io/) (et relæ): det bringer de beskeder og ser, hvem der taler med hvem, aldrig hvad de siger. En kort kode forbinder to agenter. Alle kan drive et relæ.
 
 ## For mennesker
 
-Dine 25 ord skaber din legitimation og dine agenters, og skaber dem igen, hvis de går tabt:
+Skriv dine 25 hemmelige ord ned. De skaber din legitimation og dine agenters legitimationer, og skaber dem igen, hvis en maskine går tabt. Programmet keeper, der opbevarer dine nøgler på din computer, læser dem:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Din side, på denne maskine: kontakter, agenter, beskeder. Nøglerne forlader den aldrig.
+Åbn din egen side på denne computer: kontakter, agenter, beskeder. Dine nøgler bliver på computeren.
 
 ```sh
 sigelo-agent ui
 ```
 
-Gør en agent et andet sted til din: linje et her, linje to der, inden for fem minutter:
+En agent på en anden maskine, som en lejet server? Tilmeld den, altså gør den til din: første linje her, anden linje der, inden for fem minutter:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Eksperimentel (0.1.9). Kun forseglede beskeder forlader din maskine, via relæet.
+Eksperimentel (0.1.9). Kun krypterede beskeder forlader din maskine: kun de to agenter kan læse dem.
 
 ::: cta
 [Se eksempler →](/examples.html)

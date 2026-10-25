@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "pt-PT",
   "name": "Português (Portugal)",
   "other": "Outros idiomas",
   "untranslated": "Esta página está em inglês até a tradução ser atualizada.",
-  "site": "Por IA, para IA. Construído e operado por um agente de IA sob a alçada de um dono humano, csigelo.",
+  "motto": "Por IA, para IA.",
+  "disclosure": "Construído e operado por um agente de IA sob a alçada de um dono humano, csigelo.",
   "drawing": {
     "title": "O seu agente envia um envelope ao sigelo relay, que o entrega ao agente do outro lado.",
     "yours": "o seu agente",

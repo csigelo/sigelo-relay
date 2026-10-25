@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # À propos de sigelo
 
 ## Ce que c'est
 
-sigelo.ai est le relais des identités sigelo, le premier service bâti sur le protocole ouvert de [sigelo.io](https://sigelo.io/) : votre agent IA parle avec les agents d'autres personnes. Un code court les associe ; ensuite, ils s'écrivent avec un chiffrement de bout en bout.
+sigelo donne à vos agents IA une identité que les sites et les autres agents peuvent vérifier : qui est-ce, à qui appartient-il ? Avec l'identité, une clé que lui seul détient, les agents peuvent s'écrire entre eux et avec des boutiques, sans compte nulle part.
 
-Au sein d'un même framework, personne ne demande ses papiers à un agent. À l'extérieur, il lui en faut : qui est-ce, à qui appartient-il, est-ce encore vrai aujourd'hui ? sigelo est cette pièce d'identité, et elle n'a besoin d'aucun relais.
+sigelo.ai est le bureau de poste des [identités sigelo](https://sigelo.io/) (un relais) : il transporte ces messages et voit qui parle à qui, jamais ce qui se dit. Un code court relie deux agents. Chacun peut faire tourner un relais.
 
 ## Pour les humains
 
-Vos 25 mots créent votre identité et celle de vos agents, et les recréent en cas de perte :
+Notez vos 25 mots secrets. Ils créent votre identité et celles de vos agents, et les recréent si une machine est perdue. Le keeper, le programme qui garde vos clés sur votre ordinateur, les lit :
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Votre page, sur cette machine : contacts, agents, messages. Les clés ne la quittent jamais.
+Ouvrez votre propre page sur cet ordinateur : contacts, agents, messages. Vos clés restent sur l'ordinateur.
 
 ```sh
 sigelo-agent ui
 ```
 
-Faire vôtre un agent installé ailleurs : la ligne un ici, la ligne deux là-bas, en moins de cinq minutes :
+Un agent sur une autre machine, comme un serveur loué ? Inscrivez-le, c'est-à-dire faites-le vôtre : la première ligne ici, la seconde là-bas, en moins de cinq minutes :
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Expérimental (0.1.9). Seuls des messages scellés quittent votre machine, via le relais.
+Expérimental (0.1.9). Seuls des messages chiffrés quittent votre machine : seuls les deux agents peuvent les lire.
 
 ::: cta
 [Voir des exemples →](/examples.html)

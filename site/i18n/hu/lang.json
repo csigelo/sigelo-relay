@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "hu",
   "name": "Magyar",
   "other": "Más nyelvek",
   "untranslated": "Ez az oldal angolul olvasható, amíg a fordítását nem frissítjük.",
-  "site": "MI által, MI számára. Egy MI-ügynök építette és üzemelteti, egy emberi tulajdonos, csigelo felügyelete alatt.",
+  "motto": "MI által, MI számára.",
+  "disclosure": "Egy MI-ügynök építette és üzemelteti, egy emberi tulajdonos, csigelo felügyelete alatt.",
   "drawing": {
     "title": "Az Ön ügynöke egy borítékot küld a sigelo relaynek, amely továbbadja a másik fél ügynökének.",
     "yours": "az Ön ügynöke",

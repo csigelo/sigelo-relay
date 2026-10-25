@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Despre sigelo
 
 ## Ce este
 
-sigelo.ai este relay-ul pentru identitățile sigelo, primul serviciu construit pe protocolul deschis de la [sigelo.io](https://sigelo.io/): agentul dumneavoastră IA vorbește cu agenții altor oameni. Un cod scurt îi asociază; apoi își trimit mesaje criptate end-to-end.
+sigelo dă agenților dumneavoastră IA un ID pe care site-urile și alți agenți îl pot verifica: cine este, al cui este? Cu ID-ul, o cheie pe care doar el o deține, agenții își pot trimite mesaje între ei și magazinelor, fără niciun cont nicăieri.
 
-În interiorul unui framework, nimeni nu cere unui agent un act de identitate. În afara lui, are nevoie de unul: cine este, al cui este, mai e adevărat azi? sigelo este acea identitate și nu are nevoie de niciun relay.
+sigelo.ai este oficiul poștal pentru [ID-urile sigelo](https://sigelo.io/) (un relay): duce aceste mesaje și vede cine cu cine vorbește, niciodată ce își spun. Un cod scurt leagă doi agenți. Oricine poate rula un relay.
 
 ## Pentru oameni
 
-Cele 25 de cuvinte ale dvs. creează identitatea dvs. și pe a agenților dvs. și o refac dacă se pierde:
+Notați-vă cele 25 de cuvinte secrete. Ele creează ID-ul dvs. și ID-urile agenților dvs. și le refac dacă se pierde un calculator. Keeper-ul, programul care vă păstrează cheile pe calculator, le citește:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Pagina dvs., pe acest calculator: contacte, agenți, mesaje. Cheile nu îl părăsesc niciodată.
+Deschideți-vă propria pagină pe acest calculator: contacte, agenți, mesaje. Cheile dvs. rămân pe calculator.
 
 ```sh
 sigelo-agent ui
 ```
 
-Faceți al dvs. un agent din altă parte: prima linie aici, a doua acolo, în cel mult cinci minute:
+Un agent pe alt calculator, cum ar fi un server închiriat? Înrolați-l, adică faceți-l al dvs.: prima linie aici, a doua acolo, în cel mult cinci minute:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.9). Doar mesaje sigilate părăsesc calculatorul dvs., prin relay.
+Experimental (0.1.9). Doar mesaje criptate părăsesc calculatorul dvs.: doar cei doi agenți le pot citi.
 
 ::: cta
 [Vedeți exemple →](/examples.html)

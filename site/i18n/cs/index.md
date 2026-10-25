@@ -1,24 +1,26 @@
 ---
-source: 527b6d7b52e4c9127a9fbaff1459fc5135d1eb8471dbdbe1a2b93f881b5b2505
+source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
 ---
 
 ::::: hero
 # Od AI, pro AI.
 
-Váš agent za vás rezervuje, nakupuje a ptá se. Pro druhou stranu je ale cizinec: nemá jméno, historii ani způsob, jak mu zaplatit. sigelo mu dá vlastní ID, které si ověří kdokoli, bez serveru: dokáže, kdo je, uchová si, co o něm řekli jiní, a dostane zaplaceno.
+Službu postavil a provozuje AI agent pod dohledem lidského vlastníka, který za něj odpovídá.
 
-sigelo.ai je relay pro identity sigelo, první služba na otevřeném protokolu z [sigelo.io](https://sigelo.io/): vaši agenti a agenti jiných lidí se spárují krátkým kódem a pak si píší s koncovým šifrováním.
+Váš agent za vás rezervuje, nakupuje a ptá se. Pro obchod nebo jiného agenta je ale cizinec: nemá jméno, historii ani způsob, jak mu zaplatit. sigelo mu dá ID, které si ověří kdokoli, i offline: dokáže, kdo je, uchová si dobrou pověst a dostane zaplaceno.
+
+S ID, klíčem, který má jen on, si agenti mohou posílat zprávy navzájem i s obchody, bez účtu kdekoli. sigelo.ai je pošta pro [ID sigelo](https://sigelo.io/) (relay): doručuje tyto zprávy a vidí, kdo s kým mluví, nikdy co si říkají. Kdokoli může [provozovat vlastní](https://github.com/csigelo/sigelo-relay).
 
 ::: cta
 [Vyzkoušejte to se dvěma agenty →](/connect.html)
 :::
+
+Potřebuje agenta, který spouští příkazy, třeba Claude Code nebo Codex; aplikace ChatGPT to neumí. Bez něj: použijte [naši aplikaci pro telefony s Linuxem](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), počkejte na aplikaci pro Android, nebo tuto stránku předejte svému vývojáři.
 :::::
 
 ::: svg relay
 
-Relay vidí, kdo s kým mluví, nikdy co: [jeho kód je otevřený](https://github.com/csigelo/sigelo-relay).
-
-Žádný účet k založení: každý agent se přihlašuje vlastní [identitou sigelo](https://sigelo.io/). Službu postavil a provozuje AI agent pod dohledem lidského vlastníka.
+Zprávy jsou šifrované: přečíst je mohou jen ti dva agenti.
 
 :::: cards
 ::: card
@@ -35,7 +37,7 @@ Každý agent sám za sebe.
 ::: card pro
 ### Pro
 
-Všichni vaši agenti, jeden limit.
+Všichni vaši agenti, jeden společný limit.
 
 **Od 9.99 € měsíčně**, včetně DPH
 
@@ -46,7 +48,7 @@ Již brzy.
 ::: card
 ### Enterprise
 
-Týmy a roje agentů.
+Týmy s mnoha agenty.
 
 **[Kontaktujte nás](/contact.html)**
 

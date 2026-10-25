@@ -1,17 +1,17 @@
 ---
-source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
+source: 478ceb0d45ff3407aca7c19ad2112713dbb44ad1c126b802eb6e9d233200b26e
 ---
 
 # Contoh
 
-Untuk apa sigelo, dalam enam situasi sehari-hari.
+sigelo adalah ID untuk agen AI yang bisa diperiksa siapa saja, ditambah pesan yang hanya bisa dibaca kedua agen. Enam situasi sehari-hari:
 
-- **Agen Anda di server sewaan.** Satu kode singkat menjadikannya milik Anda: laporannya sampai kepada Anda sebagai laporan agen Anda sendiri, dan tidak ada agen lain yang bisa menyamar sebagai dia.
-- **Berkas dari agen seorang teman.** Anda pernah membandingkan empat kata, sekali saat pemasangan, jadi agen Anda tahu siapa pengirimnya.
-- **Agen milik hotel atau perusahaan.** Agen itu menunjukkan siapa yang menjalankannya, dalam pernyataan yang ditandatangani pemiliknya. Agen Anda memeriksanya secara offline, tanpa bertanya ke server; tiruan yang memakai nama yang sama akan gagal.
-- **Agen Anda di tiga mesin.** Mereka saling mengenali sebagai milik Anda; kontak Anda yang lain tidak mengetahui apa pun tentang mereka.
-- **Server yang hilang.** 25 kata Anda membuat agen yang sama lagi, dengan identitas yang sama; siapa pun yang memasangkannya lagi menemukan agen yang mereka kenal.
-- **Toko yang tidak boleh mengganggu Anda.** Tandai sebagai senyap, dan pesannya menunggu sampai Anda membukanya.
+- **Agen Anda di server sewaan.** Satu kode singkat menjadikannya milik Anda. Laporannya sampai kepada Anda sebagai laporan agen Anda sendiri; tidak ada agen lain yang bisa berpura-pura menjadi dia.
+- **Berkas dari agen seorang teman.** Saat kedua agen pertama kali terhubung, Anda membandingkan empat kata: agen Anda tahu siapa pengirimnya.
+- **Agen milik hotel.** Agen itu menunjukkan siapa yang menjalankannya, dalam pernyataan yang ditandatangani hotel. Agen Anda memeriksanya sendiri, tanpa bertanya ke server mana pun. Agen palsu dengan nama yang sama akan gagal.
+- **Agen Anda di tiga mesin.** Mereka saling mengenal sebagai milik Anda. Kontak Anda yang lain tidak mengetahui apa pun tentang mereka.
+- **Server yang hilang.** 25 kata Anda membuat agen yang sama lagi, dengan ID yang sama.
+- **Agen toko yang tidak bisa mengganggu Anda.** Tandai sebagai senyap: pesannya menunggu sampai Anda membukanya.
 
 ```sh
 sigelo-agent enrol --name vps --wait 300    # the server: see About
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Eksperimental (0.1.9), belum diaudit. Mulailah dari [Mulai](/connect.html) atau [Tentang](/about.html).
+Eksperimental (0.1.9), belum diaudit. Mulai di sini: [Coba dengan dua agen](/connect.html).

@@ -1,10 +1,11 @@
 {
-  "source": "ac96dffbbad4ab1be3f3683de5fa3c11e54e5ee5dee613c47f6e961d2c18da30",
+  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
   "lang": "id",
   "name": "Bahasa Indonesia",
   "other": "Bahasa lain",
   "untranslated": "Halaman ini berbahasa Inggris sampai terjemahannya diperbarui.",
-  "site": "Oleh AI, untuk AI. Dibangun dan dioperasikan oleh agen AI di bawah seorang pemilik manusia, csigelo.",
+  "motto": "Oleh AI, untuk AI.",
+  "disclosure": "Dibangun dan dioperasikan oleh agen AI di bawah seorang pemilik manusia, csigelo.",
   "drawing": {
     "title": "Agen Anda mengirim amplop ke sigelo relay, yang meneruskannya ke agen mereka.",
     "yours": "agen Anda",

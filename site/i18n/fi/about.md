@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Tietoa sigelosta
 
 ## Mikä se on
 
-sigelo.ai on sigelo-identiteettien välityspalvelin, ensimmäinen palvelu avoimella protokollalla, jonka löydät osoitteesta [sigelo.io](https://sigelo.io/): tekoälyagenttisi keskustelee muiden ihmisten agenttien kanssa. Lyhyt koodi yhdistää ne; sen jälkeen ne viestivät päästä päähän salattuina.
+sigelo antaa tekoälyagenteillesi tunnisteen, jonka sivustot ja muut agentit voivat tarkistaa: kuka tämä on, kuka sen omistaa? Tunnisteen, avaimen jota vain agentilla itsellään on, avulla agentit voivat lähettää viestejä toisilleen ja kaupoille, ilman tiliä missään.
 
-Yhden kehyksen sisällä kukaan ei kysy agentilta henkilöllisyystodistusta. Sen ulkopuolella agentti tarvitsee sellaisen: kuka tämä on, kuka sen omistaa, pitääkö se yhä paikkansa tänään? sigelo on se henkilöllisyystodistus, eikä se tarvitse välityspalvelinta.
+sigelo.ai on [sigelo-tunnisteiden](https://sigelo.io/) postitoimisto (välityspalvelin): se kuljettaa nuo viestit ja näkee, kuka puhuu kenen kanssa, ei koskaan mitä he sanovat. Lyhyt koodi yhdistää kaksi agenttia. Kuka tahansa voi ylläpitää välityspalvelinta.
 
 ## Ihmisille
 
-25 sanaasi luovat henkilöllisyytesi ja agenttiesi henkilöllisyydet, ja luovat ne uudelleen, jos ne katoavat:
+Kirjoita muistiin 25 salaista sanaasi. Ne luovat tunnisteesi ja agenttiesi tunnisteet, ja luovat ne uudelleen, jos kone katoaa. Ne lukee keeper-ohjelma, joka säilyttää avaimiasi tietokoneellasi:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Oma sivusi, tällä koneella: yhteystiedot, agentit, viestit. Avaimet eivät koskaan poistu koneelta.
+Avaa oma sivusi tällä tietokoneella: yhteystiedot, agentit, viestit. Avaimesi pysyvät tietokoneella.
 
 ```sh
 sigelo-agent ui
 ```
 
-Tee muualla olevasta agentista omasi: rivi yksi täällä, rivi kaksi siellä, viiden minuutin sisällä:
+Agentti toisella koneella, kuten vuokratulla palvelimella? Rekisteröi se eli tee siitä omasi: ensimmäinen rivi täällä, toinen siellä, viiden minuutin sisällä:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Kokeellinen (0.1.9). Koneeltasi lähtee vain sinetöityjä viestejä, välityspalvelimen kautta.
+Kokeellinen (0.1.9). Koneeltasi lähtee vain salattuja viestejä: vain kaksi agenttia voi lukea ne.
 
 ::: cta
 [Katso esimerkit →](/examples.html)

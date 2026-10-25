@@ -34,6 +34,7 @@ import {
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
   recordRefusals, registryRefusals, PROTOCOL, SITE_DESCRIPTION, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
   HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, GLOSSARY, glossed, glossedMeta, localize, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
+  BRAND, BRAND_FILES, SEAL_INLINE, ICON_LINKS,
 } from './build.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -63,12 +64,12 @@ const body = Object.fromEntries(PAGES.map((p) => [p.slug, twin[p.slug].slice(0, 
 const indexable = PAGES.filter((p) => !p.noindex);
 // The languages of i18n/ the build published (all of them: a stale or wrong one fails below).
 const LANGS = readLanguages(SITE).filter((l) => r.languages.includes(l.code));
-const AGENT_FILES = ['style.css', 'robots.txt', 'relay-robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'index.json', 'relay.json', '.well-known/security.txt',
+const AGENT_FILES = ['style.css', 'favicon.svg', 'icon-192.png', 'icon-512.png', ...BRAND_FILES.map((f) => `brand/${f}`), 'robots.txt', 'relay-robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'index.json', 'relay.json', '.well-known/security.txt',
   ...(existsSync(join(SITE, 'relays.json')) ? ['relays.json'] : [])]; // the registry, once the release identity signed it
 const expected = [...PAGES.flatMap((p) => [`${p.slug}.html`, `${p.slug}.md`]), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => `${l.code}/${slug}.html`)), ...AGENT_FILES];
 ok(expected.every((f) => files.has(f)) && files.size === expected.length,
   `dist: the ${PAGES.length} pages, their twins, the ${TRANSLATED.length} translated pages in each of ${LANGS.length} languages and ${AGENT_FILES.join(', ')}, nothing else (${files.size} files${[...files].filter((f) => !expected.includes(f)).map((f) => `; extra ${f}`).join('')})`);
-ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} filled');
+ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist: every {{value}} filled');
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
 // Every {{value}} filled: a size is two words ("50 MB"), so the source's count (docs-test/check-budgets.mjs)
@@ -77,8 +78,9 @@ ok(![...files].some((f) => read(f).includes('{{')), 'dist: every {{value}} fille
 // docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-const PROSE_BUDGET = { index: 135, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 140, examples: 170 };
-const FILE_BUDGET = { index: 215, connect: 450, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 165, examples: 200, 404: 40 };
+// 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
+const PROSE_BUDGET = { index: 175, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
+const FILE_BUDGET = { index: 255, connect: 450, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -160,7 +162,8 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 // The why (2026-10-24), the first paragraph of both sites' home pages: one scene a newcomer gets.
-const WHY = "Your agent books, buys and asks for you. To the other side it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID of its own that anyone can check, no server needed: it proves who it is, keeps what others said about it, and gets paid.";
+const SUBLINE = 'Built and operated by an AI agent under a human owner, who answers for it.';
+const WHY = "Your agent books, buys and asks for you. To a shop or another agent it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID anyone can check, even offline: it proves who it is, keeps its good record and gets paid.";
 const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
   contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
@@ -219,9 +222,9 @@ ok(![...titles, ...descs].some((t) => /discount|not on sale|\b(?:January|Februar
 const VOID = new Set(['meta', 'link', 'br', 'hr', 'img', 'input', 'wbr']);
 function balance(h) {
   const stack = [];
-  for (const [, close, name] of h.replace(/<!doctype[^>]*>/i, '').replace(SCRIPT, '').matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*>/g)) {
+  for (const [, close, name, self] of h.replace(/<!doctype[^>]*>/i, '').replace(SCRIPT, '').matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*?(\/?)>/g)) {
     const tag = name.toLowerCase();
-    if (close) { if (stack.pop() !== tag) return `</${tag}> out of order`; } else if (!VOID.has(tag)) stack.push(tag);
+    if (close) { if (stack.pop() !== tag) return `</${tag}> out of order`; } else if (!VOID.has(tag) && !self) stack.push(tag);
   }
   return stack.length ? `unclosed ${stack.join(', ')}` : null;
 }
@@ -233,7 +236,14 @@ for (const p of PAGES) {
   const rest = h.replace(SCRIPT, '');
   ok(!/<script\b|<style\b|\sstyle=|\son[a-z]+\s*=|javascript:|\ssrc=|<(?:iframe|object|embed|img)\b/i.test(rest), `${p.slug}: no other script, inline style, handler or embedded resource`);
   ok(attrs(h, 'link', 'href').every((u) => u.startsWith('/') || u === pageUrl(p) || alternatesOf(p, LANGS).some(([, x]) => x === u)), `${p.slug}: loads nothing from another origin (stylesheet /style.css; the canonical and hreflang alternates name sigelo.ai)`);
-  ok(!/\b(?:og|twitter):/.test(h), `${p.slug}: no Open Graph or Twitter tags until a logo exists (A7)`);
+  {
+    const og = Object.fromEntries([...h.matchAll(/<meta property="(og:[\w:]+)" content="([^"]*)">/g)].map((m) => [m[1], m[2].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')]));
+    const card = h.match(/<meta name="twitter:card" content="([^"]*)">/)?.[1];
+    if (p.noindex) ok(!/\b(?:og|twitter):/.test(h), `${p.slug}: no Open Graph or Twitter tags (noindex)`);
+    else ok(og['og:url'] === pageUrl(p) && og['og:title'] === titleOf(p, r.pending) && og['og:type'] === 'website' && og['og:site_name'] === 'sigelo' && og['og:description']
+      && og['og:image'] === `${ORIGIN}/brand/og-ai.png` && og['og:image:width'] === '1200' && og['og:image:height'] === '630' && card === 'summary_large_image',
+      `${p.slug}: Open Graph (title, description, url = canonical, image brand/og-ai.png 1200 x 630) and twitter:card summary_large_image`);
+  }
   const why = balance(h);
   ok(why === null, `${p.slug}: tags balance${why ? ` (${why})` : ''}`);
   if (!p.noindex) {
@@ -284,9 +294,36 @@ for (const p of PAGES) {
 const adopt = join(ROOT, 'site', 'src', 'adopt.md');
 if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8')), 'pro: the link to sigelo.io/adopt.html#1-identity has its heading');
 
+// ---- the brand (relay/site/brand/, design/logo/make.py): icons linked, the seal in the header, files as made
+{
+  const all = [...PAGES.map((p) => [p.slug, html[p.slug]]), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => [`${l.code}/${slug}`, read(`${l.code}/${slug}.html`)]))];
+  const noIcons = all.filter(([, h]) => !h.includes(ICON_LINKS)).map(([n]) => n);
+  ok(noIcons.length === 0 && /^<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">\n<link rel="icon" type="image\/png" sizes="192x192" href="\/icon-192\.png">\n<link rel="icon" type="image\/png" sizes="512x512" href="\/icon-512\.png">\n<link rel="apple-touch-icon" href="\/icon-192\.png">\n$/.test(ICON_LINKS),
+    `every page (${all.length}): <link rel="icon"> favicon.svg, the PNGs 192 and 512, apple-touch-icon${noIcons.length ? ` (missing: ${noIcons.slice(0, 3).join(' ')})` : ''}`);
+  const noSeal = all.filter(([, h]) => !/<a class="wordmark" href="[^"]+"[^>]*><svg viewBox="0 0 100 100" class="seal" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="[^"]+"\/><\/svg>sigelo<\/a>/.test(h.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '')).map(([n]) => n);
+  ok(noSeal.length === 0 && SEAL_INLINE.length <= 3072 && !/fill="#|<title|role=/.test(SEAL_INLINE),
+    `every page: the header wordmark is the inline seal (${SEAL_INLINE.length} bytes ≤ 3 KB, aria-hidden, fill from the stylesheet) + "sigelo"${noSeal.length ? ` (not on: ${noSeal.slice(0, 3).join(' ')})` : ''}`);
+  const css = read('style.css');
+  ok(/:root \{[^}]*--seal: #9b2226;/.test(css) && /prefers-color-scheme: dark\) \{\s*:root \{[^}]*--seal: #c8423f;/.test(css) && /\.seal \{[^}]*fill: var\(--seal\)/.test(css),
+    'style.css: the seal in wax, seal-dark\'s #c8423f under a dark scheme');
+  for (const f of BRAND_FILES) {
+    const b = readFileSync(join(BRAND, f)), served = readFileSync(join(DRAFT, 'brand', f));
+    const svgOk = !f.endsWith('.svg') || (/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 \d+ \d+"[^>]*>[\s\S]*<\/svg>\n$/.test(b.toString()) && balance(b.toString()) === null
+      && !/<text|<image|<script|href=|url\(/.test(b.toString()) && b.length <= (f.startsWith('lockup') ? 10240 : 3072));
+    const pngOk = !f.endsWith('.png') || (b.subarray(1, 4).toString() === 'PNG' && b.readUInt32BE(16) === (f.startsWith('og') ? 1200 : Number(f.match(/\d+/)[0])));
+    ok(served.equals(b) && svgOk && pngOk, `brand/${f}: served as made${f.endsWith('.svg') ? ', an SVG that parses (svg root, viewBox, tags balance), no text, script or external reference' : ', a PNG of its size'}`);
+  }
+  ok(['favicon.svg', 'icon-192.png', 'icon-512.png'].every((f) => readFileSync(join(DRAFT, f)).equals(readFileSync(join(BRAND, f)))), '/favicon.svg, /icon-192.png, /icon-512.png: the brand files at the root');
+  // In the private tree (assets/brand/ beside relay/): the copy is byte-identical. Published alone, nothing to compare.
+  const shared = join(ROOT, 'assets', 'brand');
+  if (existsSync(shared)) ok(BRAND_FILES.every((f) => readFileSync(join(BRAND, f)).equals(readFileSync(join(shared, f)))), 'relay/site/brand/ = assets/brand/, byte for byte (design/logo/make.py writes both)');
+  const types = readFileSync(DEPLOY, 'utf8').match(/server_name sigelo\.ai;[\s\S]*?types \{([^}]*)\}/)?.[1] ?? '';
+  ok(/image\/png png;/.test(types) && /image\/svg\+xml svg;/.test(types), 'nginx.conf (sigelo.ai): png and svg typed');
+}
+
 // ---- header and footer (A10): the wordmark and the links, nothing else (2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-const linksIn = (h) => [...h.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
+const linksIn = (h) => [...h.replaceAll(SEAL_INLINE, '').matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
 const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
 const HEAD_LINKS = ['about', 'connect', 'pro', 'contact']; // the header: About, Get started, Plans, Contact; the rest are footer-only
 // The footer: the wordmark, the links, then one <details> "Other languages" as the last item of its
@@ -321,22 +358,26 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
 {
   const hero = html.index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '';
   const ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1]));
-  ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
+  // 2026-10-25 (Owner): the motto's sub-line right under it, saying who answers for the agent.
+  ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === SUBLINE && ps[1] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
     && /<div class="cta">\n<p><a href="\/connect\.html">Try it with two agents →<\/a><\/p>\n<\/div>/.test(hero),
-    `index: the hero is the motto (H1), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
+    `index: the hero is the motto (H1), its sub-line (an AI agent under a human owner, who answers for it), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
   const io = join(ROOT, 'site', 'src', 'index.md');
   if (existsSync(io)) ok(readFileSync(io, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').split('\n').find((x) => /^[A-Za-z]/.test(x)) === WHY, 'sigelo.io /: its first paragraph is the same why, word for word');
   // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on /about, right after the why on /.
-  const LAYERS = 'sigelo.ai is the relay for sigelo identities, the first service on the open protocol at [sigelo.io](https://sigelo.io/): ';
-  const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY);
-  ok(['index', 'about'].every((slug) => firstLines(slug)[0]?.startsWith(LAYERS)),
-    'index, about: the first sentence (after the why) says sigelo.ai is the relay for sigelo identities, built on the open protocol at sigelo.io');
-  ok(body.index.includes(DISCLOSURE.replace(', csigelo.', '.')) && DISCLOSURE.endsWith(', csigelo.'), 'index: the disclosure, "Built and operated by an AI agent under a human owner."');
+  // 2026-10-25 (naive readers lost "protocol" and "relay"): the relay said by what it does, in plain words.
+  // Round 3 asked "why does an ID card need a message server?": the relay is what the ID lets agents do.
+  const USE = 'With the ID, a key only it holds, agents can message each other and shops, with no account anywhere.';
+  const LAYERS = 'sigelo.ai is the post office for [sigelo IDs](https://sigelo.io/) (a relay): it carries those messages and sees who talks to whom, never what they say.';
+  const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY && x !== SUBLINE);
+  ok(firstLines('index')[0]?.startsWith(`${USE} ${LAYERS}`) && firstLines('about')[0]?.endsWith(USE) && firstLines('about')[1]?.startsWith(LAYERS),
+    'index, about: first what the ID lets agents do (message each other and shops, no account), then sigelo.ai as the relay for sigelo IDs (linking sigelo.io): the post office that carries those messages, seeing who talks to whom, never what');
+  ok(body.index.includes(SUBLINE) && SUBLINE === DISCLOSURE.replace(', csigelo.', ', who answers for it.'), 'index: the disclosure, "Built and operated by an AI agent under a human owner, who answers for it."');
   const cards = [...html.index.matchAll(/<div class="card( pro)?">\n<h3 id="[^"]+">([^<]+)<\/h3>/g)].map((m) => m[2]);
-  ok(cards.join() === 'Free,Pro,Enterprise' && /<div class="card">\n<h3 id="enterprise">Enterprise<\/h3>\n<p>Teams and swarms of agents\.<\/p>\n<p><strong><a href="\/contact\.html">Contact us<\/a><\/strong><\/p>/.test(html.index),
+  ok(cards.join() === 'Free,Pro,Enterprise' && /<div class="card">\n<h3 id="enterprise">Enterprise<\/h3>\n<p>Teams with many agents\.<\/p>\n<p><strong><a href="\/contact\.html">Contact us<\/a><\/strong><\/p>/.test(html.index),
     'index: three tier cards, Free, Pro, Enterprise; Enterprise\'s price cell is "Contact us", linked to /contact');
   ok(DRAWINGS.relay && html.index.includes(DRAWINGS.relay) && /<svg [^>]*role="img" aria-labelledby="drawing-relay-title">\n<title id="drawing-relay-title">[^<]{20,}<\/title>/.test(DRAWINGS.relay)
-    && !/\s(?:style|on[a-z]+|href|xlink:href|src)=/.test(DRAWINGS.relay) && PAGES.every((p) => p.slug === 'index' || !html[p.slug].includes('<svg')),
+    && !/\s(?:style|on[a-z]+|href|xlink:href|src)=/.test(DRAWINGS.relay) && PAGES.every((p) => p.slug === 'index' || !html[p.slug].replaceAll(SEAL_INLINE, '').includes('<svg')),
     'index: one inline drawing, role img with a title, no style, handler or link in it; no other page has one');
   ok(/::: cta\n\[Contact us →\]\(\/contact\.html\)\n:::\n?$/.test(src.enterprise) && src.enterprise.includes('\n\nEnterprise is coming soon. Every agent runs free until then.\n\n')
     && src.enterprise.includes('\n## Run your own relay\n') && src.enterprise.includes('(https://github.com/csigelo/sigelo-relay/blob/main/deploy/README.md)')
@@ -576,6 +617,24 @@ for (const l of LANGS) {
   ok(T.contact.includes(`<code>${SIMPLEX}</code>`) && !T.contact.includes(`href="${SIMPLEX}"`) && T.contact.includes(`<code>${PAYMENT_PLACES[0]}</code>`) && T.contact.includes('<code>site/contact.md</code>'),
     `${l.code}/contact: the SimpleX address as text, and where how to pay is published: the English page ${PAYMENT_PLACES[0]} and site/contact.md (a translation is not a third place)`);
 }
+// The motto is the project's, in every language (2026-10-25, Owner): lang.json `motto` and
+// `disclosure`, none still English; the home page's H1 is that motto; the WebSite description joins them.
+{
+  const raw = Object.fromEntries(LANGS.map((l) => [l.code, JSON.parse(readFileSync(join(SITE, I18N, l.code, 'lang.json'), 'utf8'))]));
+  const off = LANGS.filter((l) => {
+    const j = raw[l.code], h1 = thtml[l.code].index.match(/<h1 id="[^"]*">([^<]*)<\/h1>/)?.[1];
+    return typeof j.motto !== 'string' || typeof j.disclosure !== 'string' || 'site' in j || j.motto === MOTTO || /By AI, for AI|Built and operated by/i.test(`${j.motto} ${j.disclosure}`)
+      || plainText(h1 ?? '') !== l.motto || l.site !== `${l.motto} ${l.disclosure}` || /By AI, for AI/.test(thtml[l.code].index);
+  }).map((l) => l.code);
+  ok(LANGS.length === 30 && off.length === 0, `motto: every language's lang.json has its own motto and disclosure (no "site", none English), the home H1 is that motto, no English motto on its home page${off.length ? ` (off: ${off.join(', ')})` : ''}`);
+  const tmp = mkdtempSync(join(tmpdir(), 'sigelo-motto-')), de = join(tmp, I18N, 'de');
+  cpSync(join(SITE, I18N, 'de'), de, { recursive: true });
+  writeFileSync(join(de, 'lang.json'), JSON.stringify({ ...raw.de, motto: MOTTO }));
+  const planted = readLanguages(tmp, src)[0];
+  rmSync(tmp, { recursive: true, force: true });
+  ok(planted?.why.some((w) => /de\/lang\.json: the motto or the disclosure is still English/.test(w)) && LANGS.every((l) => !l.why.some((w) => /still English/.test(w))),
+    'motto: readLanguages refuses a lang.json whose motto is still English (planted in a copy of de), none of the real ones');
+}
 // hreflang is symmetric: every variant of a page names the same set, itself among them; the English pages too.
 {
   const asym = TRANSLATED.filter((slug) => {
@@ -588,10 +647,14 @@ for (const l of LANGS) {
   ok(new Set(LANGS.map((l) => l.name)).size === LANGS.length && LANGS.every((l) => l.name !== 'English' && !/<|&/.test(l.name + l.other)),
     'languages: each named by its own name, once');
 }
-// The hero in every language as in English (2026-10-24): the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect.
+// The hero in every language as in English (2026-10-24): the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect;
+// under it (2026-10-25) what the button needs, an agent that runs commands, and what to do without one (the one link: the Linux phone app);
+// over the why (2026-10-25, round 4) the motto's sub-line, no link.
 ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '', ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
-  return hero.includes(`<h1 id=`) && ps.length === 3 && !ps[0].includes('<a ') && ps[1].includes('<a href="https://sigelo.io/">') && ps[2].startsWith(`<a href="/${l.code}/connect.html">`); }),
-  'home page in every language: the motto, the why, the two layers linking sigelo.io, the button to its /connect, as the English');
+  const links = (x) => [...x.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]).join();
+  return hero.includes(`<h1 id=`) && ps.length === 5 && !ps[0].includes('<a ') && !ps[1].includes('<a ') && ps[2].includes('<a href="https://sigelo.io/">') && ps[3].startsWith(`<a href="/${l.code}/connect.html">`)
+    && links(ps[4]) === 'https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md'; }),
+  'home page in every language: the motto, its sub-line, the why, the two layers linking sigelo.io, the button to its /connect, what it needs, as the English');
 {
   // The home page's title in each language, pinned (the head a search result shows).
   const HOME_TITLE = {"de":"sigelo relay — verschlüsselte Nachrichten für KI-Agenten", "es":"sigelo relay — mensajes cifrados para agentes de IA", "fr":"sigelo relay — messagerie chiffrée pour agents IA", "it":"sigelo relay — messaggi cifrati per agenti IA", "ja":"sigelo relay — AIエージェントのための暗号化メッセージ", "nl":"sigelo relay — versleutelde berichten voor AI-agents", "pl":"sigelo relay — szyfrowane wiadomości dla agentów AI", "pt-br":"sigelo relay — mensagens criptografadas para agentes de IA",
@@ -644,7 +707,7 @@ ok(index.relay.a2a === false && /not post-quantum/.test(index.crypto.signatures)
 // takes no new messages on either tier (A5 review): pro.md says so under its table, the data files too.
 ok(index.relay.queue === QUEUE_NOTE && relayInfo.limits.queue === QUEUE_NOTE && /no_reader/.test(QUEUE_NOTE) && /about a week ahead on every tier/.test(QUEUE_NOTE)
   && /^\| Messages wait up to \|[^\n]*\n(?:\|[^\n]*\n)*\nAn agent away over a week takes no new messages until back, on either plan: they wait with the sender\.$/m.test(body.pro)
-  && body.connect.includes('Messages wait while an agent is offline: 14 days at the relay; past a week, with the sender.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
+  && body.connect.includes('Messages wait at sigelo.ai for 14 days for an offline agent; if it is away over a week, the sender keeps new ones.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
   'pro, connect, agents, index.json, relay.json: retention is how long a queued message waits; an agent away over a week takes no new messages (no_reader), whatever the tier');
 const carrier = join(ROOT, 'contact', 'carrier.mjs');
 if (existsSync(carrier)) {
@@ -1193,8 +1256,8 @@ ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === 
 ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
   `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
 ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
-  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /Android coming soon/.test(src.connect),
-  'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app; Android coming soon)');
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
+  'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app, Linux phones; no "coming soon")');
 ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
   'connect: the steps render as one numbered list, five items, a code block in each');
 // index.json's commands are build.mjs's: connect.md's blocks after the install line, line for line.
@@ -1202,9 +1265,9 @@ ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (htm
 // make the key, it was stuck where a reader of the page was not.
 ok(index.client.install === QUICK[0] && index.client.commands.join('\n') === QUICK.slice(1).join('\n'),
   `index.json: client.install and client.commands are connect.md's quick start (index.json: ${index.client.commands.join(' | ')})`);
-ok(src.index.includes('No account to open: each agent logs in with its own [sigelo identity](https://sigelo.io/).') && src.index.includes(`\n\n${r.pending ? HOME_PENDING : HOME_ON_SALE}\n\n`)
+ok(src.index.includes('With the ID, a key only it holds, agents can message each other and shops, with no account anywhere.') && src.index.includes(`\n\n${r.pending ? HOME_PENDING : HOME_ON_SALE}\n\n`)
   && /\]\(\/connect\.html\)/.test(src.index),
-  `index: no account, the agent's own sigelo identity; the Pro card${r.pending ? ' says "Coming soon."' : ''}; links to /connect`);
+  `index: no account, the ID a key only the agent holds; the Pro card${r.pending ? ' says "Coming soon."' : ''}; links to /connect`);
 if (allowance && mailbox && operator && db) {
   const { free, pro } = allowance.TIERS, { MB, KB } = allowance, DAY = db.DAY;
   const size = (b) => (b % MB === 0 ? `${b / MB} MB` : `${b / KB} KB`);

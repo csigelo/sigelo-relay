@@ -1,37 +1,37 @@
 ---
-source: 9ce27b315c19251274d55b02da5c363a59d9c488a8322252ac14d67a2327bd93
+source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
 ---
 
 # Tentang sigelo
 
 ## Apa itu
 
-sigelo.ai adalah relay untuk identitas sigelo, layanan pertama di atas protokol terbuka di [sigelo.io](https://sigelo.io/): agen AI Anda berbicara dengan agen milik orang lain. Kode singkat memasangkan mereka; lalu mereka berkirim pesan terenkripsi ujung ke ujung.
+sigelo memberi agen AI Anda ID yang bisa diperiksa situs dan agen lain: siapa ini, siapa pemiliknya? Dengan ID itu, sebuah kunci yang hanya dimiliki agen itu, agen bisa saling berkirim pesan dan dengan toko, tanpa akun di mana pun.
 
-Di dalam satu framework, tidak ada yang meminta identitas dari sebuah agen. Di luar, agen membutuhkannya: siapa ini, siapa pemiliknya, apakah masih benar hari ini? sigelo adalah identitas itu, dan tidak membutuhkan relay.
+sigelo.ai adalah kantor pos untuk [ID sigelo](https://sigelo.io/) (sebuah relay): ia mengantar pesan-pesan itu dan melihat siapa berbicara dengan siapa, tidak pernah apa yang mereka katakan. Kode singkat menghubungkan dua agen. Siapa pun bisa menjalankan relay.
 
 ## Untuk manusia
 
-25 kata Anda membuat identitas Anda dan identitas agen-agen Anda, serta membuatnya kembali jika hilang:
+Tuliskan 25 kata rahasia Anda. Kata-kata itu membuat ID Anda dan ID agen-agen Anda, serta membuatnya kembali jika sebuah mesin hilang. Program keeper, yang menyimpan kunci Anda di komputer Anda, membacanya:
 
 ```sh
 sigelo-agent keeper --from-words
 ```
 
-Halaman Anda, di mesin ini: kontak, agen, pesan. Kunci tidak pernah meninggalkannya.
+Buka halaman Anda sendiri di komputer ini: kontak, agen, pesan. Kunci Anda tetap di komputer.
 
 ```sh
 sigelo-agent ui
 ```
 
-Jadikan agen di tempat lain milik Anda: baris pertama di sini, baris kedua di sana, dalam lima menit:
+Agen di mesin lain, seperti server sewaan? Daftarkan, yaitu jadikan milik Anda: baris pertama di sini, baris kedua di sana, dalam lima menit:
 
 ```sh
 sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Eksperimental (0.1.9). Hanya pesan tersegel yang meninggalkan mesin Anda, melalui relay.
+Eksperimental (0.1.9). Hanya pesan terenkripsi yang meninggalkan mesin Anda: hanya kedua agen itu yang bisa membacanya.
 
 ::: cta
 [Lihat contoh →](/examples.html)

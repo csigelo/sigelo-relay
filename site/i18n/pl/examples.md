@@ -1,17 +1,17 @@
 ---
-source: 7d659fa162e34969403bbcc9082759668ab6dfe7fead971cc6f61f8a8ef00157
+source: 478ceb0d45ff3407aca7c19ad2112713dbb44ad1c126b802eb6e9d233200b26e
 ---
 
 # Przykłady
 
-Do czego służy sigelo, w sześciu codziennych scenach.
+sigelo to identyfikator dla agentów AI, który każdy może sprawdzić, plus wiadomości, które mogą przeczytać tylko dwaj agenci. Sześć codziennych scen:
 
-- **Twój agent na wynajętym serwerze.** Jeden krótki kod czyni go twoim: jego raporty docierają do ciebie jako raporty twojego agenta, a żaden inny agent nie może się pod niego podszyć.
-- **Plik od agenta znajomego.** Raz, przy parowaniu, porównaliście cztery słowa, więc twój agent wie, kto go wysłał.
-- **Agent hotelu lub firmy.** Pokazuje, kto go prowadzi, w oświadczeniu podpisanym przez właściciela. Twój agent sprawdza je offline, bez pytania żadnego serwera; podróbka o tej samej nazwie nie przechodzi.
-- **Twoi agenci na trzech komputerach.** Rozpoznają się nawzajem jako twoi; twoje pozostałe kontakty nic się o nich nie dowiadują.
-- **Utracony serwer.** Twoje 25 słów tworzy tego samego agenta na nowo, z tym samym dowodem; kto ponownie się z nim sparuje, znajdzie agenta, którego znał.
-- **Sklep, który nie może ci przeszkadzać.** Oznacz go jako cichy, a jego wiadomości poczekają, aż je otworzysz.
+- **Twój agent na wynajętym serwerze.** Jeden krótki kod czyni go twoim. Jego raporty docierają do ciebie jako raporty twojego agenta; żaden inny agent nie może się pod niego podszyć.
+- **Plik od agenta znajomego.** Gdy agenci połączyli się po raz pierwszy, porównaliście cztery słowa: twój agent wie, kto go wysłał.
+- **Agent hotelu.** Pokazuje, kto go prowadzi, w oświadczeniu podpisanym przez hotel. Twój agent sprawdza to sam, bez pytania żadnego serwera. Podróbka o tej samej nazwie nie przechodzi.
+- **Twoi agenci na trzech komputerach.** Rozpoznają się nawzajem jako twoi. Twoje pozostałe kontakty nic się o nich nie dowiadują.
+- **Utracony serwer.** Twoje 25 słów tworzy tego samego agenta na nowo, z tym samym identyfikatorem.
+- **Agent sklepu, który nie może ci przeszkadzać.** Oznacz go jako cichy: jego wiadomości poczekają, aż je otworzysz.
 
 ```sh
 sigelo-agent enrol --name vps --wait 300    # the server: see About
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Eksperymentalne (0.1.9), bez audytu. Zacznij od [Połącz](/connect.html) lub [O sigelo](/about.html).
+Eksperymentalne (0.1.9), bez audytu. Zacznij tutaj: [Wypróbuj z dwoma agentami](/connect.html).
