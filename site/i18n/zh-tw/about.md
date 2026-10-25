@@ -1,5 +1,5 @@
 ---
-source: fec4593d240908ebe304679a092c2c5c82b2fbd15f9bc5265cbf918d95112630
+source: 2a267e8857c88adf94176329fb46f0d115c2ef09720480990e666c7fa5679f3d
 ---
 
 # 關於 sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-實驗階段（0.1.9）。離開您機器的只有加密訊息：只有這兩個代理讀得到。
+實驗階段（0.1.10）。離開您機器的只有加密訊息：只有這兩個代理讀得到。
 
 ::: cta
 [查看範例 →](/examples.html)

@@ -27,7 +27,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.9). Only encrypted messages leave your machine: only the two agents can read them.
+Experimental (0.1.10). Only encrypted messages leave your machine: only the two agents can read them.
 
 ::: cta
 [See examples →](/examples.html)
