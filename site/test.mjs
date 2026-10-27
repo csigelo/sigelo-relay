@@ -34,7 +34,7 @@ import {
   LAUNCH_RECORD, fill, VENDOR_PENDING, VENDOR_PENDING_PAGES, vendorPending, vendorRefusals, launchCheck, pinnedVendor, HOME_PENDING, HOME_ON_SALE,
   recordRefusals, registryRefusals, PROTOCOL, SITE_DESCRIPTION, CONTACT_VERBS_SINCE, NPM_REGISTRY, versionAtLeast, SIMPLEX, quickStart, stripBoxes, FOOTER, DRAWINGS,
   HEADER, TRANSLATED, OTHER_LANGUAGES, I18N, FRONT_RE, sha256, englishStringsHash, readLanguages, translationRefusals, GLOSSARY, glossed, glossedMeta, localize, pageUrlIn, titleIn, alternatesOf, PRICE_TOKEN_RE, parseIn, drawingRelay, DRAWING_WORDS, STALE_NOTE,
-  BRAND, BRAND_FILES, SEAL_INLINE, ICON_LINKS,
+  BRAND, BRAND_FILES, SEAL_INLINE, ICON_LINKS, DISCLOSED, DARK, readDark, darkOut, darkPlaceholders,
 } from './build.mjs';
 
 const SITE = dirname(fileURLToPath(import.meta.url));
@@ -104,7 +104,7 @@ const budgetsFile = join(ROOT, 'docs-test', 'budgets.json');
 if (existsSync(budgetsFile)) {
   const b = JSON.parse(readFileSync(budgetsFile, 'utf8'));
   const wrong = PAGES.filter((p) => b[`relay/site/${p.slug}.md`] !== budget(p.slug)).map((p) => p.slug);
-  const stale = Object.keys(b).filter((k) => k.startsWith('relay/site/') && !PAGES.some((p) => k === `relay/site/${p.slug}.md`));
+  const stale = Object.keys(b).filter((k) => k.startsWith('relay/site/') && !k.startsWith(`relay/site/${DARK}/`) && !PAGES.some((p) => k === `relay/site/${p.slug}.md`));
   ok(wrong.length === 0 && stale.length === 0, `docs-test/budgets.json: the same whole-file budgets for the pages, none for a page that is gone${wrong.length ? ` (differs: ${wrong.join(', ')})` : ''}${stale.length ? ` (stale: ${stale.join(', ')})` : ''}`);
 }
 
@@ -1531,6 +1531,70 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
 }
 
 // ---- the internal runbook's self-test (private tree only) --------------------------------------
+// ---- dark pages (ROADMAP §15 R1): built aside while DISCLOSED is false, pages of the site once true ----
+// In the relay's public export relay/site/dark/ is left out (release/publish.sh) while DISCLOSED is false,
+// so there these checks see no dark page and only the flag's mechanics are checked (with a fixture).
+{
+  const dark = readDark(SITE), slugs = dark.map((d) => d.slug);
+  const linksTo = (text, slug) => new RegExp(`(?:^|[^\\w-])${slug}\\.(?:html|md)\\b`).test(text);
+  const textFiles = [...files].filter((f) => !f.endsWith('.png'));
+  if (!DISCLOSED) {
+    ok(slugs.every((s) => !files.has(`${s}.html`) && !files.has(`${s}.md`)) && !existsSync(join(DRAFT, DARK)),
+      `dark: DISCLOSED false: none of the ${dark.length} dark pages (${slugs.join(', ') || 'none here'}) is in dist`);
+    const linking = textFiles.flatMap((f) => slugs.filter((s) => linksTo(read(f), s)).map((s) => `${f} → ${s}`));
+    ok(linking.length === 0, `dark: nothing in dist links to a dark page or names its URL (pages, twins, translations, sitemap, index.json, llms.txt, llms-full.txt)${linking.length ? ` (${linking.slice(0, 5).join('; ')})` : ''}`);
+    const sitemap = read('sitemap.xml'), idx = JSON.parse(read('index.json'));
+    ok(slugs.every((s) => !sitemap.includes(`/${s}.html`) && !idx.pages.some((p) => p.slug === s) && !read('llms.txt').includes(`/${s}.`)),
+      'dark: the sitemap, index.json pages and llms.txt lack every dark page');
+    const aside = darkOut(DRAFT);
+    ok(slugs.every((s) => existsSync(join(aside, `${s}.html`)) && existsSync(join(aside, `${s}.md`))) && (dark.length ? existsSync(aside) : !existsSync(aside)),
+      `dark: built aside, in <out>-${DARK}/ (relay/site/dist-${DARK}/ for dist/), each with its twin`);
+    ok(slugs.every((s) => { const h = readFileSync(join(aside, `${s}.html`), 'utf8'); return h.includes('<meta name="robots" content="noindex">') && !h.includes('rel="canonical"') && !h.includes('application/ld+json') && !h.includes('og:'); }),
+      'dark: each aside page is noindex, with no canonical, JSON-LD or Open Graph');
+    ok(r.dark.join() === slugs.join() && r.disclosed === false, 'dark: build() reports the dark pages and DISCLOSED false');
+  }
+  // The sources, whatever the flag: the budgets, the words never written, the payment line, the seller
+  // sentence with its placeholders until filled, and the quote path to the contact page.
+  const b = existsSync(budgetsFile) ? JSON.parse(readFileSync(budgetsFile, 'utf8')) : null;
+  for (const d of dark) {
+    const file = `relay/site/${DARK}/${d.slug}.md`, text = readFileSync(join(SITE, DARK, `${d.slug}.md`), 'utf8'), w = words(text);
+    if (b) ok(b[file] <= 220 && w <= b[file], `dark: ${file}: ${w} words, budget ${b[file]} (≤ 220) in docs-test/budgets.json`);
+    const hits = neverHits(text);
+    ok(hits.length === 0 && !/audit|s[t]ripe|credit card|not on sale|invoiced in euros|reverse.charge|excl\.? VAT|net price|\bVAT rate\b/i.test(text),
+      `dark: ${d.slug}: no word never written (the relay's list, "audit", the card processor, "not on sale", "Invoiced in euros", reverse charge, net prices)${hits.length ? ` (${hits.join('; ')})` : ''}`);
+    ok(text.includes('VAT included. Bank transfer, or Monero at 10 % off. No card.') && [...text.matchAll(/€/g)].length === [...text.matchAll(/<[a-z ]*price> €/g)].length,
+      `dark: ${d.slug}: the payment line, and every price gross as "<… price> €" (one figure, VAT included, the Owner's to fill)`);
+    ok(/sold by (?:<Company legal name>|[^<\n]+), (?:<country>|[^<\n]+) \((?:<VAT no\.>|[^<\n]+)\)\./.test(text) && /\[Contact us for a quote\]\(\/contact\.html\)/.test(text),
+      `dark: ${d.slug}: the seller sentence, and "Contact us for a quote" to the contact page`);
+  }
+  // The flag is one line release/publish.sh can read, and publish.sh leaves dark/ out of the relay's export by it.
+  ok(/^export const DISCLOSED = (?:true|false);$/m.test(readFileSync(join(SITE, 'build.mjs'), 'utf8')), 'dark: build.mjs says `export const DISCLOSED = true|false;` on one line (release/publish.sh reads it)');
+  const publish = join(ROOT, 'release', 'publish.sh');
+  if (existsSync(publish)) ok(readFileSync(publish, 'utf8').includes(`grep -q '^export const DISCLOSED = true;$' "$stage/site/build.mjs" || { rm -rf "$stage/site/dark"; dark_out=1; }`),
+    'dark: release/publish.sh --relay leaves site/dark/ out of the public export unless DISCLOSED is true');
+  // Flipped: a copy of the sources with one dark page (its own, or a fixture where none is here) builds
+  // it as a page of the site, and its placeholders are open.
+  const dir = mkdtempSync(join(OUT, 'lit-'));
+  cpSync(SITE, dir, { recursive: true, filter: (f) => !/[\\/]dist(?:-dark)?$/.test(f) });
+  if (!dark.length) {
+    mkdirSync(join(dir, DARK), { recursive: true });
+    writeFileSync(join(dir, DARK, 'fixture.md'), '---\ntitle: Fixture\ndescription: A dark fixture page.\n---\n\n# Fixture\n\n<fixture price> €, VAT included. `<code>` is not a placeholder.\n');
+  }
+  const lit = readDark(dir), litOut = join(dir, 'dist');
+  const rl = build({ site: dir, out: litOut, disclosed: true });
+  const litRead = (f) => readFileSync(join(litOut, f), 'utf8');
+  ok(lit.every((d) => existsSync(join(litOut, `${d.slug}.html`)) && existsSync(join(litOut, `${d.slug}.md`)) && !litRead(`${d.slug}.html`).includes('noindex')
+    && litRead(`${d.slug}.html`).includes(`<link rel="canonical" href="${ORIGIN}/${d.slug}.html">`)) && !existsSync(darkOut(litOut)) && rl.pages === PAGES.length + lit.length,
+    `dark: DISCLOSED true: ${lit.map((d) => d.slug).join(', ')} built into dist as indexed pages (canonical, no noindex), nothing aside`);
+  const litIdx = JSON.parse(litRead('index.json'));
+  ok(lit.every((d) => litRead('sitemap.xml').includes(`<loc>${ORIGIN}/${d.slug}.html</loc>`) && litIdx.pages.some((p) => p.slug === d.slug)
+    && litRead('llms.txt').includes(`(${ORIGIN}/${d.slug}.md)`) && litRead('llms-full.txt').includes(`Source: ${ORIGIN}/${d.slug}.md`)),
+    'dark: DISCLOSED true: each is in the sitemap, index.json pages, llms.txt and llms-full.txt');
+  const holes = lit.flatMap((d) => darkPlaceholders(d.md).map((x) => `${DARK}/${d.slug}.md: ${x}`));
+  ok(holes.length > 0 && holes.every((x) => rl.open.includes(x)) && !holes.some((x) => x.includes('<code>') || x.includes('<your command>')),
+    `dark: DISCLOSED true: every placeholder left is open (${holes.length}; --final refuses), code aside`);
+}
+
 const runbook = join(ROOT, 'commercial', 'relay-pro-runbook.md');
 if (existsSync(runbook)) {
   const FENCE = '`'.repeat(3);

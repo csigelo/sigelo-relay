@@ -48,7 +48,8 @@ import { checkEntries, checkRegistry, RELEASE_DID } from './registry.mjs';
 const SITE = dirname(fileURLToPath(import.meta.url));
 const RELAY = dirname(SITE);
 export const ROOT = dirname(RELAY);   // the private tree; in the relay's own export, what lies above relay/
-export const DIST = join(SITE, 'dist');
+const DIST_NAME = 'dist';
+export const DIST = join(SITE, DIST_NAME);
 export const DEPLOY = join(RELAY, 'deploy', 'nginx.conf');
 export const ORIGIN = 'https://sigelo.ai';
 export const HOST = 'relay.sigelo.ai';
@@ -217,6 +218,38 @@ export const pageUrl = (p) => (p.slug === 'index' ? `${ORIGIN}/` : `${ORIGIN}/${
 const headOf = (p, pending) => ({ title: p.title, description: p.description, ...(pending && p.pending) });
 export const titleOf = (p, pending = false) => (p.slug === 'index' ? p.title : `${headOf(p, pending).title} — sigelo relay`);
 export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).description, p.slug);
+
+// Dark pages (ROADMAP §15 R1): pages written ahead of the Owner's go, in relay/site/dark/<slug>.md, each
+// beginning with front matter `---`, `title: …`, `description: …`, `---`, then its H1. While DISCLOSED is
+// false they are built OUTSIDE the site, into <out>-dark/ (relay/site/dist-dark/ for dist/), as noindex
+// pages to read locally: never into dist/, so a deploy cannot carry them, and in no nav, sitemap,
+// index.json, llms.txt or llms-full.txt. release/publish.sh --relay leaves relay/site/dark/ out of the
+// relay's public export while this line says false, so the sources stay private too. Flipping it to true
+// (on disclosure day) builds them as pages of the site: dist/<slug>.html and .md, indexed, in
+// the sitemap, index.json, llms.txt and llms-full.txt; each `<placeholder>` left in one is then open, so
+// --final refuses until it is filled. relay/site/test.mjs checks both states.
+export const DISCLOSED = false;
+export const DARK = 'dark';
+const DARK_FRONT_RE = /^---\ntitle: ([^\n]+)\ndescription: ([^\n]+)\n---\n\n?/;
+// `<words>` outside code that is not an autolink: a value the Owner fills on disclosure day (price, seller).
+export const DARK_PLACEHOLDER_RE = /<(?!https?:\/\/)[^<>\n]+>/g;
+export const darkPlaceholders = (md) => [...new Set(md.replace(/^( *)```[\s\S]*?^\1```$/gm, '').replace(/`[^`\n]*`/g, '').match(DARK_PLACEHOLDER_RE) ?? [])];
+// → [{ slug, nav: null, dark: true, title, description, md }] from site/dark/, by file name; [] without it.
+export function readDark(site = SITE) {
+  const dir = join(site, DARK);
+  if (!existsSync(dir)) return [];
+  const taken = new Set(PAGES.map((p) => p.slug));
+  return readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => {
+    const slug = f.slice(0, -3), text = readFileSync(join(dir, f), 'utf8'), m = text.match(DARK_FRONT_RE);
+    if (!/^[a-z][a-z0-9-]*$/.test(slug) || taken.has(slug)) throw new Error(`${DARK}/${f}: want a new slug of a-z, 0-9 and -`);
+    if (!m) throw new Error(`${DARK}/${f}: does not begin with front matter: ---, title: …, description: …, ---`);
+    const md = text.slice(m[0].length);
+    if (!/^# /.test(md)) throw new Error(`${DARK}/${f}: no H1 after the front matter`);
+    return { slug, nav: null, dark: true, title: m[1], description: m[2], md };
+  });
+}
+// Where the dark pages go while DISCLOSED is false: beside the output, never inside it.
+export const darkOut = (out) => `${out}-${DARK}`;
 
 // ---------------------------------------------------------------------------------------------
 // Languages (2026-10-16): the seven pages a person reads (TRANSLATED), in every language
@@ -1181,7 +1214,7 @@ function git(...args) {
 const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths);
 
 // llms.txt (SEO spec §4.3): one fetch tells an agent what this is and where the rest is.
-function llmsTxt(version, pending) {
+function llmsTxt(version, pending, lit = []) {
   return `# sigelo relay
 
 > Your agent talks to another agent, yours or someone else's: a person says an 8-character code; then they message end to end; the relay cannot read it, but sees who talks to whom. Login by sigelo identity, no accounts. Messages wait while one is offline. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
@@ -1208,7 +1241,7 @@ ${MOTTO} ${DISCLOSURE}
 - [Examples](${ORIGIN}/examples.md): uses
 - [Privacy](${ORIGIN}/privacy.md): what is kept
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
-- [Source](${REPO}): AGPL-3.0
+${lit.map((p) => `- [${p.title}](${ORIGIN}/${p.slug}.md)\n`).join('')}- [Source](${REPO}): AGPL-3.0
 `;
 }
 
@@ -1225,16 +1258,21 @@ export const quickStart = (md) => [...md.matchAll(/^( *)```sh\n([\s\S]*?)\n\1```
 // default to SELLER and the DID the relay pins (pinnedVendor). A test builds changed copies through
 // these.
 export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY, root = ROOT, seller = SELLER,
-  vendor = pinnedVendor(), proStorage = proStorageCap() } = {}) {
+  vendor = pinnedVendor(), proStorage = proStorageCap(), disclosed = DISCLOSED } = {}) {
   const md = readPages(site);
+  // The dark pages: pages of the site once disclosed (their placeholders open), else built aside.
+  const dark = readDark(site), lit = disclosed ? dark : [], pages = [...PAGES, ...lit];
+  for (const d of lit) md[d.slug] = d.md;
+  const srcOf = (p) => (p.dark ? join(site, DARK, `${p.slug}.md`) : join(site, `${p.slug}.md`));
   const open = [...new Set(Object.values(md).flatMap((text) => text.match(PLACEHOLDER_RE) ?? []))];
   if (DRAFT_RE.test(md.terms)) open.push('DRAFT');
   if (seller === null) open.push('SELLER');
   const vendorSet = vendor !== DEV_VENDOR_DID, pending = vendorPending(md) === true;
   open.push(...vendorRefusals(md, vendor), ...deployRefusals(deploy), ...launchGate(root, site));
+  for (const d of lit) open.push(...darkPlaceholders(d.md).map((x) => `${DARK}/${d.slug}.md: ${x}`));
   const price = priceOf(md.pro), storage = md.pro.match(STORAGE_RE)?.[1];
   const wrong = [
-    ...paymentDetailRefusals(md),
+    ...paymentDetailRefusals({ ...md, ...Object.fromEntries(dark.map((d) => [`${DARK}/${d.slug}`, d.md])) }),
     !price && 'pro: no price table (a "### N months *save n %*" plan a period: "**x €** a month", "y € for N months", "[Get Pro](/contact.html)", adding up to the cent) and "VAT included. … Bank transfer, or Monero at n % off." line',
     !storage && 'pro: no "| Room for waiting messages | … | N MB or N GB |" row',
     proStorage === null ? 'RELAY_PRO_STORAGE_MB: want a whole number of MB from 1 to 10000000, as the relay reads it'
@@ -1252,7 +1290,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   }
   const live = langs.filter((l) => !l.why.length), stale = live.flatMap((l) => l.stale);
   if (final && (open.length || wrong.length)) throw new Error(`--final: ${[...open, ...wrong].join('; ')}`);
-  for (const p of PAGES) if (!/^# /.test(stripBoxes(md[p.slug]))) throw new Error(`${p.slug}.md: does not start with an H1 (containers aside)`);
+  for (const p of pages) if (!/^# /.test(stripBoxes(md[p.slug]))) throw new Error(`${p.slug}.md: does not start with an H1 (containers aside)`);
 
   // Final: every value is filled (the gate above). A draft writes null for each open value and
   // offers nothing for sale.
@@ -1265,14 +1303,23 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
     dirty: git('status', '--porcelain', '--untracked-files=no', '--', '.') !== null };
 
   rmSync(out, { recursive: true, force: true });
+  rmSync(darkOut(out), { recursive: true, force: true });
   mkdirSync(join(out, '.well-known'), { recursive: true });
   const put = (name, data) => writeFileSync(join(out, name), data);
   const twins = {};
-  for (const p of PAGES) {
+  for (const p of pages) {
     const text = fill(md[p.slug], `${p.slug}.md`);
     twins[p.slug] = rewriteMd(stripBoxes(text), linker('md'));
     put(`${p.slug}.md`, `${twins[p.slug].trimEnd()}\n\n---\n\n${rewriteMd(footerMd(), linker('md'))}\n`);
     put(`${p.slug}.html`, htmlPage(p, render(text, linker('html')), ctx));
+  }
+  if (!disclosed && dark.length) {
+    mkdirSync(darkOut(out));
+    for (const d of dark) {
+      const text = fill(d.md, `${DARK}/${d.slug}.md`);
+      writeFileSync(join(darkOut(out), `${d.slug}.md`), `${rewriteMd(stripBoxes(text), linker('md')).trimEnd()}\n`);
+      writeFileSync(join(darkOut(out), `${d.slug}.html`), htmlPage({ ...d, noindex: true }, render(text, linker('html')), ctx));
+    }
   }
   for (const l of live) {
     mkdirSync(join(out, l.code));
@@ -1306,8 +1353,8 @@ Sitemap: ${ORIGIN}/sitemap.xml
   // llms.txt, and llms-full.txt: the pages' twins in one file, for an agent that wants it all at once.
   // The contact page stays out: it says how to pay is published only on itself and in its file on
   // the relay repository (PAYMENT_PLACES), and a third copy would make that untrue.
-  put('llms.txt', llmsTxt(version, pending));
-  const fullPages = PAGES.filter((p) => !p.noindex && !PAYMENT_PLACES.includes(pageUrl(p)));
+  put('llms.txt', llmsTxt(version, pending, lit));
+  const fullPages = pages.filter((p) => !p.noindex && !PAYMENT_PLACES.includes(pageUrl(p)));
   put('llms-full.txt', `# sigelo relay: the pages in one file
 
 ${MOTTO} ${DISCLOSURE}
@@ -1368,7 +1415,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     official,
     agent_surfaces: { llms_txt: `${ORIGIN}/llms.txt`, llms_full_txt: `${ORIGIN}/llms-full.txt`, relay_json: `https://${HOST}/relay.json`,
       sitemap: `${ORIGIN}/sitemap.xml`, security_txt: `${ORIGIN}/.well-known/security.txt` },
-    pages: PAGES.filter((p) => !p.noindex).map((p) => ({ slug: p.slug, html: pageUrl(p), markdown: `${ORIGIN}/${p.slug}.md` })),
+    pages: pages.filter((p) => !p.noindex).map((p) => ({ slug: p.slug, html: pageUrl(p), markdown: `${ORIGIN}/${p.slug}.md` })),
     contact, privacy: `${ORIGIN}/privacy.html`, terms: `${ORIGIN}/terms.html`,
   }, null, 2) + '\n');
   // relay.json: the relay's own info document, in the spirit of Nostr's NIP-11 (plan §11), served at
@@ -1392,7 +1439,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   const valueSources = ['allowance.mjs', 'mailbox.mjs', 'operator.mjs', 'park.mjs'].map((f) => join(RELAY, f));
   // Every language of a TRANSLATED page, each with the page's alternates (hreflang).
   const locs = [
-    ...PAGES.filter((p) => !p.noindex).map((p) => [pageUrl(p), lastCommit(join(site, `${p.slug}.md`), ...(/\{\{/.test(md[p.slug]) ? valueSources : [])), alternatesOf(p, live)]),
+    ...pages.filter((p) => !p.noindex).map((p) => [pageUrl(p), lastCommit(srcOf(p), ...(/\{\{/.test(md[p.slug]) ? valueSources : [])), alternatesOf(p, live)]),
     ...live.flatMap((l) => PAGES.filter((p) => TRANSLATED.includes(p.slug) && !l.fallback.has(p.slug)).map((p) => [pageUrlIn(p, l.code),
       lastCommit(join(site, I18N, l.code, `${p.slug}.md`), join(site, I18N, l.code, 'lang.json'), ...(/\{\{/.test(l.md[p.slug]) ? valueSources : [])), alternatesOf(p, live)])),
     [`${ORIGIN}/llms.txt`, lastCommit(fileURLToPath(import.meta.url), join(RELAY, 'package.json')), []],
@@ -1418,7 +1465,7 @@ Preferred-Languages: en
   // against the release identity and lists exactly relays.src.json's; else not served, and said.
   const registry = registryStatus(site);
   if (registry.ok) put('relays.json', registry.text);
-  return { pages: PAGES.length, open, wrong, pending, built, languages: live.map((l) => l.code), stale, registry };
+  return { pages: pages.length, open, wrong, pending, built, languages: live.map((l) => l.code), stale, registry, dark: dark.map((d) => d.slug), disclosed };
 }
 
 /** relays.json beside the pages: { ok, text, why } — ok when it verifies (release identity, now) and lists relays.src.json's relays. */
@@ -1478,6 +1525,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const label = { DRAFT: "DRAFT — the terms' draft mark (terms.md)", SELLER: 'SELLER — the name the pages give the seller (relay/site/build.mjs)',
       'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
     for (const f of r.stale) console.log(`warning: stale: ${f}: its URL serves the English page until refreshed (node relay/site/build.mjs --stale)`);
+    if (r.dark.length && !r.disclosed) console.log(`dark: ${r.dark.join(', ')} in relay/site/${DIST_NAME}-${DARK}/ only (DISCLOSED false: not in dist, never deployed)`);
     console.log(r.registry.ok ? `relays.json: ${r.registry.relays} relays, signed` : `warning: not served: ${r.registry.why}`);
     if (r.pending) console.log('note: Pro is coming soon (pro.md says so): the vendor DID is not required, index.json and relay.json say not_yet_on_sale');
     for (const p of r.open) console.log(`open: ${PLACEHOLDERS[p] ? `${p} — ${PLACEHOLDERS[p]}` : label[p] ?? p}`);
