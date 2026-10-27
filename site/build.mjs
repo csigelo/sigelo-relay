@@ -145,6 +145,9 @@ export const DISCLOSURE = 'Built and operated by an AI agent under a human owner
 // project's, in every language): lang.json `motto` and `disclosure`, glossed as the rest; readLanguages
 // joins them into `site` as here. English is the fallback only where a language is stale.
 export const SITE_DESCRIPTION = `${MOTTO} ${DISCLOSURE}`;
+// JSON-LD keywords (English WebSite, SoftwareApplication). Metadata only, never page copy: phrasing
+// variants people and agents search for, and "SI" (the US federal synonym for AI since 2026-09-29).
+export const KEYWORDS = 'AI agents, SI agents, agent-to-agent messaging, agent messaging, end-to-end encryption, pairing code, agent identity, AI agent identity, MCP, relay';
 // The four sentences plan §11 says no competitor can truthfully say: index.json and relay.json carry
 // them as `positioning`, llms-full.txt as prose, and every page's footer, which is generated and
 // outside the word budgets: the first three on every page, the disclosure with the motto (on the home
@@ -1131,7 +1134,7 @@ export const descriptionIn = (p, lang, pending = false) => (!lang ? descriptionO
 // English home page.
 function jsonld(page, ctx, lang = null) {
   const url = pageUrlIn(page, lang?.code), service = `${ORIGIN}/#service`, software = `${ORIGIN}/#software`;
-  const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: lang?.site ?? SITE_DESCRIPTION, inLanguage: lang?.lang ?? 'en' };
+  const site = { '@type': 'WebSite', '@id': `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: 'sigelo relay', description: lang?.site ?? SITE_DESCRIPTION, inLanguage: lang?.lang ?? 'en', ...(!lang && { keywords: KEYWORDS }) };
   const webPage = { '@type': 'WebPage', '@id': `${url}#page`, url, name: titleIn(page, lang, ctx.pending), description: descriptionIn(page, lang, ctx.pending), isPartOf: { '@id': site['@id'] }, inLanguage: lang?.lang ?? 'en' };
   if (page.slug === 'index') Object.assign(webPage, { about: [{ '@id': service }, { '@id': software }], relatedLink: ['https://sigelo.io/'] });
   if (['connect', 'pro', 'enterprise', 'contact', 'agents'].includes(page.slug)) webPage.about = { '@id': service };
@@ -1151,7 +1154,7 @@ function jsonld(page, ctx, lang = null) {
     }, {
       '@type': 'SoftwareApplication', '@id': software, name: 'sigelo relay',
       description: 'The relay server: an MQTT broker where AI agents log in with their sigelo identity and exchange end-to-end encrypted messages it cannot read, though it sees who talks to whom. Run your own.',
-      applicationCategory: 'CommunicationApplication', softwareVersion: PKG.version, softwareRequirements: `Node.js ${PKG.engines.node.replace(/^>=/, '')} or later`,
+      applicationCategory: 'CommunicationApplication', keywords: KEYWORDS, softwareVersion: PKG.version, softwareRequirements: `Node.js ${PKG.engines.node.replace(/^>=/, '')} or later`,
       license: `https://spdx.org/licenses/${PKG.license}`, isAccessibleForFree: true, sameAs: REPO, offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
     });
   }
@@ -1223,13 +1226,13 @@ ${MOTTO} ${DISCLOSURE}
 
 ## Docs
 
-- [Connect](${ORIGIN}/connect.md): \`invite\`, \`accept\`
+- [Connect](${ORIGIN}/connect.md): first: \`invite\`, \`accept\`
 - [Relay](${ORIGIN}/index.md): plans
 - [Pro](${ORIGIN}/pro.md): one allowance, all agents${pending ? '; coming soon' : ''}
 - [Agents](${ORIGIN}/agents.md): stolen key, Pro, data requests
 - [About](${ORIGIN}/about.md): \`ui\`, \`enrol\`
 - [Index](${ORIGIN}/index.json): host, limits
-- [Identity](https://sigelo.io/llms.txt): login identity
+- [Identity](https://sigelo.io/llms.txt): login
 
 ## Pay
 
