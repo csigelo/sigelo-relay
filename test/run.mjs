@@ -29,7 +29,7 @@ import { relayPolicy } from '../allowance.mjs';
 import { mailboxes } from '../mailbox.mjs';
 import { solve } from '../pow.mjs';
 import { LOOKUPS_ALL, parking } from '../park.mjs';
-import { CREATED, bundleOf, clientId, identity, password, rotated, seed, selfSigned } from './fixtures.mjs';
+import { CREATED, bundleOf, clientId, identity, password, recovered, rotated, seed, selfSigned } from './fixtures.mjs';
 
 let n = 0, failed = 0;
 const ok = (cond, what) => { n++; if (cond) console.log(`ok ${what}`); else { failed++; console.log(`FAIL ${what}`); } };
@@ -448,6 +448,37 @@ let a, b;
   ok(lv3.client?.connected === true, 'vera\'s chain with a recovery rotation from that key logs in, and takes it back');
   if (lv3.client) await end(lv3.client);
   await refused(vt, {}, 'bundle', 'the thief\'s chain again');
+}
+{
+  // A retired recovery key (SPEC §7.2, THREAT-MODEL §2.5a): wren rotates G0 → G1, then recovers
+  // with R1 into G2 under a new key R2. A thief holding only R1 (an old backup) signs a recovery
+  // G0 → T, or G1 → T with a later iat than hers: every offline verifier accepts either chain, and
+  // the relay used to store it for her account and refuse her next login "bundle". It remembers
+  // the retirement (the chain it keeps) and refuses the thief retired_recovery; she stays.
+  const wren = identity('wren'), w1 = rotated(wren, 'wren 1', 'voluntary', now - 900), w2 = recovered(w1, 'wren 2', now - 600);
+  const tA = recovered(wren, 'wren thief A', now - 60), tB = recovered(w1, 'wren thief B', now - 30);
+  everyone.push(wren, w1, w2, tA, tB);
+  ok(verify(bundleOf(tA), now).did === tA.did && verify(bundleOf(tB), now).did === tB.did,
+    'offline, both thief chains verify (G0 → T, and G1 → T with a later iat): nothing in them names the retirement');
+  const lw = await login(w2);
+  ok(lw.client?.connected === true, 'wren logs in with her chain: G0 → G1 → recovery into G2 under a new recovery key');
+  if (lw.client) await end(lw.client);
+  const rA = await refused(tA, {}, 'retired_recovery', 'the thief with G0 and his recovery by the retired key');
+  ok(!rA.c.json.detail.includes('did:sigelo:'), `and the refusal names no DID (${rA.c.json.detail})`);
+  await refused(tB, {}, 'retired_recovery', 'the thief from G1 with a later iat than hers');
+  await refused(tA, { bundle: bundleOf({ ...tA, rotations: [...w2.rotations, ...tA.rotations] }) }, 'retired_recovery', 'the thief sending her rotations beside his');
+  const again = await login(w2);
+  ok(again.client?.connected === true, 'her next login is not refused: she stays');
+  if (again.client) await end(again.client);
+  ok(relay.db.chainOf(accountOf(wren.original), wren.original).length === 2, 'and the relay still keeps her chain, none of the thief\'s rotations');
+  // The limit: a relay that saw the thief's chain before her retirement cannot tell. First seen
+  // wins both ways: the thief's recovery retired R1 in the chain kept, so hers by R1 is refused.
+  const xena = identity('xena'), x1 = rotated(xena, 'xena 1', 'voluntary', now - 900), x2 = recovered(x1, 'xena 2', now - 600), xt = recovered(xena, 'xena thief', now - 60);
+  everyone.push(xena, x1, x2, xt);
+  const lxt = await login(xt);
+  ok(lxt.client?.connected === true, 'the limit: a thief by a retired key who logs in before the relay saw the retirement is taken');
+  if (lxt.client) await end(lxt.client);
+  await refused(x2, {}, 'retired_recovery', 'the limit: then her chain is refused (first seen)');
 }
 {
   await refused(alice, { signer: bob, bundle: bundleOf(alice) }, 'sig', 'alice\'s bundle, bob\'s signature');

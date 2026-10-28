@@ -267,7 +267,8 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    `relay_full`) come after every other check, so their answer tells no outsider which identities
    are connected; a CONNECT taking over its own identity's session always passes them.
 3. A refused CONNECT: `POST /check {username, client_id, password, clean?}` names the check:
-   `rate`, `password`, `challenge_unknown`, `challenge_expired`, `bundle`, `sig`, `client_id`,
+   `rate`, `password`, `challenge_unknown`, `challenge_expired`, `bundle`, `sig`, `retired_recovery`
+   (a recovery rotation by a recovery key the identity's chain here retired), `client_id`,
    `pow`, `relay_full` (also a new free identity, or a longer chain of one, once the free tier's
    ceiling is reached; and an agent whose identity rows, with its pool's, would pass the pool's
    storage). A relay failure is no check: CONNACK 3, and 503 from `/check`. Each POST

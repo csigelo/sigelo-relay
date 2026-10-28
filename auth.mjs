@@ -24,7 +24,8 @@
 // Checks, in order (accept/node/sigelo-pair.mjs's order where they overlap): rate (before any
 // work), password (shape), challenge_unknown (single use), challenge_expired, bundle (the caps
 // first, then on the bundle as sent: a genesis with the username's DID), sig (under that key),
-// bundle (SPEC §9 over the bundle with the rotations this relay keeps merged in: it must resolve
+// retired_recovery (a recovery rotation sent, signed by a recovery key the chain kept here has
+// retired: retiredBy), bundle (SPEC §9 over the bundle with the rotations this relay keeps merged in: it must resolve
 // to the username, and pass through a DID of another identity's chain here, its original
 // included, only by a recovery rotation from it), client_id, closed (a closed relay: closed.mjs), pow,
 // relay_full (disk), then the session caps (rate per network, relay_full in all: seat). A login
@@ -38,7 +39,7 @@
 // Loopback HTTP behind nginx, with world/server.mjs's body limit and timeouts.
 import { createServer } from 'node:http';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { canonicalize, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
+import { canonicalize, commitmentOf, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
 import { PARK_FIELDS, ParkError } from './park.mjs';
 import { GIFT_FIELDS } from './gifts.mjs';
@@ -54,7 +55,7 @@ export const TYP_LOGIN = 'relay-login';
 export const loginBody = (did, relay, nonce) => ({ v: V, typ: TYP_LOGIN, did, relay, nonce });
 export const TTL = 300, MAX_ITEMS = 64, MAX_BODY = 256 * 1024, WINDOW = 60;
 export const DID_RE = /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/;
-export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'client_id', 'closed', 'pow', 'relay_full'];
+export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'retired_recovery', 'client_id', 'closed', 'pow', 'relay_full'];
 // Plan §3 "Operator attestation": the only attestations the relay reads (M4), at most this many.
 export const OPERATOR_CTX = 'sigelo-relay/operator', MAX_OPERATOR = 4;
 // Signature checks bundles may cost per address prefix and minute: one bundle at its largest (64
@@ -128,6 +129,22 @@ const itemCount = (b) => isObject(b)
   : 0;
 const verifyBundle = (bundle, now) => { try { return verify(bundle, now); } catch (e) { return fail('bundle', `REJECT: ${e.message}`); } };
 const edgeOf = (r) => `${r.body.id} ${r.body.next}`;
+// A recovery key that was used and replaced still governs every node up to the one it was retired
+// at (SPEC §7.2), so whoever holds an old copy signs a recovery from any of them, and no offline
+// verifier tells it from the owner's (THREAT-MODEL §2.5a). This relay has memory: the chain it keeps
+// holds the recovery rotation that retired the key. → commitment → JCS of the kept recovery rotation
+// that retired it (signed by the key hashing to it, into a genesis with another commitment or
+// none). Nothing new is stored: the kept chain is the memory, sealed and kept as long as it is.
+const commitOrNull = (k) => { try { return commitmentOf(k); } catch { return null; } };
+function retiredBy(kept) {
+  const out = new Map();
+  for (const r of kept) {
+    const c = r.body.reason === 'recovery' ? commitOrNull(r.body.recovery_key) : null;
+    if (c !== null && r.next_genesis.recovery !== c) out.set(c, canonicalize(r));
+  }
+  return out;
+}
+const jcsOrNull = (x) => { try { return canonicalize(x); } catch { return null; } };
 // A DID is the SHA-256 of its genesis, so the genesis with DID d is the one whose hash is d. An
 // object that does not hash (not canonical JSON) is no genesis of anything: it never matches.
 const hashesTo = (g, d) => { try { return didOf(g) === d; } catch { return false; } };
@@ -293,6 +310,18 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     if (!verifySig(key, challenge, sig)) fail('sig', 'does not verify under the username\'s key over the login body issued ({v, typ: "relay-login", did, relay, nonce})');
     const kept = db.chainOf(accountOf(original), original);   // a sealed chain that does not open throws: the relay's error
     let rotations = bundle.rotations;
+    // retired_recovery, before the merge: any other recovery rotation signed by a key the kept chain
+    // retired is a fork by a retired key, refused, so a thief's never replaces the owner's chain
+    // here, whatever its node or iat. A relay that saw the thief's first cannot tell (the limit).
+    const retired = retiredBy(kept);
+    if (retired.size > 0 && Array.isArray(rotations)) {
+      for (const r of rotations) {
+        const c = r?.body?.reason === 'recovery' ? commitOrNull(r.body.recovery_key) : null;
+        if (c === null || !retired.has(c) || jcsOrNull(r) === retired.get(c)) continue;
+        verifyCost(prefix, now, 1);
+        if (verifySig(r.body.recovery_key, r.body, r.sig)) fail('retired_recovery', 'a recovery rotation signed by a recovery key this identity has retired (a later recovery replaced it): a retired key recovers nothing here');
+      }
+    }
     if (Array.isArray(rotations) && kept.length > 0) {
       let sent;
       try { sent = new Set(rotations.map(canonicalize)); } catch (e) { fail('bundle', `REJECT: rotations: ${e.message}`); }

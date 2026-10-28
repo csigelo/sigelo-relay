@@ -31,6 +31,15 @@ export function rotated(from, label2, reason = 'voluntary', iat = 1760000000) {
 export const bundleOf = (id, extra = {}) => ({ v: 'sigelo/0', typ: 'bundle', genesis: id.origin, rotations: id.rotations, bindings: [], attestations: [], issuers: [], ...extra });
 export const clientId = (id) => clientIdOf(id.original);
 
+// A recovery rotation into the key of `label2` whose genesis carries a NEW commitment, that of the
+// recovery key of `label2`: the old recovery key is retired (SPEC §7.2). from.recovery signs it.
+export function recovered(from, label2, iat) {
+  const recovery = seed(`${label2} recovery`);
+  const next = keygen({ seed: seed(label2), recovery: publicKeyOf(recovery), created: CREATED, nonce: seed(`${label2} nonce`).slice(0, 16) });
+  const r = rotate({ genesis: from.genesis, next_genesis: next.genesis, iat, reason: 'recovery', secret: from.recovery, next_secret: next.secret });
+  return { ...from, label: label2, did: next.did, secret: next.secret, genesis: next.genesis, recovery, rotations: [...from.rotations, r] };
+}
+
 // The CONNECT password for a login body from GET /challenge (JCS, as the relay requires). The body
 // signed is spelled out here, not taken from auth.mjs, so the wire format is pinned by the tests:
 // {v: "sigelo-relay/0", typ: "relay-login", did: the signer's current DID, relay, nonce}.
