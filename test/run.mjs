@@ -1446,8 +1446,22 @@ function walStates(r, name, tag = name) {
   const again = await fetchPark(h), unknown = await fetchPark(hashOf('00000000')), malformed = await fetchPark('K7F3-Q9ZP');
   ok([again, unknown, malformed].every((x) => x.status === 404 && x.json.check === 'park_unknown') && JSON.stringify(again.json) === JSON.stringify(unknown.json) && JSON.stringify(unknown.json) === JSON.stringify(malformed.json),
     'one use: the second fetch is park_unknown (404), word for word as a hash nobody parked and a malformed one');
-  r = await park(alice, { code_hash: h, invite: longCode(alice), exp: now + 600 });
-  const late = await (async () => { now += 600; const x = await fetchPark(h); now -= 600; return x; })();
+  // Review 2026-10-28, MEDIUM 3: a code holder fetches the code, then parks its own long code under
+  // the same hash at once, and the intended contact's lookup got the re-parked code, not park_unknown.
+  // A fetched hash stays taken until the original exp (a tombstone); then it is free again.
+  const repark = await park(bob, { code_hash: h, invite: longCode(bob), exp: now + 600 }), victim = await fetchPark(h, '203.0.113.10');
+  ok(repark.json.ok === false && repark.json.check === 'park_taken' && victim.status === 404 && victim.json.check === 'park_unknown',
+    `a fetched hash cannot be parked again before its exp: park_taken, and the next lookup is park_unknown (${JSON.stringify(repark.json)}; ${victim.status})`);
+  now += 600;
+  pr.sweep();
+  const freed = await park(bob, { code_hash: h, invite: longCode(bob), exp: now + 600 });
+  ok(freed.json.ok === true && pr.park.fetch(h) !== null, 'at the fetched code\'s exp its hash is free again: parked, then taken out here');
+  now += 600;
+  pr.sweep();
+  now -= 1200;
+  const h2 = hashOf('K7F3Q9ZQ');
+  r = await park(alice, { code_hash: h2, invite: longCode(alice), exp: now + 600 });
+  const late = await (async () => { now += 600; const x = await fetchPark(h2); now -= 600; return x; })();
   ok(r.json.ok === true && late.status === 404 && late.json.check === 'park_unknown' && pr.park.size() === 0, 'expiry: parked, then fetched 10 minutes later: park_unknown, and gone');
   // What may be parked: an invite to its parker, at this relay, for at most 10 minutes and within its own life.
   const refusal = async (id, fields, what) => {
@@ -1462,6 +1476,10 @@ function walStates(r, name, tag = name) {
   // An inviter's clock ahead of the relay's: parked, for 10 minutes by the relay's clock.
   r = await park(alice, { code_hash: hashOf('ZZZZZZZY'), invite: longCode(alice), exp: now + 630 });
   ok(r.json.ok === true && r.json.exp === now + 600 && pr.park.fetch(hashOf('ZZZZZZZY')) !== null, `POST /park: an exp 30 s past 10 minutes (the inviter's clock ahead) parks until 10 minutes from now (${JSON.stringify(r.json)})`);
+  // Its fetch above left a tombstone until that exp, which counts against the cap: purged, so the cap below counts parked codes only.
+  now += 600;
+  pr.sweep();
+  now -= 600;
   await refusal(alice, { exp: now }, 'an exp already passed');
   await refusal(alice, { invite: longCode(alice, { exp: now + 300 }) }, 'an exp after the code\'s own');
   await refusal(alice, { code_hash: 'K7F3Q9ZP' }, 'a code_hash that is not 64 hex digits (the code itself)');
@@ -1538,6 +1556,19 @@ function walStates(r, name, tag = name) {
   ok((await look4('100.64.9.1')).status === 404, 'lookups: the relay-wide count starts afresh the next 10 minutes');
   now -= 600;
   await pr4.close();
+  // Review 2026-10-28 (also observed): POST /park answered park_taken for a live hash without
+  // consuming it and outside the relay-wide lookup ceiling, a liveness oracle. A park that reaches
+  // the hash is now charged as a lookup: here a network's share is 1, so its second park is rate.
+  const pr5 = await startRelay({ ...cfg, db: join(dir, 'park-oracle.db'), park: { lookupsAll: { n: 8, window: 600 } } });
+  const parkAt = async (id, fields, ip) => {
+    const { challenge } = await getChallenge(id.did, pr5, ip);
+    const res = await fetch(`${base(pr5)}/park`, { method: 'POST', headers: realIp(ip), body: JSON.stringify({ username: id.did, client_id: clientId(id), password: password(id, challenge), ...fields }) });
+    return { status: res.status, json: await res.json() };
+  };
+  const first = await parkAt(alice, { code_hash: hashOf('AAAAAAAA'), invite: longCode(alice), exp: now + 600 }, '100.65.0.1');
+  const probe = await parkAt(bob, { code_hash: hashOf('AAAAAAAA'), invite: longCode(bob), exp: now + 600 }, '100.65.0.1');
+  ok(first.json.ok === true && probe.status === 429 && probe.json.check === 'rate', `POST /park is charged against the lookup brakes: a network's second park past its share is rate, not park_taken (${probe.status} ${JSON.stringify(probe.json)})`);
+  await pr5.close();
   now -= 661;
 }
 

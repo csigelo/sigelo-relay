@@ -1334,7 +1334,7 @@ if (sigelo && operator && auth && db) {
   ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^\[Contact us\]\(\/contact\.md\), naming that DID; pay by bank transfer or in Monero \(10 % off\); renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
     'pro: log in with the operator identity (step 2), and after each rotation again and sign the agents\' attestations anew (step 5), before paying (3, renewal the same) and uploading (4)');
   ok(/prints the operator DID \(later: the first of its `chain`\)/.test(body.agents), 'agents step 1: a licence names the operator\'s original DID, the first of its chain');
-  ok(src.agents.includes('The relay takes a licence only for an operator it has seen log in (step 2).'), 'agents: log in with the operator identity before paying (step 2 before 3)');
+  ok(src.agents.includes("A licence counts only from its operator's first login here (step 2)."), 'agents: log in with the operator identity before paying (step 2 before 3)');
   const licenceFor = (sub, exp) => ({ attestation: sigelo.attest({ secret: vendor.secret, iss: vendor.did, sub, iat: now, exp, ctx: operator.LICENCE_CTX, admission: 'payment',
     claims: { tier: 'pro', storage_mb: 1, msgs_day: 1, retention_days: 1, groups: 0 } }), issuer: vendor.genesis, rotations: [] });
   const relayDb = () => { const d = db.openDb(':memory:'); return [d, operator.operators({ db: d, host: HOST, vendor: vendor.did, clock: () => now })]; };
@@ -1344,8 +1344,11 @@ if (sigelo && operator && auth && db) {
     const before = ops.upload(licenceFor(op.did, now + YEAR), now);
     d.touchAccount(a, now);
     const after = ops.upload(licenceFor(op.did, now + YEAR), now);
-    ok(before.ok === false && before.check === 'licence' && after.ok === true,
-      `pro step 2 is load-bearing: the relay refuses a licence whose operator never logged in, and takes it after one login (${before.ok ? 'taken before any login' : before.detail})`);
+    // Review 2026-10-28: the upload is answered word for word the same before and after the
+    // operator's first login (a refusal before told who logs in here); the licence pools nothing
+    // until that login (relay/test/allowance.mjs), which is what step 2 says.
+    ok(before.ok === true && before.note === operator.LICENCE_NOTE && JSON.stringify(before) === JSON.stringify(after),
+      `pro step 2 is load-bearing: the relay keeps a licence before its operator's first login and answers the same after it, with the note that it counts from that login (${JSON.stringify(before)})`);
     d.close();
   }
   {

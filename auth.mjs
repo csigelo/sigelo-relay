@@ -580,6 +580,8 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
         // Only an identity that has proven its work (allowance.mjs keep) parks: a fresh DID costs nothing.
         if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity parks after its first login with proof of work: run inbox, then invite again' });
+        // park_taken says whether a hash is held: charged as a lookup, its network's and the relay-wide.
+        try { park.charge('lookup', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         try { return send(200, { ok: true, ...park.park(body, body.username, clock()) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
       }
       // Gift codes (gifts.mjs): the brake first, before the body or the login, as /park. Neither the

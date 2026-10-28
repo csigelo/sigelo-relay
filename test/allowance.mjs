@@ -522,13 +522,19 @@ const POOL = accountOf(opr.original);
 let annC, benC, K;
 {
   now = Date.parse('2026-10-20T00:00:00Z') / 1000;
-  // The relay takes the operator's current key from the chain it keeps with the operator's
-  // account: no account, no licence (else a thief's key could pool until the licence ends).
-  const early = await upload(licence(opr));
-  ok(early.ok === false && early.check === 'licence' && early.detail.includes('logs in once with its bundle before uploading'), `POST /licence before the operator has ever logged in: refused "licence" (${early.detail})`);
+  // Review 2026-10-28 (also observed): POST /licence refused a licence whose operator had never
+  // logged in, so anyone holding the public licence learnt whether it logs in here. It is now
+  // answered the same before and after; the relay takes the operator's current key from the chain
+  // it keeps with the operator's account, so until that account exists the licence pools nothing
+  // (else a thief's key could pool until the licence ends).
+  const lic0 = licence(opr), early = await upload(lic0), pre = identity('pre');
+  const lp = await login(pre, { pow: true, bundle: withVouch(pre, opr, vouch(opr, pre)) });
+  ok(lp.client?.connected && tierOf(pre).pool === null && relay.db.account(POOL) === undefined, 'a licence uploaded before its operator ever logged in pools nothing: the agent it vouches for is free tier');
+  lp.client?.end(true);
   (await login(opr)).client?.end(true);
-  const up = await upload(licence(opr));
+  const up = await upload(lic0);
   ok(up.ok === true && up.operator === opr.original && up.chain === 1 && up.claims.msgs_day === 5, `POST /licence: once it has logged in, a vendor licence to the operator's original DID is kept (${JSON.stringify(up)})`);
+  ok(JSON.stringify(early) === JSON.stringify(up), `POST /licence answers word for word the same before the operator's first login as after: it tells nobody who logs in here (${JSON.stringify(early)})`);
   const la = await login(ann, { pow: true, bundle: withVouch(ann, opr, vouch(opr, ann)) });
   const lb = await login(ben, { pow: true, bundle: withVouch(ben, opr, vouch(opr, ben)) });
   annC = la.client; benC = lb.client;
@@ -684,10 +690,11 @@ let annC, benC, K;
   ok(lg.client?.connected && await noticed(lg.client, 'licence') && tierOf(gus).pool === null, `an attestation from an operator without a licence here: free tier, "licence" (${notices(lg.client)[0]?.detail})`);
   lg.client?.end(true);
   // The operator logs in, as every operator must before its licence is taken. A licence naming its
-  // CURRENT DID (after a rotation) binds no account: refused, saying sub is the original DID.
+  // CURRENT DID (after a rotation) binds no account: kept and answered as any upload (POST /licence
+  // tells nobody who logs in here), its note saying sub is the original DID; it counts for nobody.
   (await login(opx)).client?.end(true);
   const rsub = await upload(licence({ original: rotated(opx, 'operator x 2').did }));
-  ok(rsub.ok === false && rsub.detail.includes('names the operator by its ORIGINAL DID'), `POST /licence for an operator's rotated DID: refused "licence" (${rsub.detail})`);
+  ok(rsub.ok === true && rsub.note.includes('names the operator by its ORIGINAL DID') && tierOf(opx).pool === null, `POST /licence for an operator's rotated DID: answered as any, its note says the ORIGINAL DID, and the operator holds no licence (${rsub.note})`);
   // A licence that lapses: pooled while it holds, free tier after.
   const short = await upload(licence(opx, { exp: now + 2 * DAY }));
   const hal = identity('hal');

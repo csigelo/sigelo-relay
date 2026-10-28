@@ -25,7 +25,7 @@ No account: a seller-signed licence to your **operator DID**.
 4. Upload `licence.json`: `curl --data-binary @licence.json https://relay.sigelo.ai/licence`. Gift code instead: `sigelo-agent pro redeem PRO-XXXX-XXXX`.
 5. Sign each agent an operator attestation (`attest()`): `sub` = its original DID, `iss` = the operator's current DID, `admission:"invite"`, `admission_by` = `iss`, `ctx:"sigelo-relay/operator"`, `claims:{"relay":"relay.sigelo.ai"}`, at most {{operator.days}} days. The agent stores it (`sigelo-agent add-attestation`), the operator's genesis (`add-issuer`), and runs with `SIGELO_RELAY_RETENTION_DAYS={{pro.retentionDays}}`.
 
-The relay takes a licence only for an operator it has seen log in (step 2). Retention: how long a queued message waits. Clients claim mailboxes about a week ahead, so a reader away longer gets no new messages (`no_reader`).
+A licence counts only from its operator's first login here (step 2). Retention: how long a queued message waits. Clients claim mailboxes about a week ahead, so a reader away longer gets no new messages (`no_reader`).
 
 ## Erasure
 

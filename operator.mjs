@@ -11,8 +11,10 @@
 // precedence, the signer is the chain's current key, term at most 3 × 366 days), so the keeper and
 // the relay cannot drift. `sub` is the operator's ORIGINAL DID: the relay keys every account by it
 // (db.mjs), so a licence binds exactly one account and an operator's rotation needs no new
-// licence. Uploaded by POST /licence and kept per operator, once the operator has logged in: the
-// relay keeps the operator's chain with its account, and takes its current key from there.
+// licence. Uploaded by POST /licence and kept per operator; it counts once the operator has logged
+// in: the relay keeps the operator's chain with its account, and takes its current key from there.
+// Until then it pools nothing (live): an upload is answered the same either way, since a licence is
+// public and a refusal told its holder whether the operator logs in here (review 2026-10-28).
 //
 // Operator attestation: a SPEC §5 attestation with iss = the operator's current DID, sub = the
 // agent's ORIGINAL DID, ctx "sigelo-relay/operator", admission "invite", admission_by = iss, claims
@@ -67,6 +69,9 @@ export const SUPPORT = Object.freeze(['none', 'email', 'priority']);
 // later), used or not, and its operator's account and chain with it (allowance.mjs accountKept):
 // that chain holds any recovery from a stolen key (the header).
 export const LICENCE_KEEP = 30 * DAY;
+// Every kept upload says so, word for word, whether or not its operator has logged in here (upload).
+export const LICENCE_NOTE = 'kept: it counts once the operator it names has logged in here with its bundle. The licence names the operator by its ORIGINAL DID (the first of its chain), and the operator logs in again after any rotation of its key, so this relay knows its current key';
+
 // The vendor rotations a licence may carry here. spend/licence.ts reads up to 256 from a keeper's
 // own file; here anyone may upload, and each rotation costs a signature check, twice once a vendor
 // chain is kept (the licence's chain, then its union with the kept one). A vendor rotates rarely.
@@ -224,6 +229,10 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
     return rotations.some((r) => r.body.reason === 'recovery' && (hashHex(r.body.id) === lic.current || s.retired.get(hashHex(r.body.id))?.operator === operator));
   }
 
+  // A licence row counts only once its operator has an account here (upload).
+  const live = (lic) => db.account(lic.operator) !== undefined;
+  const byCurrent = (key) => s.byCurrent.all(key).filter(live);
+
   // The operator's current key is now `currentKey`, and it has rotated away from each of
   // `retiredKeys` (hashes) and from the key that was current before, when that one differs.
   function follow(operator, previous, currentKey, retiredKeys) {
@@ -238,12 +247,10 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
     const v = checkRelayLicence(raw, now, { vendor, seen: () => seenVendor(now) });
     if (!v.ok) return refuse(v.why);
     const body = v.attestation.body, c = body.claims, operator = hashHex(body.sub);
-    // The operator's account holds the chain the relay takes its current key from: without it, an
-    // attestation by a thief's key could pool until the licence ends. Asked only once the licence
-    // verifies, so POST /licence tells no outsider which DIDs log in here.
-    if (db.account(operator) === undefined) {
-      return refuse('no identity whose original DID is this licence\'s sub has logged in here: the licence names the operator by its ORIGINAL DID (the first of its chain), and the operator logs in once with its bundle before uploading, and again after any rotation of its key, so this relay knows its current key');
-    }
+    // Kept whether or not the operator has an account here, and answered the same: refusing told
+    // anyone holding the public licence whether the operator logs in here. Without the account the
+    // relay has no chain to take the current key from, so the row counts only once it exists (live):
+    // else an attestation by a thief's key could pool until the licence ends.
     const old = s.licence.get(operator);
     // The licence the vendor issued last is kept (iat; issued together, the longer): an older one
     // uploaded again (anyone can hold a copy, it is public) neither cuts a term short nor swaps the
@@ -266,7 +273,7 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
       if (follows) follow(operator, old?.current, currentKey, dids.slice(0, -1));
     }));
     head = v.head;
-    return { ok: true, operator: body.sub, exp: body.exp, chain: v.chain.chain.length, claims: c };
+    return { ok: true, operator: body.sub, exp: body.exp, chain: v.chain.chain.length, claims: c, note: LICENCE_NOTE };
   }
 
   const rates = new Map();   // address prefix → { window, n }
@@ -314,7 +321,7 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
   // to 90 days, renewable, instead of 30 days after its last login.
   function present(result, now) {
     const all = Object.values(result.attestations).flat();
-    const keep = Math.max(0, ...all.filter((a) => attestationRefusal(a, host, result.chain[0]) === undefined && s.byCurrent.all(hashHex(a.iss)).length === 1).map((a) => a.exp));
+    const keep = Math.max(0, ...all.filter((a) => attestationRefusal(a, host, result.chain[0]) === undefined && byCurrent(hashHex(a.iss)).length === 1).map((a) => a.exp));
     return { ...pick(all, result, now), keep };
   }
   function pick(all, result, now) {
@@ -326,7 +333,7 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
       const why = attestationRefusal(a, host, result.chain[0]);
       if (why) { notice ??= { code: 'operator', detail: `${why}: free tier` }; continue; }
       const key = hashHex(a.iss);
-      const lics = s.byCurrent.all(key);
+      const lics = byCurrent(key);
       if (lics.length > 1) { notice ??= { code: 'operator', detail: 'the attestation\'s key is the current key of more than one licensed operator here: refused, free tier' }; continue; }
       if (lics.length === 0) {
         // The relay learns an operator's rotations only from the operator's own logins, so a key it
@@ -348,7 +355,7 @@ export function operators({ db, host, vendor, clock, rate = LICENCE_RATE, log = 
   // gift: true when only gift months give it (allowance.mjs grants the relay's Pro tier then).
   function licenceOf(operator, key, now) {
     const lic = s.licence.get(operator);
-    if (!lic || (key !== null && lic.current !== key) || licenceRefusal(lic, now) !== undefined) return null;
+    if (!lic || !live(lic) || (key !== null && lic.current !== key) || licenceRefusal(lic, now) !== undefined) return null;
     return paidRefusal(lic, now) === undefined ? lic : { ...lic, gift: true };
   }
 

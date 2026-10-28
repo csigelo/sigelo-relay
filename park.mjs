@@ -4,7 +4,7 @@
 //   POST /park           {username, client_id, password, code_hash, invite, exp}: the login fields of
 //                        POST /check (auth.mjs: a fresh GET /challenge nonce, signed, spent here),
 //                        then what to park → {ok: true, exp} | {ok: false, check, detail}
-//   GET  /park/<hash>    → 200 {ok: true, invite}, deleted at once (one use)
+//   GET  /park/<hash>    → 200 {ok: true, invite}, replaced at once by a tombstone (one use)
 //                        | 404 {ok: false, check: "park_unknown", detail} | 429 {ok: false, check: "rate", detail}
 //
 // The inviter parks its long code (contact/invite.mjs, sgl1…) under code_hash = hex SHA-256
@@ -30,6 +30,13 @@
 // 37,000), and a crowd under its own brakes no longer locks out a new one (review 2026-10-19).
 // PARK_MAX entries at once in all (park_full). Expired entries are
 // purged at every sweep (server.mjs, each minute) and when the cap is reached.
+//
+// A fetched code leaves a tombstone until its original exp, and park refuses park_taken while an
+// entry or a tombstone under the hash is unexpired: else a code holder (an eavesdropper, a lucky
+// guesser) fetches the code, parks its own long code under the same hash, and the intended contact
+// gets that instead of the park_unknown that tells the inviter (review 2026-10-28, MEDIUM 3). A
+// tombstone counts against PARK_MAX as the entry did. A park that reaches the hash answers whether
+// it is taken, so auth.mjs charges it as a lookup too (the brakes above), never a free oracle.
 // A miss and a hit cost one Map lookup each; a malformed hash looks up the empty string, so every
 // miss takes one path.
 import { createHash } from 'node:crypto';
@@ -106,7 +113,7 @@ const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-
 
 /** host: this relay's name; clock: Unix seconds. → { charge, park, fetch, sweep, size }. */
 export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL }) {
-  const held = new Map();    // code_hash → { invite, exp }
+  const held = new Map();    // code_hash → { invite, exp }; invite null: a tombstone (fetched)
   const rates = new Map();   // kind + prefix → { window, n }
   const all = fairCeiling(lookupsAll);   // lookups from every network
 
@@ -154,14 +161,19 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     return { exp: until };
   }
 
-  // → the long code, gone from here at once; or null (unknown, expired, malformed).
+  // → the long code, gone from here at once (a tombstone holds the hash until its exp); or null
+  // (unknown, fetched, expired, malformed).
   function fetch(hash, now = clock()) {
     const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
     const e = held.get(k);
     if (e === undefined) return null;
-    held.delete(k);
-    return e.exp > now ? e.invite : null;
+    if (e.exp <= now) { held.delete(k); return null; }
+    if (e.invite === null) return null;
+    held.set(k, { invite: null, exp: e.exp });
+    return e.invite;
   }
 
-  return { charge, park, fetch, sweep, size: () => held.size };
+  // size: the codes parked, not yet fetched (tombstones count against max, not here).
+  const size = () => { let n = 0; for (const e of held.values()) if (e.invite !== null) n++; return n; };
+  return { charge, park, fetch, sweep, size };
 }
