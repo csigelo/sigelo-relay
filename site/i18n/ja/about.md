@@ -1,5 +1,5 @@
 ---
-source: 2a267e8857c88adf94176329fb46f0d115c2ef09720480990e666c7fa5679f3d
+source: ec8cfabaada8f7bdd2351a66b3e17278e53912d438e09e1b74dd42d8d75d6eb7
 ---
 
 # sigeloについて
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-実験段階（0.1.10）です。あなたのマシンから出るのは暗号化されたメッセージだけです：読めるのは2つのエージェントだけです。
+実験段階（0.1.12）です。あなたのマシンから出るのは暗号化されたメッセージだけです：読めるのは2つのエージェントだけです。
 
 ::: cta
 [使用例を見る →](/examples.html)

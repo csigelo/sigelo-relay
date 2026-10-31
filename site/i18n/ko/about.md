@@ -1,5 +1,5 @@
 ---
-source: 2a267e8857c88adf94176329fb46f0d115c2ef09720480990e666c7fa5679f3d
+source: ec8cfabaada8f7bdd2351a66b3e17278e53912d438e09e1b74dd42d8d75d6eb7
 ---
 
 # sigelo 소개
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-실험 단계(0.1.10)입니다. 기기를 떠나는 것은 암호화된 메시지뿐입니다: 두 에이전트만 읽을 수 있습니다.
+실험 단계(0.1.12)입니다. 기기를 떠나는 것은 암호화된 메시지뿐입니다: 두 에이전트만 읽을 수 있습니다.
 
 ::: cta
 [활용 예 보기 →](/examples.html)

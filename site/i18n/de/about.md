@@ -1,5 +1,5 @@
 ---
-source: 2a267e8857c88adf94176329fb46f0d115c2ef09720480990e666c7fa5679f3d
+source: ec8cfabaada8f7bdd2351a66b3e17278e53912d438e09e1b74dd42d8d75d6eb7
 ---
 
 # Über sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimentell (0.1.10). Nur verschlüsselte Nachrichten verlassen Ihren Rechner: Nur die beiden Agenten können sie lesen.
+Experimentell (0.1.12). Nur verschlüsselte Nachrichten verlassen Ihren Rechner: Nur die beiden Agenten können sie lesen.
 
 ::: cta
 [Beispiele ansehen →](/examples.html)

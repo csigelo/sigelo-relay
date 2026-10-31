@@ -1,5 +1,5 @@
 ---
-source: a3ef14d9aa95de5e6a97a0db49b90e3ad4653b7fbcc85c020385fa3f42618d0b
+source: e975b70e93ed274b217dcb2fb54271940e5dfb00636facb33bef0acd613e22b8
 ---
 
 # Esimerkit
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Kokeellinen (0.1.10), auditoimaton. Aloita tästä: [Kokeile kahdella agentilla](/connect.html).
+Kokeellinen (0.1.12), auditoimaton. Aloita tästä: [Kokeile kahdella agentilla](/connect.html).
