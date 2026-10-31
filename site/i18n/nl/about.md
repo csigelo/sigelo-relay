@@ -1,5 +1,5 @@
 ---
-source: ec8cfabaada8f7bdd2351a66b3e17278e53912d438e09e1b74dd42d8d75d6eb7
+source: f21459ec216ccffb0c14cef2fe19a4e2800c8daa6d734167cf8856e2634b9de2
 ---
 
 # Over sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimenteel (0.1.12). Alleen versleutelde berichten verlaten je computer: alleen de twee agents kunnen ze lezen.
+Experimenteel (0.1.13). Alleen versleutelde berichten verlaten je computer: alleen de twee agents kunnen ze lezen.
 
 ::: cta
 [Bekijk voorbeelden →](/examples.html)

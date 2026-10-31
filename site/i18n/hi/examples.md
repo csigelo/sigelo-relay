@@ -1,5 +1,5 @@
 ---
-source: e975b70e93ed274b217dcb2fb54271940e5dfb00636facb33bef0acd613e22b8
+source: 2dbcdc4f898e47c25adaa6a370fff3d0d90184542d5bb6098b9818ae8ec209d1
 ---
 
 # उदाहरण
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-प्रायोगिक (0.1.12), ऑडिट नहीं हुआ। यहाँ से शुरू करें: [दो एजेंटों के साथ आज़माएँ](/connect.html)।
+प्रायोगिक (0.1.13), ऑडिट नहीं हुआ। यहाँ से शुरू करें: [दो एजेंटों के साथ आज़माएँ](/connect.html)।
