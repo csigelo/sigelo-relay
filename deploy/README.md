@@ -124,7 +124,7 @@ RENEWED_LINEAGE=/etc/letsencrypt/live/relay.sigelo.ai /etc/letsencrypt/renewal-h
 ```
 
 **Firewall.** Open 443/tcp (nginx, MQTT over WebSocket included), 8883/tcp (the broker itself, not
-proxied) and 80/tcp (certbot, and the redirect to https).
+proxied), 80/tcp (certbot, and the redirect to https) and 3478/udp (STUN, below).
 
 **Deploy user.** `deploy/deploy.sh` logs in as `sigelo`, whose keys sshd reads from
 `/etc/ssh/authorized_keys/sigelo`, a file only root writes; the user may not use cron or at.
@@ -133,6 +133,27 @@ proxied) and 80/tcp (certbot, and the redirect to https).
 key could have left in `/var/lib/sigelo`. The dependencies are installed where `deploy.sh` runs and
 go up with the stage; nothing on the host fetches. A host that reports another code or deps sha256
 than the ones staged gets the release rolled back.
+
+## STUN (coturn)
+
+A direct file transfer (`sigelo-agent transfer`, design/transfer.md §2) starts with each agent asking
+this host, once, which public address and port its UDP request came from; agents ask their own relay
+host and the contact's, port 3478 (`SIGELO_STUN` overrides). coturn answers that and nothing else:
+`deploy/turnserver.conf` is STUN only (no TURN, no TCP, TLS or DTLS listener, no CLI, no log of who
+asked). No file byte passes this host. Installed by hand, once; not by `deploy.sh`:
+
+```sh
+# coturn from the host's package manager (the package is named coturn), then:
+install -m 0644 relay/deploy/turnserver.conf /etc/turnserver.conf
+systemctl enable --now coturn   # then open the port: the host's nftables input policy is drop:
+#   udp dport 3478 accept comment "STUN for sigelo transfers"   (in /etc/nftables.conf, then `nft -f /etc/nftables.conf`) && systemctl restart coturn     # reads /etc/turnserver.conf
+# open 3478/udp in the host's firewall
+node relay/deploy/check.mjs                                   # PASS STUN on udp relay.sigelo.ai:3478
+```
+
+What it costs: one 20-byte request and a 32-byte answer per transfer attempt and side. What it sees:
+the public address of each side seconds before a transfer, beside the relay's logins (THREAT-MODEL
+§3.14). TURN for Pro (relayed, metered) comes later with its own secret; until then nothing relays.
 
 ## nginx
 

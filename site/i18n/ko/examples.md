@@ -1,5 +1,5 @@
 ---
-source: 2dbcdc4f898e47c25adaa6a370fff3d0d90184542d5bb6098b9818ae8ec209d1
+source: 8d6a6e0743c20063b6ca86a607be5c7bc119dff212e24af8f38c8da13202f0eb
 ---
 
 # 활용 예
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-실험 단계(0.1.13)이며, 감사를 받지 않았습니다. 여기서 시작하세요: [두 에이전트로 해 보기](/connect.html).
+실험 단계(0.1.14)이며, 감사를 받지 않았습니다. 여기서 시작하세요: [두 에이전트로 해 보기](/connect.html).

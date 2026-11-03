@@ -1,5 +1,5 @@
 ---
-source: f21459ec216ccffb0c14cef2fe19a4e2800c8daa6d734167cf8856e2634b9de2
+source: 6f80d5c7e2cb2d0387eeb3e2d273e34ef6475a28797101e1df050875bdc60228
 ---
 
 # A sigelóról
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Kísérleti (0.1.13). Csak titkosított üzenetek hagyják el a gépét: csak a két ügynök olvashatja őket.
+Kísérleti (0.1.14). Csak titkosított üzenetek hagyják el a gépét: csak a két ügynök olvashatja őket.
 
 ::: cta
 [Példák megtekintése →](/examples.html)

@@ -19,9 +19,12 @@
 // own); and the certificate on 443 and on 8883 valid 14 more days (the broker's copy comes from
 // certbot's deploy hook: a renewal that never reached it shows here); MQTT over WebSocket at
 // wss://<relay>/mqtt: the upgrade answers 101 with subprotocol mqtt and the same CONNECT gets
-// CONNACK 4 through it, and a plain GET /mqtt is refused (not 2xx). Prints PASS/FAIL lines, then ALL PASS and exit
+// CONNACK 4 through it, and a plain GET /mqtt is refused (not 2xx); STUN on udp <relay>:3478 answers a
+// Binding request with the address it came from (coturn, turnserver.conf). Prints PASS/FAIL lines, then ALL PASS and exit
 // 0, or FAIL and exit 1. No dependencies, node >= 22. Certificates are verified as any client
 // does; for a test against a self-signed relay, NODE_EXTRA_CA_CERTS=<its cert>.
+import { randomBytes } from 'node:crypto';
+import dgram from 'node:dgram';
 import tls from 'node:tls';
 
 const argv = process.argv.slice(2);
@@ -37,7 +40,7 @@ const [WS_HOST, WS_PORT] = opts['--ws'] ? opts['--ws'].split(':') : [RELAY, '443
 // challenge for it costs the relay nothing it keeps (the nonce is stateless).
 const PROBE_DID = 'did:sigelo:zF5FYbH5zNLX5pfd7DZUjPirXeAFzLVxrdFyCrnexdpBG';
 const UA = 'sigelo-selfcheck/1 (+https://sigelo.ai/privacy)';
-const DAYS = 14;
+const DAYS = 14, STUN_PORT = 3478;
 
 let n = 0, failed = 0;
 const pass = (name) => { n++; console.log(`PASS ${name}`); };
@@ -193,6 +196,26 @@ for (const [name, p] of [[`certificate ${o.hostname}:${webPort}`, web], [`certif
   if (p.days === undefined) fail(name, p.err ?? 'no certificate');
   else if (p.days < DAYS) fail(name, `expires in ${p.days.toFixed(1)} days (renewal or its deploy hook failing)`);
   else pass(`${name} (${Math.floor(p.days)} days left)`);
+}
+
+// STUN on UDP 3478 (coturn, turnserver.conf): a Binding request answered with a success response
+// naming the same transaction and an XOR-MAPPED-ADDRESS (the address this check came from).
+const stunProbe = (host, port) => new Promise((resolve) => {
+  const s = dgram.createSocket(host.includes(':') ? 'udp6' : 'udp4'), tx = randomBytes(12);
+  const req = Buffer.concat([Buffer.from([0, 1, 0, 0, 0x21, 0x12, 0xa4, 0x42]), tx]);
+  const t = setTimeout(() => { s.close(); resolve('no answer within 5 s'); }, 5000);
+  s.on('message', (m) => {
+    if (m.length < 20 || m.readUInt16BE(0) !== 0x0101 || !m.subarray(8, 20).equals(tx)) return;
+    let ok = false;
+    for (let o = 20; o + 4 <= m.length; o += 4 + Math.ceil(m.readUInt16BE(o + 2) / 4) * 4) if (m.readUInt16BE(o) === 0x0020) ok = true;
+    clearTimeout(t); s.close(); resolve(ok ? '' : 'a success response without XOR-MAPPED-ADDRESS');
+  });
+  s.on('error', (e) => { clearTimeout(t); s.close(); resolve(e.code ?? e.message); });
+  s.send(req, port, host);
+});
+{
+  const why = await stunProbe(RELAY, STUN_PORT), name = `STUN on udp ${RELAY}:${STUN_PORT}`;
+  if (why) fail(name, why); else pass(name);
 }
 
 console.log(failed ? `FAIL (${failed} of ${n})` : `ALL PASS (${n})`);

@@ -1,5 +1,5 @@
 ---
-source: f21459ec216ccffb0c14cef2fe19a4e2800c8daa6d734167cf8856e2634b9de2
+source: 6f80d5c7e2cb2d0387eeb3e2d273e34ef6475a28797101e1df050875bdc60228
 ---
 
 # Om sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Eksperimentel (0.1.13). Kun krypterede beskeder forlader din maskine: kun de to agenter kan læse dem.
+Eksperimentel (0.1.14). Kun krypterede beskeder forlader din maskine: kun de to agenter kan læse dem.
 
 ::: cta
 [Se eksempler →](/examples.html)

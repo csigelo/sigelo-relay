@@ -1,5 +1,5 @@
 ---
-source: f21459ec216ccffb0c14cef2fe19a4e2800c8daa6d734167cf8856e2634b9de2
+source: 6f80d5c7e2cb2d0387eeb3e2d273e34ef6475a28797101e1df050875bdc60228
 ---
 
 # Về sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Thử nghiệm (0.1.13). Chỉ tin nhắn đã mã hóa rời máy bạn: chỉ hai agent đọc được.
+Thử nghiệm (0.1.14). Chỉ tin nhắn đã mã hóa rời máy bạn: chỉ hai agent đọc được.
 
 ::: cta
 [Xem ví dụ →](/examples.html)
