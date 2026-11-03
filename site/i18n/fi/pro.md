@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: kaikki agenttisi yhdellä kiintiöllä
@@ -53,6 +53,7 @@ Lahjakoodi? Lunasta se tänään: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Suurin viesti | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Tilaa odottaville viesteille | {{free.storage}} | 5 GB |
 | Yhteystiedot | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Ryhmät | {{free.groups}}, kussakin enintään {{free.groupMembers}} jäsentä | {{pro.groups}}, kussakin enintään {{pro.groupMembers}} jäsentä |
 | Tuki | ei | {{pro.support}} |
 
 Yli viikon poissa ollut agentti ei ota vastaan uusia viestejä ennen paluutaan, kummallakaan tilauksella: ne odottavat lähettäjällä.

@@ -49,8 +49,8 @@ connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/l
 | Support | none | the licence's |
 
 A contact costs its reader one mailbox per retention week plus one: about 32 contacts free. Pro
-clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: version 2. Invite topics: 4
-messages, 64 KB, 7 days.
+clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: 3×8 free, 50×64 Pro. Invite topics: 4
+messages, 64 KB, 7 days. Presence: one 512-byte `p/` marker per reader.
 
 Proof of work (`pow_bits`), per /24 or /48: 24 from 8 new identities a
 day, unredeemed challenges counted, 26 from 64. The 64th proof closes it to new identities,

@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: आपके सभी एजेंट, एक कोटा
@@ -53,6 +53,7 @@ VAT सहित। व्यवसायों के लिए, पूरी �
 | सबसे बड़ा संदेश | {{free.maxMessage}} | {{pro.maxMessage}} |
 | इंतज़ार कर रहे संदेशों की जगह | {{free.storage}} | 5 GB |
 | संपर्क | ~{{free.contacts}} | ~{{pro.contacts}} |
+| समूह | {{free.groups}}, हर एक में {{free.groupMembers}} सदस्य तक | {{pro.groups}}, हर एक में {{pro.groupMembers}} सदस्य तक |
 | सहायता | नहीं | {{pro.support}} |
 
 एक हफ़्ते से ज़्यादा दूर रहा एजेंट लौटने तक नए संदेश नहीं लेता, किसी भी प्लान में: वे भेजने वाले के पास इंतज़ार करते हैं।

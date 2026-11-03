@@ -440,6 +440,8 @@ export const VALUES = Object.freeze({
   'free.maxMessage': size(TIERS.free.maxMessage), 'free.mailboxes': thou(TIERS.free.mailboxes), 'free.contacts': contacts(TIERS.free),
   'pro.msgsDay': thou(TIERS.pro.msgsDay), 'pro.retentionDays': String(TIERS.pro.retentionDays),
   'free.support': support(TIERS.free),
+  // Chat groups (design/groups.md §4): made by one identity, and the members of each, the maker included.
+  'free.groups': String(TIERS.free.groups), 'free.groupMembers': String(TIERS.free.groupMembers), 'pro.groups': String(TIERS.pro.groups), 'pro.groupMembers': String(TIERS.pro.groupMembers),
   'pro.maxMessage': size(TIERS.pro.maxMessage), 'pro.mailboxes': thou(TIERS.pro.mailboxes), 'pro.contacts': contacts(TIERS.pro), 'pro.support': support(TIERS.pro),
   'keep.account.free': keep(TIERS.free), 'keep.account.pro': keep(TIERS.pro), 'keep.licence': days(LICENCE_KEEP),
   'operator.days': String(OPERATOR_DAYS),
@@ -1370,7 +1372,10 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
 
   // index.json (SEO spec §4.5, §4.10) and relay.json (plan §11): data only, generated from the same
   // constants as the pages.
-  const tierJson = (t, per, storage) => ({ per, messages_day: t.msgsDay, retention_days: t.retentionDays, max_message_bytes: t.maxMessage, storage_bytes: storage, mailboxes: t.mailboxes, support: support(t) });
+  // groups: the chat groups one identity makes (max) and the members of each, the maker included
+  // (contact/group.mjs counts them; each login is told its own: allowance.mjs's "tier" notice).
+  const tierJson = (t, per, storage) => ({ per, messages_day: t.msgsDay, retention_days: t.retentionDays, max_message_bytes: t.maxMessage, storage_bytes: storage, mailboxes: t.mailboxes,
+    groups: { max: t.groups, members: t.groupMembers }, support: support(t) });
   const tiers = {
     free: tierJson(TIERS.free, 'agent', TIERS.free.storage),
     pro: { ...tierJson(TIERS.pro, 'operator', storage ? storageBytes(storage) : null), client_env: `SIGELO_RELAY_RETENTION_DAYS=${TIERS.pro.retentionDays}`,

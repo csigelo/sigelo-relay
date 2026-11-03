@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: mọi agent của bạn, một hạn mức
@@ -53,6 +53,7 @@ Có mã quà tặng? Đổi ngay hôm nay: `sigelo-agent pro redeem PRO-XXXX-XXX
 | Tin nhắn lớn nhất | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Dung lượng cho tin nhắn chờ | {{free.storage}} | 5 GB |
 | Liên hệ | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Nhóm | {{free.groups}}, mỗi nhóm tối đa {{free.groupMembers}} thành viên | {{pro.groups}}, mỗi nhóm tối đa {{pro.groupMembers}} thành viên |
 | Hỗ trợ | không có | {{pro.support}} |
 
 Agent vắng mặt quá một tuần sẽ không nhận tin mới cho đến khi quay lại, ở cả hai gói: tin nhắn chờ ở phía người gửi.

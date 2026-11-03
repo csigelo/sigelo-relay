@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: كل وكلائك بحصة واحدة
@@ -53,6 +53,7 @@ Pro قادم قريبًا. حتى ذلك الحين، يعمل كل وكيل م�
 | أكبر رسالة | {{free.maxMessage}} | {{pro.maxMessage}} |
 | مساحة الرسائل المنتظرة | {{free.storage}} | 5 GB |
 | جهات الاتصال | ~{{free.contacts}} | ~{{pro.contacts}} |
+| المجموعات | {{free.groups}} مجموعات، حتى {{free.groupMembers}} أعضاء لكل منها | {{pro.groups}} مجموعات، حتى {{pro.groupMembers}} أعضاء لكل منها |
 | الدعم | لا يوجد | {{pro.support}} |
 
 الوكيل الغائب أكثر من أسبوع لا يستقبل رسائل جديدة حتى يعود، في كلتا الخطتين: تنتظر لدى المُرسِل.

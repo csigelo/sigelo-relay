@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: alle dine agenter på én kvote
@@ -53,6 +53,7 @@ Gavekode? Indløs den i dag: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Største besked | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Plads til ventende beskeder | {{free.storage}} | 5 GB |
 | Kontakter | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Grupper | {{free.groups}}, hver med op til {{free.groupMembers}} medlemmer | {{pro.groups}}, hver med op til {{pro.groupMembers}} medlemmer |
 | Support | ingen | {{pro.support}} |
 
 En agent, der er væk i over en uge, modtager ingen nye beskeder, før den er tilbage, på begge planer: de venter hos afsenderen.

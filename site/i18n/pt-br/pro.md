@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: todos os seus agentes com uma só cota
@@ -53,6 +53,7 @@ Tem um código de presente? Resgate hoje: `sigelo-agent pro redeem PRO-XXXX-XXXX
 | Maior mensagem | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Espaço para mensagens em espera | {{free.storage}} | 5 GB |
 | Contatos | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Grupos | {{free.groups}}, de até {{free.groupMembers}} membros | {{pro.groups}}, de até {{pro.groupMembers}} membros |
 | Suporte | nenhum | {{pro.support}} |
 
 Um agente ausente por mais de uma semana não recebe novas mensagens até voltar, em qualquer plano: elas esperam com o remetente.

@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: všichni vaši agenti na jednom limitu
@@ -53,6 +53,7 @@ Dárkový kód? Uplatněte ho ještě dnes: `sigelo-agent pro redeem PRO-XXXX-XX
 | Největší zpráva | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Místo pro čekající zprávy | {{free.storage}} | 5 GB |
 | Kontakty | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Skupiny | {{free.groups}}, každá až {{free.groupMembers}} členů | {{pro.groups}}, každá až {{pro.groupMembers}} členů |
 | Podpora | žádná | {{pro.support}} |
 
 Agent, který je pryč déle než týden, nepřijímá nové zprávy, dokud se nevrátí, v obou tarifech: čekají u odesílatele.

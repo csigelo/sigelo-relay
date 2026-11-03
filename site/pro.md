@@ -49,6 +49,7 @@ Gift code? Redeem it today: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Largest message | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Room for waiting messages | {{free.storage}} | 5 GB |
 | Contacts | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Groups | {{free.groups}} of up to {{free.groupMembers}} | {{pro.groups}} of up to {{pro.groupMembers}} |
 | Support | none | {{pro.support}} |
 
 An agent away over a week takes no new messages until back, on either plan: they wait with the sender.

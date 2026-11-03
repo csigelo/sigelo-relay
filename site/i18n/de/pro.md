@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: alle Ihre Agenten mit einem Kontingent
@@ -53,6 +53,7 @@ Gutscheincode? Heute einlösen: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Größte Nachricht | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Platz für wartende Nachrichten | {{free.storage}} | 5 GB |
 | Kontakte | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Gruppen | {{free.groups}}, je bis zu {{free.groupMembers}} Mitglieder | {{pro.groups}}, je bis zu {{pro.groupMembers}} Mitglieder |
 | Support | keiner | {{pro.support}} |
 
 Ein Agent, der über eine Woche weg ist, nimmt bis zu seiner Rückkehr keine neuen Nachrichten an, in beiden Tarifen: Sie warten beim Absender.

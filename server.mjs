@@ -45,6 +45,7 @@ import { relayPolicyFromEnv } from './allowance.mjs';   // M4: allowances, proof
 import { relayStats } from './stats.mjs';
 import { parking } from './park.mjs';
 import { closedOperators, closedRelay } from './closed.mjs';
+import { PRESENCE_WILL, presence as presenceMarkers } from './presence.mjs';
 
 export { WS_PATH, prefixOf };
 
@@ -279,7 +280,9 @@ export async function startRelay(cfg) {
     unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park, closed });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed });
+  // Presence markers (presence.mjs): the relay's offline goes to the readers through the broker.
+  const presence = presenceMarkers({ clock, publish: (packet) => broker.publish(packet, () => {}), policy });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -297,8 +300,16 @@ export async function startRelay(cfg) {
   };
   broker = await Aedes.createBroker({
     persistence: m.persistence,
-    // Once admitted, the session may send packets up to MAX_FRAME (Capped).
-    authenticate: (client, username, password, cb) => a.authenticate(client, username, password, (err, ok) => { if (ok && client.conn) client.conn.loggedIn = true; cb(err, ok); }),
+    // Once admitted, the session may send packets up to MAX_FRAME (Capped). auth.mjs drops every
+    // will; the presence will is kept as a mark (presence.mjs), never as a will Aedes publishes.
+    authenticate: (client, username, password, cb) => {
+      const will = client._will?.topic === PRESENCE_WILL;
+      a.authenticate(client, username, password, (err, ok) => {
+        if (ok && client.conn) client.conn.loggedIn = true;
+        if (ok && will) presence.watch(client, a.sessionOf(client)?.account);
+        cb(err, ok);
+      });
+    },
     authorizePublish: m.authorizePublish,
     authorizeSubscribe: m.authorizeSubscribe,
     authorizeForward,
@@ -307,8 +318,8 @@ export async function startRelay(cfg) {
     drainTimeout: DRAIN_MS,
     keepaliveLimit: KEEPALIVE_MAX,
   });
-  policy.attach?.({ broker, notify: m.notify, sessionOf: a.sessionOf });   // M4: a login's operator/licence notice
-  broker.on('clientDisconnect', (client) => log(`disconnect ${a.prefixOf(client)}`));
+  policy.attach?.({ broker, notify: m.notify, inform: m.inform, sessionOf: a.sessionOf });   // M4: a login's operator/licence notice, then its group tier
+  broker.on('clientDisconnect', (client) => { log(`disconnect ${a.prefixOf(client)}`); presence.end(client, a.sessionOf(client)?.account); });
   const onError = (client, err) => { if (!err.login) log(`error ${a.prefixOf(client)} ${err.check ?? 'protocol'}`); };
   broker.on('clientError', onError);
   broker.on('connectionError', onError);
@@ -324,7 +335,9 @@ export async function startRelay(cfg) {
     const prefix = prefixOf(address);
     const client = broker.handle(new Capped(sock, { held, early, prefix, frameMs, raw }));
     a.attach(client, prefix);
-    net.once('close', () => a.detach(client));   // every socket closes, whatever ended it: the session caps count down
+    // Every socket closes, whatever ended it: the session caps count down, and a session that set
+    // the presence will goes offline (once: clientDisconnect may have said so first).
+    net.once('close', () => { a.detach(client); presence.end(client, a.sessionOf(client)?.account); });
   };
   const onSocket = (sock) => onStream(sock, sock.remoteAddress);
   const listen = (server, port, host) => new Promise((resolve, reject) => {
@@ -369,7 +382,7 @@ export async function startRelay(cfg) {
   const sweep = (now) => {
     park.sweep(now ?? clock());
     const r = m.sweep(now);
-    if (r.expired || r.invites || r.idle || r.accounts) log(`sweep expired=${r.expired} invites=${r.invites} idle=${r.idle} accounts=${r.accounts}`);
+    if (r.expired || r.invites || r.idle || r.accounts || r.presence) log(`sweep expired=${r.expired} invites=${r.invites} idle=${r.idle} accounts=${r.accounts} presence=${r.presence}`);
     return r;
   };
   // A failed sweep is retried at the next tick; it must not end the process mid-delivery.
@@ -387,7 +400,7 @@ export async function startRelay(cfg) {
     m.close();
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, presence, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {

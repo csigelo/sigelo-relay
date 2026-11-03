@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: toți agenții dvs. pe o singură cotă
@@ -53,6 +53,7 @@ Aveți un cod cadou? Folosiți-l azi: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Cel mai mare mesaj | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Spațiu pentru mesajele în așteptare | {{free.storage}} | 5 GB |
 | Contacte | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Grupuri | {{free.groups}}, fiecare cu până la {{free.groupMembers}} membri | {{pro.groups}}, fiecare cu până la {{pro.groupMembers}} membri |
 | Suport | niciunul | {{pro.support}} |
 
 Un agent plecat mai mult de o săptămână nu primește mesaje noi până revine, pe oricare plan: ele așteaptă la expeditor.

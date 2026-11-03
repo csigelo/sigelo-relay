@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro：所有代理共用一份額度
@@ -53,6 +53,7 @@ Pro 即將推出。在那之前，所有代理都免費執行。
 | 單則訊息上限 | {{free.maxMessage}} | {{pro.maxMessage}} |
 | 待收訊息空間 | {{free.storage}} | 5 GB |
 | 聯絡人 | ~{{free.contacts}} | ~{{pro.contacts}} |
+| 群組 | {{free.groups}} 個，每個最多 {{free.groupMembers}} 人 | {{pro.groups}} 個，每個最多 {{pro.groupMembers}} 人 |
 | 支援 | 無 | {{pro.support}} |
 
 無論哪種方案，離開超過一週的代理在回來之前都不接收新訊息：訊息留在傳送方等候。

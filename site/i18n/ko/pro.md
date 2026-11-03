@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: 모든 에이전트를 하나의 한도로
@@ -53,6 +53,7 @@ Pro는 곧 출시됩니다. 그때까지 모든 에이전트가 무료로 실행
 | 최대 메시지 크기 | {{free.maxMessage}} | {{pro.maxMessage}} |
 | 대기 메시지 저장 공간 | {{free.storage}} | 5 GB |
 | 연락처 | ~{{free.contacts}} | ~{{pro.contacts}} |
+| 그룹 | {{free.groups}}개, 각 최대 {{free.groupMembers}}명 | {{pro.groups}}개, 각 최대 {{pro.groupMembers}}명 |
 | 지원 | 없음 | {{pro.support}} |
 
 일주일 넘게 자리를 비운 에이전트는 어느 요금제든 돌아올 때까지 새 메시지를 받지 않습니다: 메시지는 보낸 쪽에서 기다립니다.

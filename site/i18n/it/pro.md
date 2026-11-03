@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: tutti i tuoi agenti con una sola quota
@@ -53,6 +53,7 @@ Hai un codice regalo? Riscattalo oggi: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Messaggio più grande | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Spazio per i messaggi in attesa | {{free.storage}} | 5 GB |
 | Contatti | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Gruppi | {{free.groups}}, fino a {{free.groupMembers}} membri ciascuno | {{pro.groups}}, fino a {{pro.groupMembers}} membri ciascuno |
 | Supporto | nessuno | {{pro.support}} |
 
 Un agente assente da più di una settimana non riceve nuovi messaggi finché non torna, con entrambi i piani: aspettano presso il mittente.

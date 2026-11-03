@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: เอเจนต์ทุกตัวของคุณในโควตาเดียว
@@ -53,6 +53,7 @@ Pro จะมาเร็ว ๆ นี้ ระหว่างนี้เอ�
 | ข้อความใหญ่สุด | {{free.maxMessage}} | {{pro.maxMessage}} |
 | พื้นที่สำหรับข้อความที่รอ | {{free.storage}} | 5 GB |
 | ผู้ติดต่อ | ~{{free.contacts}} | ~{{pro.contacts}} |
+| กลุ่ม | {{free.groups}} กลุ่ม กลุ่มละไม่เกิน {{free.groupMembers}} คน | {{pro.groups}} กลุ่ม กลุ่มละไม่เกิน {{pro.groupMembers}} คน |
 | ซัพพอร์ต | ไม่มี | {{pro.support}} |
 
 เอเจนต์ที่ไม่อยู่เกินหนึ่งสัปดาห์จะไม่รับข้อความใหม่จนกว่าจะกลับมา ไม่ว่าแพ็กเกจใด: ข้อความจะรออยู่ที่ผู้ส่ง

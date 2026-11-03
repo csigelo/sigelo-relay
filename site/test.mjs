@@ -79,8 +79,9 @@ ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
 // 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
+// 2026-11-03: pro +15, the Free/Pro table's Groups row (design/groups.md §4), a table row only: no prose.
 const PROSE_BUDGET = { index: 175, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
-const FILE_BUDGET = { index: 255, connect: 450, pro: 280, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
+const FILE_BUDGET = { index: 255, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -1288,8 +1289,13 @@ if (allowance && mailbox && operator && db) {
   // The licence claim "email" is answered over SimpleX (terms §7): contact@ only receives, so no page
   // or agent file may sell e-mail support.
   const supportOf = (t) => ({ none: 'none', email: 'SimpleX', priority: 'priority' })[t.support];
-  ok(row('Support').join() === `${supportOf(free)},${supportOf(pro)}` && body.agents.includes('No account: a seller-signed licence to your **operator DID**.') && pro.groups === 0 && !/\bgroups?\b/i.test(body.pro),
-    `pro: support as TIERS.pro.support (${pro.support}, shown as ${supportOf(pro)}); no groups sold while TIERS.pro.groups is 0 (version 2)`);
+  ok(row('Support').join() === `${supportOf(free)},${supportOf(pro)}` && body.agents.includes('No account: a seller-signed licence to your **operator DID**.'),
+    `pro: support as TIERS.pro.support (${pro.support}, shown as ${supportOf(pro)})`);
+  // Groups (design/groups.md §4): groups made and members of each, as TIERS says and relay.json tells clients.
+  ok(row('Groups').join() === `${free.groups} of up to ${free.groupMembers},${pro.groups} of up to ${pro.groupMembers}` && free.groups === 3 && free.groupMembers === 8 && pro.groups === 50 && pro.groupMembers === 64
+    && relayInfo.limits.free.groups.max === free.groups && relayInfo.limits.free.groups.members === free.groupMembers && relayInfo.limits.pro.groups.max === pro.groups && relayInfo.limits.pro.groups.members === pro.groupMembers
+    && index.tiers.free.groups.max === free.groups && index.tiers.pro.groups.members === pro.groupMembers,
+    `pro: Groups ${row('Groups').join(' | ')} (TIERS: free ${free.groups} of up to ${free.groupMembers}, Pro ${pro.groups} of up to ${pro.groupMembers}); relay.json and index.json limits say the same`);
   ok(index.tiers.pro.support === supportOf(pro) && index.tiers.free.support === supportOf(free) && relayInfo.limits.pro.support === supportOf(pro)
     && (pro.support !== 'email' || src.terms.includes('answered over SimpleX')) && !/Support: e-?mail/i.test(Object.values(body).join('\n')),
     'support: index.json and relay.json say what pro.md says; e-mail support is answered over SimpleX (terms §7) and no page sells "Support: e-mail"');

@@ -11,6 +11,8 @@
 //               holds 4 messages / 64 KB, dies at the first answer its reader acknowledges or 7
 //               days after the claim, to the end of that UTC day (the longest invite expiry: the
 //               relay cannot read the code's).
+//   p/<32 hex>  a presence topic (presence.mjs): its writer's one marker, replaced, sent at once to a
+//               subscriber as a retained message; nothing of it is in the database.
 //   $sigelo/notice  refusals after login, as {code, detail}, written to that client alone; a publish
 //               to a topic nobody holds now gets "no_reader". Every refusal is named. A refused
 //               PUBLISH's notice also carries its packet id (`id`). The notice is written before the
@@ -38,6 +40,7 @@
 // a message is stored by authorizePublish in the same transaction as the checks that admit it.
 import { Readable } from 'node:stream';
 import { DAY } from './db.mjs';
+import { PRESENCE } from './presence.mjs';
 
 export const MAILBOX = /^m\/[0-9a-f]{32}$/, INVITE = /^i\/[0-9a-f]{32}$/, NOTICE = '$sigelo/notice';
 export const MAX_MESSAGE = 256 * 1024, INVITE_MESSAGES = 4, INVITE_BYTES = 64 * 1024, INVITE_TTL = 7 * DAY;
@@ -75,7 +78,8 @@ const live = (c, now) => c !== undefined && !c.dead && (c.expires === null || c.
 // kept; idle mailboxes go retention + 7 days after their last use, never sooner than 14 days),
 // tidy (its own retention, run inside the sweep's transaction: db.mjs sweep) and accountKept
 // (an idle account the sweep keeps). members: closed.mjs's on a closed relay (its kept and tidy too).
-export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null }) {
+// presence: presence.mjs's, for p/ topics (none: they are refused as any other topic).
+export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null }) {
   // The row each queued message is stored in, by its payload Buffer. Aedes wraps a publish in new
   // packet objects on its way to the reader but always passes the payload Buffer along by
   // reference, and the payload is all the relay knows a message by; a weak key frees with it.
@@ -124,6 +128,9 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify(n)), qos: 0, retain: false }, () => done());
   };
 
+  // A notice that refuses nothing (allowance.mjs's group tier, {code: "tier", …}): not counted as refused.
+  const inform = (client, n) => { client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify(n)), qos: 0, retain: false }, () => {}); };
+
   // → null when stored, else { code, detail }. Synchronous, on the one thread: the claim read first
   // cannot change before the transaction that stores.
   function store(session, packet) {
@@ -169,15 +176,16 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
   function authorizePublish(client, packet, cb) {
     const session = client && sessionOf(client);
     if (!session) return cb(refusal('no session'));
-    if (!MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
+    const marker = presence !== null && PRESENCE.test(packet.topic);
+    if (!marker && !MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
     if (packet.qos !== 1) return cb(refusal('qos'));   // store-and-forward is QoS 1 (0 is not stored, 2 not offered)
-    packet.retain = false;                              // nothing is retained here
+    packet.retain = false;                              // nothing is retained by Aedes: a presence marker is held by presence.mjs
     let r, rated;
     // Aedes calls this from the parser's event: a throw here would end the process. A store that
     // fails (disk full, a bug) closes this connection instead; the client retransmits later.
     try {
       rated = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'publish', now: clock(), prefix: session.prefix }) ?? null;
-      r = rated || store(session, packet);
+      r = rated || (marker ? presence.store(client, session, packet) : store(session, packet));
       // Every refused publish is a strike (allowance.mjs RATE): a no_reader or a quota costs the
       // writer nothing else, and drew on its network's bucket without end.
       if (r && !rated) policy.strike?.({ account: session.account, clientId: session.clientId, now: clock() });
@@ -232,6 +240,12 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
       return cb(null, c && c.account === session.account && live(c, clock()) ? sub : null);
     }
     if (sub.topic === NOTICE) return cb(null, sub);
+    // A presence topic: read by whoever names it, at QoS 0 (a marker is never queued); no claim.
+    if (presence !== null && PRESENCE.test(sub.topic)) {
+      const r = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'subscribe', now: clock(), prefix: session.prefix });
+      if (r) return notify(client, r.code, r.detail, () => cb(null, null));
+      return cb(null, { ...sub, qos: 0 });
+    }
     const invite = INVITE.test(sub.topic);
     if (!invite && !MAILBOX.test(sub.topic)) return cb(null, null);   // granted 128: no wildcards, no other topics
     if (sub.qos < 1) return cb(null, null);                            // a QoS 0 subscription would never acknowledge
@@ -334,7 +348,8 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     async setup() {},
     async storeRetained() {},                               // authorizePublish clears retain
     createRetainedStream: empty,
-    createRetainedStreamCombi: empty,
+    // At a SUBSCRIBE, the presence markers of the topics granted (presence.mjs): no other is retained.
+    createRetainedStreamCombi: (topics) => (presence === null ? empty() : Readable.from(presence.held(topics))),
     // A claim is made in authorizeSubscribe, atomically with the mailbox_taken check. Aedes calls
     // this with every topic of the SUBSCRIBE packet, refused ones too, so it must add nothing.
     async addSubscriptions() {},
@@ -390,7 +405,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     async incomingGetPacket() { throw new Error('no such packet'); },
     async incomingDelPacket() { throw new Error('no such packet'); },
     async cleanIncoming() {},
-    async putWill() {},                                     // auth.mjs drops wills at login
+    async putWill() {},                                     // auth.mjs drops wills at login (server.mjs keeps the presence will's mark)
     async getWill() { return undefined; },
     async delWill() { return undefined; },
     streamWill: empty,
@@ -406,10 +421,11 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
       tidy: (t) => { stats?.flush(t); policy.tidy?.(t); members?.tidy(t); }, kept: (account, t) => members?.kept(account, t) || (policy.accountKept?.(account, t) ?? false),
     });
     reapSoon();
+    if (presence !== null) r.presence = presence.sweep(now);
     return r;
   };
   // Before the database closes: no batch runs after it.
   const close = () => { closed = true; clearImmediate(reaping); reaping = null; };
 
-  return { persistence, authorizePublish, authorizeSubscribe, forward, sweep, notify, close };
+  return { persistence, authorizePublish, authorizeSubscribe, forward, sweep, notify, inform, close };
 }

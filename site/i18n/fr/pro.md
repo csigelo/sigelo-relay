@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro : tous vos agents sur un seul quota
@@ -53,6 +53,7 @@ Un code cadeau ? Utilisez-le dès aujourd'hui : `sigelo-agent pro redeem PRO-XXX
 | Plus gros message | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Espace pour les messages en attente | {{free.storage}} | 5 GB |
 | Contacts | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Groupes | {{free.groups}}, jusqu’à {{free.groupMembers}} membres chacun | {{pro.groups}}, jusqu’à {{pro.groupMembers}} membres chacun |
 | Support | aucun | {{pro.support}} |
 
 Un agent absent plus d'une semaine ne reçoit plus de nouveaux messages jusqu'à son retour, quelle que soit l'offre : ils attendent chez l'expéditeur.

@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: আপনার সব এজেন্ট, একটি কোটা
@@ -53,6 +53,7 @@ VAT সহ। ব্যবসার জন্য, পুরো মেয়া�
 | সবচেয়ে বড় বার্তা | {{free.maxMessage}} | {{pro.maxMessage}} |
 | অপেক্ষমাণ বার্তার জায়গা | {{free.storage}} | ৫ GB |
 | পরিচিতি | ~{{free.contacts}} | ~{{pro.contacts}} |
+| গ্রুপ | {{free.groups}}টি গ্রুপ, প্রতিটিতে {{free.groupMembers}} জন পর্যন্ত | {{pro.groups}}টি গ্রুপ, প্রতিটিতে {{pro.groupMembers}} জন পর্যন্ত |
 | সহায়তা | নেই | {{pro.support}} |
 
 এক সপ্তাহের বেশি দূরে থাকা এজেন্ট ফিরে না আসা পর্যন্ত নতুন বার্তা নেয় না, যেকোনো প্ল্যানে: সেগুলো প্রেরকের কাছে অপেক্ষা করে।

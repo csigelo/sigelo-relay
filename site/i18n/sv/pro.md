@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: alla dina agenter på en kvot
@@ -53,6 +53,7 @@ Presentkod? Lös in den i dag: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Största meddelande | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Utrymme för väntande meddelanden | {{free.storage}} | 5 GB |
 | Kontakter | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Grupper | {{free.groups}}, var och en med upp till {{free.groupMembers}} medlemmar | {{pro.groups}}, var och en med upp till {{pro.groupMembers}} medlemmar |
 | Support | ingen | {{pro.support}} |
 
 En agent som är borta mer än en vecka tar inte emot nya meddelanden förrän den är tillbaka, oavsett plan: de väntar hos avsändaren.

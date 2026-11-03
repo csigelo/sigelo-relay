@@ -82,8 +82,8 @@ const postJson = async (path, body, r = relay) => {
   return { status: res.status, json: await res.json() };
 };
 // local: the client's own loopback address (127.0.1.1 is another /24 than 127.0.0.1).
-const mqttConnect = ({ username, clientId: cid, password: pw }, r = relay, local = undefined) => new Promise((resolve) => {
-  const o = { protocolVersion: 4, clean: false, clientId: cid, username, password: pw, reconnectPeriod: 0, connectTimeout: 5000 };
+const mqttConnect = ({ username, clientId: cid, password: pw, will }, r = relay, local = undefined) => new Promise((resolve) => {
+  const o = { protocolVersion: 4, clean: false, clientId: cid, username, password: pw, reconnectPeriod: 0, connectTimeout: 5000, ...(will && { will }) };
   const c = local ? new MqttClient(() => netConnect({ host: '127.0.0.1', port: r.ports.tcp, localAddress: local }), o) : connect({ host: '127.0.0.1', port: r.ports.tcp, ...o });
   c.box = [];
   c.on('message', (t, p) => c.box.push({ t, p }));
@@ -94,14 +94,14 @@ const mqttConnect = ({ username, clientId: cid, password: pw }, r = relay, local
 // Log in as id. opts: bundle (an object, or false for none), pow (true: solve it; a string: send
 // it; false: none; absent: as contact/carrier.mjs does, a proof at the identity's first login to
 // that relay, none after), local (the client's loopback address), ip (the X-Real-IP of its GET
-// /challenge: the network its proof counts against).
+// /challenge: the network its proof counts against), will (the CONNECT's).
 const proved = new Set();   // relay port + original DID of each login with a proof that connected
 async function login(id, opts = {}, r = relay) {
   const { challenge, pow_bits } = await getChallenge(id.did, r, opts.ip);
   const first = !proved.has(`${r.ports.tcp} ${id.original}`);
   const pow = opts.pow === true || (opts.pow === undefined && first) ? solve(HOST, id.original, challenge.nonce, pow_bits) : opts.pow || undefined;
   const pw = password(id, challenge, { bundle: opts.bundle ?? true, extra: pow === undefined ? {} : { pow } });
-  const creds = { username: id.did, clientId: clientId(id), password: pw };
+  const creds = { username: id.did, clientId: clientId(id), password: pw, ...(opts.will && { will: opts.will }) };
   const out = { ...(await mqttConnect(creds, r, opts.local)), creds, challenge, pow_bits };
   if (out.client && pow !== undefined) proved.add(`${r.ports.tcp} ${id.original}`);
   return out;
@@ -113,13 +113,16 @@ const unsubscribe = (c, t) => new Promise((resolve) => c.unsubscribe(t, () => re
 // "notice:<code>", any other packet as its type. A refusal's notice must come before the
 // acknowledgement of the request it refuses (mailbox.mjs): a client reads it that way.
 async function wireOf(c, f) {
-  const wire = [], on = (p) => wire.push(p.cmd === 'publish' && p.topic === '$sigelo/notice' ? `notice:${JSON.parse(p.payload).code}` : p.cmd);
+  const wire = [], on = (p) => { if (!(p.cmd === 'publish' && p.topic === '$sigelo/notice' && JSON.parse(p.payload).code === 'tier')) wire.push(p.cmd === 'publish' && p.topic === '$sigelo/notice' ? `notice:${JSON.parse(p.payload).code}` : p.cmd); };
   c.on('packetreceive', on);
   try { await f(); } finally { c.off('packetreceive', on); }
   return wire.join();
 }
 const publish = (c, t, p) => new Promise((resolve) => c.publish(t, p, { qos: 1 }, (e) => resolve(e ?? null)));
-const notices = (c) => c.box.filter((m) => m.t === '$sigelo/notice').map((m) => JSON.parse(m.p));
+// The group tier every login is told (allowance.mjs's header) refuses nothing: apart from the rest.
+const allNotices = (c) => c.box.filter((m) => m.t === '$sigelo/notice').map((m) => JSON.parse(m.p));
+const notices = (c) => allNotices(c).filter((x) => x.code !== 'tier');
+const tierNotice = async (c) => (await until(() => allNotices(c).some((x) => x.code === 'tier'))) ? allNotices(c).find((x) => x.code === 'tier') : null;
 const noticed = (c, code) => until(() => notices(c).some((x) => x.code === code));
 const got = (c, t) => c.box.filter((m) => m.t === t);
 const end = (c) => new Promise((resolve) => c.end(false, {}, resolve));
@@ -1316,9 +1319,9 @@ const fresh = (name, extra = {}) => {
 {
   now += DAY;
   const { free, pro } = DEFAULT_TIERS;
-  ok(free.retentionDays === 14 && free.maxMessage === 512 * KB && free.mailboxes === 128 && free.msgsDay === 3000 && free.storage === 100 * MB && free.groups === 0 && free.support === 'none'
-    && pro.retentionDays === 90 && pro.maxMessage === MB && pro.groups === 0 && pro.support === 'email' && windowWeeks(free.retentionDays) === 3 && windowWeeks(pro.retentionDays) === 14,
-    `the default tiers (§11): free 3,000 a day, 14 days, 512 KB, 100 MB, 128 mailboxes, no support; Pro 90 days, 1 MB, e-mail support; a reader's window ${windowWeeks(14)} weeks free, ${windowWeeks(90)} Pro`);
+  ok(free.retentionDays === 14 && free.maxMessage === 512 * KB && free.mailboxes === 128 && free.msgsDay === 3000 && free.storage === 100 * MB && free.groups === 3 && free.groupMembers === 8 && free.support === 'none'
+    && pro.retentionDays === 90 && pro.maxMessage === MB && pro.groups === 50 && pro.groupMembers === 64 && pro.support === 'email' && windowWeeks(free.retentionDays) === 3 && windowWeeks(pro.retentionDays) === 14,
+    `the default tiers (§11): free 3,000 a day, 14 days, 512 KB, 100 MB, 128 mailboxes, 3 groups of 8, no support; Pro 90 days, 1 MB, 50 groups of 64, e-mail support; a reader's window ${windowWeeks(14)} weeks free, ${windowWeeks(90)} Pro`);
   // A licence table without support (and with the day of use an older one kept): its rows read as
   // "email", and the sweep's rebuild in key order copies the table as made now.
   const old = new DatabaseSync(join(dir, 'default tiers.db'));   // fresh('default tiers') opens it
@@ -1335,10 +1338,21 @@ const fresh = (name, extra = {}) => {
   const opd = identity('operator d'), agd = identity('agent d'), frd = identity('free d');
   (await login(opd, {}, R)).client?.end(true);
   const up = await upload(licence(opd, { claims: { tier: 'pro', storage_mb: 8192, msgs_day: 50000, retention_days: 365, groups: 5, support: 'priority' } }), R);
-  (await login(agd, { pow: true, bundle: withVouch(agd, opd, vouch(opd, agd)) }, R)).client?.end(true);
+  const la = await login(agd, { pow: true, bundle: withVouch(agd, opd, vouch(opd, agd)) }, R), lf = await login(frd, { pow: true }, R);
+  const [ta, tf] = [await tierNotice(la.client), await tierNotice(lf.client)];
+  la.client?.end(true); lf.client?.end(true);
   const t = D.tier(agd).limits, f = D.tier(frd).limits;
-  ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 5120 * MB && t.groups === 0 && t.support === 'priority',
-    'a licence selling 365 days, 8 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 5 GB, groups 0 until they exist, support "priority"');
+  ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 5120 * MB && t.groups === 5 && t.groupMembers === 64 && t.support === 'priority',
+    'a licence selling 365 days, 8 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 5 GB, 5 groups of up to 64 members, support "priority"');
+  ok(ta?.tier === 'pro' && ta.groups.max === 5 && ta.groups.members === 64 && tf?.tier === 'free' && tf.groups.max === 3 && tf.groups.members === 8 && notices(la.client).length === 0,
+    `each login is told its group tier, $sigelo/notice "tier": the pooled agent ${JSON.stringify(ta?.groups)} (${ta?.detail}), a free identity ${JSON.stringify(tf?.groups)}; no refusal among them`);
+  // A licence selling fewer groups than free gives: the pool keeps free's (a pool never below free's).
+  const ope = identity('operator e'), age = identity('agent e');
+  (await login(ope, {}, R)).client?.end(true);
+  await upload(licence(ope, { claims: { tier: 'pro', storage_mb: 1, msgs_day: 1, retention_days: 1, groups: 0 } }), R);
+  (await login(age, { pow: true, bundle: withVouch(age, ope, vouch(ope, age)) }, R)).client?.end(true);
+  const te = D.tier(age).limits, gift = D.pol.groupTier(accountOf(age.original), now);
+  ok(te.groups === 3 && te.groupMembers === 64 && gift.tier === 'pro' && gift.groups.max === 3, `a licence selling 0 groups: the pool makes free's 3, of up to 64 members (${gift.detail})`);
   ok(f.retentionDays === 14 && f.maxMessage === 512 * KB && f.mailboxes === 128 && f.support === 'none' && D.pol.retention(accountOf(agd.original)) === 90 * DAY,
     'a free identity: 14 days, 512 KB, 128 mailboxes, no support; the pooled agent\'s messages are kept 90 days');
   await R.close();
@@ -1937,6 +1951,22 @@ const fresh = (name, extra = {}) => {
   ok(readme.includes(`| Kept | ${free.retentionDays} days, or until read | the licence's, up to ${pro.retentionDays} days |`) && readme.includes(`| Mailboxes | ${free.mailboxes} | ${pro.mailboxes.toLocaleString('en')} |`)
     && readme.includes('(https://relay.sigelo.ai/relay.json)'),
     'README: Kept and Mailboxes match the default tiers (Pro kept: the licence\'s, up to 90 days); /relay.json links the published document');
+}
+
+// Presence markers (presence.mjs) under the allowances: counted against no message quota, never
+// queued or charged; the first marker of an identity that has proven no work is refused pow.
+{
+  const WILL = { topic: '$sigelo/presence', payload: 'offline', qos: 0, retain: false };
+  const pid = identity('presence writer'), fresh = identity('presence fresh');
+  const w = await login(pid, { will: WILL }), acct = accountOf(pid.original), before = relay.db.sentToday(acct, now), bytes = charged(pid);
+  for (let i = 0; i < TIERS.free.msgsDay + 3; i++) await publish(w.client, `p/${randomBytes(16).toString('hex')}`, randomBytes(318));
+  await sleep(50);
+  ok(notices(w.client).length === 0 && relay.db.sentToday(acct, now) === before && charged(pid) === bytes,
+    `presence: ${TIERS.free.msgsDay + 3} markers past a free day's ${TIERS.free.msgsDay} messages: none refused, no message counted, nothing charged to a queue`);
+  const f = await login(fresh, { will: WILL, pow: false });
+  await publish(f.client, `p/${randomBytes(16).toString('hex')}`, randomBytes(318));
+  ok(await noticed(f.client, 'pow'), `presence: the first marker of an identity that has proven no work: pow, as its first claim (${notices(f.client).map((x) => x.code)})`);
+  w.client.end(true); f.client.end(true);
 }
 
 // The main relay's totals after everything above: deliveries, expiry, mailboxes given up.

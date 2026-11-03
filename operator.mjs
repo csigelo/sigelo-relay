@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS licences (
   storage_mb     INTEGER NOT NULL,  -- the claims as sold; allowance.mjs grants at most its Pro tier
   msgs_day       INTEGER NOT NULL,
   retention_days INTEGER NOT NULL,
-  groups         INTEGER NOT NULL,  -- version 2: kept, not enforced yet
+  groups         INTEGER NOT NULL,  -- chat groups to make: allowance.mjs tells each login (never below free's)
   support        TEXT NOT NULL,     -- none, email or priority: what the vendor owes; nothing the relay applies
   replaced_exp   INTEGER NOT NULL DEFAULT 0, -- the latest exp of the licences this one replaced (0: none): the row is kept until LICENCE_KEEP after the later of the two, so a licence a reissue ended early cannot be uploaded again while it would still hold
   gift_exp       INTEGER NOT NULL DEFAULT 0  -- the end of the Pro its gift codes give (gifts.mjs; 0: none), the start of a UTC day; vendor_key '' and iat, exp 0: gifts only, no licence

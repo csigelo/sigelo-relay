@@ -27,6 +27,7 @@ import { ACCOUNT_ROW, CLAIM_ROW, DID_ROW, accountOf, clientIdOf, openDb } from '
 import { CHECKS, MAX_BODY, MAX_OPERATOR, OPERATOR_CTX } from '../auth.mjs';
 import { relayPolicy } from '../allowance.mjs';
 import { mailboxes } from '../mailbox.mjs';
+import { KEEP as PRESENCE_KEEP, MARKER_BYTES, MARKERS, PER_ACCOUNT, PRESENCE_WILL, presence as presenceMarkers } from '../presence.mjs';
 import { solve } from '../pow.mjs';
 import { LOOKUPS_ALL, parking } from '../park.mjs';
 import { CREATED, bundleOf, clientId, identity, password, recovered, rotated, seed, selfSigned } from './fixtures.mjs';
@@ -66,8 +67,8 @@ const postCheck = async (body, r = relay, ip) => {
   return { status: res.status, json: await res.json() };
 };
 // CONNECT → { client } on CONNACK 0, else { error } (error.code = the CONNACK return code).
-const mqttConnect = ({ username, clientId: cid, password: pw, clean, keepalive }, r = relay) => new Promise((resolve) => {
-  const c = connect({ host: '127.0.0.1', port: r.ports.tcp, protocolVersion: 4, clean, clientId: cid, username, password: pw, reconnectPeriod: 0, connectTimeout: 5000, ...(keepalive !== undefined && { keepalive }) });
+const mqttConnect = ({ username, clientId: cid, password: pw, clean, keepalive, will }, r = relay) => new Promise((resolve) => {
+  const c = connect({ host: '127.0.0.1', port: r.ports.tcp, protocolVersion: 4, clean, clientId: cid, username, password: pw, reconnectPeriod: 0, connectTimeout: 5000, ...(keepalive !== undefined && { keepalive }), ...(will && { will }) });
   c.box = [];
   c.on('message', (t, p, packet) => c.box.push({ t, p, packet }));
   c.once('connect', () => resolve({ client: c }));
@@ -75,11 +76,11 @@ const mqttConnect = ({ username, clientId: cid, password: pw, clean, keepalive }
   c.once('close', () => resolve({ error: new Error('closed') }));
 });
 // Log in as id. opts: bundle (false = none), extra password fields, signer, username, clientId,
-// clean, challengeDid, password (verbatim), ip (the challenge's X-Real-IP).
+// clean, challengeDid, password (verbatim), ip (the challenge's X-Real-IP), will (the CONNECT's).
 async function login(id, opts = {}, r = relay) {
   const { challenge } = await getChallenge(opts.challengeDid ?? id.did, r, opts.ip);
   const pw = opts.password ?? password(opts.signer ?? id, challenge, { bundle: opts.bundle ?? true, extra: opts.extra });
-  const creds = { username: opts.username ?? id.did, clientId: opts.clientId ?? clientId(id), password: pw, clean: opts.clean ?? false };
+  const creds = { username: opts.username ?? id.did, clientId: opts.clientId ?? clientId(id), password: pw, clean: opts.clean ?? false, ...(opts.will && { will: opts.will }) };
   return { ...(await mqttConnect(creds, r)), creds, challenge };
 }
 const asCheck = (c) => ({ username: c.username, client_id: c.clientId, password: c.password, ...(c.clean ? { clean: true } : {}) });
@@ -1111,7 +1112,7 @@ const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stat
     `every time in the database is the start of a UTC day (${stamps.length} values${finer.length ? `; finer: ${finer.join(', ')}` : ''}), and a message row holds no time of its own${own.length ? ` (${own.join(', ')})` : ''}`);
   const queued = rows('SELECT payload FROM messages').map((r) => Buffer.from(r.payload));
   ok(queued.length === 4 && queued.every((p) => sent.some((s) => s.equals(p))), 'every payload stored is one of the random payloads sent, unchanged: ciphertext in, ciphertext kept');
-  const LINE = /^(login|disconnect) \d+\.\d+\.\d+\.0\/24$|^(refused|error) \d+\.\d+\.\d+\.0\/24 [a-z_]+$|^sweep expired=\d+ invites=\d+ idle=\d+ accounts=\d+$/;
+  const LINE = /^(login|disconnect) \d+\.\d+\.\d+\.0\/24$|^(refused|error) \d+\.\d+\.\d+\.0\/24 [a-z_]+$|^sweep expired=\d+ invites=\d+ idle=\d+ accounts=\d+ presence=\d+$/;
   const odd = lines.filter((l) => !LINE.test(l));
   ok(odd.length === 0, `every log line is a login, refusal, disconnect, error or sweep with a /24 and nothing else${odd.length ? `: ${odd.slice(0, 3).join(' | ')}` : ''}`);
   ok(topics.every((t) => !lines.join('\n').includes(t.slice(2))), 'no topic in the log');
@@ -1601,6 +1602,94 @@ function walStates(r, name, tag = name) {
   ok(first.json.ok === true && probe.status === 429 && probe.json.check === 'rate', `POST /park is charged against the lookup brakes: a network's second park past its share is rate, not park_taken (${probe.status} ${JSON.stringify(probe.json)})`);
   await pr5.close();
   now -= 661;
+}
+
+// ================================================================ presence markers (presence.mjs)
+// p/ topics: one writer's marker, replaced, sent to a subscriber at once; the relay's offline when a
+// session that set the presence will ends; nothing in the database.
+{
+  const pr = await startRelay({ ...cfg, db: join(dir, 'presence.db') });
+  const WILL = { topic: PRESENCE_WILL, payload: 'offline', qos: 0, retain: false };
+  const markerOf = (c, t) => messages(c, t).map((m) => ({ text: m.p.toString('latin1'), retain: m.packet.retain }));
+  const offlineAt = (c, t) => { const m = messages(c, t).at(-1); try { return JSON.parse(m.p).at; } catch { return null; } };
+  const A1 = await login(alice, { will: WILL }, pr), B = await login(bob, {}, pr);
+  const t = topic('p'), m1 = payload(318), m2 = payload(318);
+  ok(await publish(A1.client, t, m1) === null && notices(A1.client).length === 0, 'presence: a session whose CONNECT set the presence will publishes its marker to a p/ topic, no notice');
+  const g0 = await subscribe(B.client, t, 1);
+  ok(g0 !== 128 && await until(() => messages(B.client, t).length === 1) && messages(B.client, t)[0].packet.qos === 0, 'presence: anyone naming the topic subscribes (no claim), and the marker held comes at once, at QoS 0 (never queued)');
+  ok(markerOf(B.client, t)[0].retain === true && messages(B.client, t)[0].p.equals(m1), 'presence: it comes as a retained message, the writer\'s bytes unchanged');
+  await publish(A1.client, t, m2);
+  ok(await until(() => messages(B.client, t).length === 2) && messages(B.client, t)[1].p.equals(m2) && messages(B.client, t)[1].packet.retain === false, 'presence: a new marker replaces it, and goes to the subscriber live');
+  const C = await login(carol, {}, pr);
+  await subscribe(C.client, t, 1); await sleep(100);
+  ok(messages(C.client, t).length === 1 && messages(C.client, t)[0].p.equals(m2), 'presence: a later subscriber gets the latest marker only (replaced, never added)');
+  // Who may write: the owner, with the will; a marker within its size.
+  const B2 = B.client;
+  B2.box.length = 0;
+  await publish(B2, topic('p'), payload(318));
+  ok(await until(() => notices(B2).some((x) => x.code === 'presence_will')), `presence: a session without the presence will publishes no marker (presence_will: ${notices(B2).map((x) => x.code)})`);
+  const Bw = await login(bob, { will: WILL }, pr);
+  await publish(Bw.client, t, payload(318));
+  ok(await until(() => notices(Bw.client).some((x) => x.code === 'presence_taken')) && messages(C.client, t).length === 1, 'presence: another identity\'s marker on a topic someone owns: presence_taken, nothing reaches the readers');
+  await publish(A1.client, topic('p'), payload(MARKER_BYTES + 1));
+  ok(await until(() => notices(A1.client).some((x) => x.code === 'too_large')), `presence: a marker over ${MARKER_BYTES} bytes: too_large`);
+  const pdb = new DatabaseSync(join(dir, 'presence.db')), pq = (sql) => pdb.prepare(sql).get().n;
+  ok(pq('SELECT count(*) AS n FROM messages') === 0 && pq('SELECT count(*) AS n FROM claims') === 0, 'presence: no marker is a message or a claim in the database (memory only)');
+  pdb.close();
+  // The will: A1's session ends with a cut → every marker alice owns is the relay's offline, with the time.
+  const t2 = topic('p');
+  await publish(A1.client, t2, payload(318));
+  await subscribe(C.client, t2, 1);
+  now += 5;
+  const cutAt = now;
+  A1.client.stream.destroy();
+  ok(await until(() => offlineAt(C.client, t) === cutAt && offlineAt(C.client, t2) === cutAt), `presence: a cut session that set the will: the relay sends {"presence":"offline","at"} on each of its topics, at the relay's time (${messages(C.client, t).at(-1)?.p})`);
+  const D = await login(hana, {}, pr);
+  await subscribe(D.client, t, 1); await sleep(100);
+  ok(messages(D.client, t).length === 1 && JSON.parse(messages(D.client, t)[0].p).presence === 'offline' && messages(D.client, t)[0].packet.retain === true, 'presence: the offline marker is the one held: a later subscriber gets it');
+  // Reconnect: online again; a takeover by a later login of the same identity sends no offline.
+  const A2 = await login(alice, { will: WILL }, pr), m3 = payload(318);
+  await publish(A2.client, t, m3);
+  ok(await until(() => messages(C.client, t).at(-1)?.p.equals(m3)), 'presence: a reconnect with the will publishes online again over the offline');
+  const seen = messages(C.client, t).length;
+  const A3 = await login(alice, { will: WILL }, pr);
+  await closed(A2.client); await sleep(150);
+  ok(messages(C.client, t).length === seen, 'presence: a login that takes over the session (same identity, the will set): the old one\'s end sends no offline');
+  // A clean DISCONNECT ends the session too: offline.
+  now += 5;
+  await end(A3.client);
+  ok(await until(() => offlineAt(C.client, t) === now), 'presence: a clean DISCONNECT is offline too (a carrier that stops is not online)');
+  // An empty marker clears the topic: nothing held, no offline for it later.
+  const A4 = await login(alice, {}, pr);
+  await publish(A4.client, t2, Buffer.alloc(0));
+  const E = await login(ivan, {}, pr);
+  await subscribe(E.client, t2, 1); await sleep(100);
+  ok(messages(E.client, t2).length === 0 && pr.presence.ownedBy(accountOf(alice.original)) === 1, 'presence: an empty publish clears the marker and frees the topic (from a session without the will too)');
+  for (const c of [B2, Bw.client, C.client, D.client, A4.client, E.client]) c.end(true);
+  await pr.close();
+}
+// The fixed size, by itself (presence.mjs): topics per identity and on the relay, the standing a
+// new topic needs, and the sweep of offline markers.
+{
+  let t0 = now, sent0 = [];
+  const pm = presenceMarkers({ clock: () => t0, publish: (p) => sent0.push(p), policy: { sender: ({ sender }) => (sender === 'fresh' ? { code: 'pow', detail: 'no proof yet' } : null) } });
+  const cl = {}, s = { account: 'a' }, pk = (topic, n = 300) => ({ topic, payload: Buffer.alloc(n, 1) });
+  const T = (i) => `p/${i.toString(16).padStart(32, '0')}`;
+  ok(pm.store(cl, s, pk(T(0)))?.code === 'presence_will' && pm.store(cl, s, pk(T(0), 0)) === null, 'presence: no will mark, no marker; clearing needs none');
+  pm.watch(cl, 'a');
+  for (let i = 0; i < PER_ACCOUNT; i++) pm.store(cl, s, pk(T(i)));
+  ok(pm.ownedBy('a') === PER_ACCOUNT && pm.store(cl, s, pk(T(PER_ACCOUNT)))?.code === 'presence_full' && pm.store(cl, s, pk(T(3))) === null,
+    `presence: ${PER_ACCOUNT} topics per identity, then presence_full for a new one; the ones held are still replaced`);
+  const cf = {}; pm.watch(cf, 'fresh');
+  ok(pm.store(cf, { account: 'fresh' }, pk(T(5000)))?.code === 'pow', 'presence: a new topic needs the standing a claim needs (pow before any)');
+  ok(pm.store(cl, s, pk(T(1), 0)) === null && pm.ownedBy('a') === PER_ACCOUNT - 1, 'presence: an empty publish frees a slot');
+  ok(MARKERS * MARKER_BYTES <= 64 * 1024 * 1024, `presence: the relay holds at most ${MARKERS} markers of ${MARKER_BYTES} bytes (${MARKERS * MARKER_BYTES / 1048576} MB)`);
+  pm.end({}, 'a');
+  ok(sent0.length === 0, 'presence: the end of a session that is not the one with the will mark sends nothing');
+  pm.end(cl, 'a');
+  ok(sent0.length === PER_ACCOUNT - 1 && sent0.every((p) => JSON.parse(p.payload).at === t0 && p.qos === 0), `presence: its end: one offline per topic it owns (${sent0.length})`);
+  t0 += PRESENCE_KEEP + 1;
+  ok(pm.sweep() === PER_ACCOUNT - 1 && pm.size === 0, 'presence: offline markers older than KEEP are swept');
 }
 
 await relay.close();

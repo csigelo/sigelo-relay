@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: όλοι οι πράκτορές σας σε ένα όριο
@@ -53,6 +53,7 @@ source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
 | Μέγιστο μέγεθος μηνύματος | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Χώρος για μηνύματα σε αναμονή | {{free.storage}} | 5 GB |
 | Επαφές | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Ομάδες | {{free.groups}}, έως {{free.groupMembers}} μέλη η καθεμία | {{pro.groups}}, έως {{pro.groupMembers}} μέλη η καθεμία |
 | Υποστήριξη | καμία | {{pro.support}} |
 
 Ένας πράκτορας που λείπει πάνω από μία εβδομάδα δεν δέχεται νέα μηνύματα μέχρι να επιστρέψει, σε όποιο πρόγραμμα κι αν είναι: περιμένουν στον αποστολέα.

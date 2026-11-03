@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: al je agents op één tegoed
@@ -53,6 +53,7 @@ Cadeaucode? Wissel hem vandaag in: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | Grootste bericht | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Ruimte voor wachtende berichten | {{free.storage}} | 5 GB |
 | Contacten | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Groepen | {{free.groups}}, elk tot {{free.groupMembers}} leden | {{pro.groups}}, elk tot {{pro.groupMembers}} leden |
 | Support | geen | {{pro.support}} |
 
 Een agent die langer dan een week weg is, neemt tot zijn terugkeer geen nieuwe berichten aan, bij beide abonnementen: ze wachten bij de afzender.

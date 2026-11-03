@@ -8,7 +8,7 @@
 // from a network that mints many: pow.mjs), so free volume is not what Pro sells. Free: 14 days,
 // 512 KB, a modest daily count, 128 mailboxes (raised 2026-10-14 from 7 days, 256 KB, 1,000 a day,
 // 50 MB, 64). Pro sells what cannot be minted: 90 days' retention,
-// 1 MB messages, the operator pool, groups (version 2: counted in no table yet), support.
+// 1 MB messages, the operator pool, more groups (design/groups.md §4), support.
 //
 // Charged per account (an identity's original DID, db.mjs): bytes queued to the reader, freed when
 // it acknowledges a message or the message expires; messages today (UTC) to the sender; live
@@ -34,7 +34,10 @@
 // proven work (pow.mjs) may log in, but nothing is stored for it (no account, chain or pool row),
 // and its first claim or message is refused "pow". A login whose operator attestation pools
 // nothing still succeeds, on the free tier, and is told why ("operator" or "licence") as soon as
-// it is connected.
+// it is connected. Every login is then told its group tier, once connected: $sigelo/notice {code:
+// "tier", detail, tier: free | pro, groups: {max, members}} (TIERS groups and groupMembers, the
+// licence's groups claim for a pool): groups live in the clients (contact/group.mjs), which count
+// the groups an identity made and its members against it; the relay counts only messages.
 //
 // A pool: the operator holding a valid licence, and every agent whose last bundle carried a valid
 // operator attestation from it (operator.mjs), draw on one allowance. Never a count of agents. What
@@ -70,17 +73,19 @@ const FRAME = 1024 * 1024;
 // a reader subscribes to every week its retention reaches back into (§11): 2 for 7 days, 14 for 90.
 export const windowWeeks = (retentionDays) => Math.ceil(retentionDays / 7) + 1;
 // Plan §3 "Allowances", §11. free: every identity. pro: the most this relay grants any licence; a
-// pool gets the licence's claims (storage_mb, msgs_day, retention_days, groups) up to these and,
-// but for groups, never less than free's, pro's largest message and mailboxes, and the licence's
+// pool gets the licence's claims (storage_mb, msgs_day, retention_days, groups) up to these and
+// never less than free's, pro's largest message, mailboxes and group members, and the licence's
 // support. Mailboxes: a contact costs its reader windowWeeks of its retention plus the week ahead
 // a client claims, so free's 128 hold about 32 contacts (4 each at 14 days) and pro's 16,384 about 1,090 for a
 // whole pool (15 each). pro.storage is 5 GB (2026-10-16; plan §9 item
-// 3); pro.groups stays 0 until groups exist (version 2), whatever a licence claims.
+// 3). groups: chat groups an identity may make (design/groups.md §4: free 3, Pro 50, a pool never
+// below free's); groupMembers: the members of one, the maker included, fixed per tier (8, 64), no
+// claim: it bounds fan-out, which msgsDay counts copy by copy.
 export const TIERS = Object.freeze({
-  free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 0, support: 'none' }),
-  pro: Object.freeze({ storage: 5120 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 0, support: 'email' }),
+  free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 3, groupMembers: 8, support: 'none' }),
+  pro: Object.freeze({ storage: 5120 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 50, groupMembers: 64, support: 'email' }),
 });
-const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes'];
+const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes', 'groups', 'groupMembers'];
 // What a queued message is charged: its payload, at least MESSAGE_FLOOR, plus MESSAGE_ROW for the
 // row that holds it. The payload alone let empty messages queue free of charge: a row of db.mjs's
 // messages table takes 333 bytes on disk with its four index entries (measured over 100,000 empty
@@ -241,7 +246,6 @@ function checkTiers(given) {
       if (!Number.isSafeInteger(t[k]) || t[k] < 1) throw new Error(`tiers.${name}.${k}: want a whole number, at least 1`);
       if (name === 'pro' && t[k] < tiers.free[k]) throw new Error(`tiers.pro.${k}: want at least tiers.free.${k} (${tiers.free[k]})`);
     }
-    if (!Number.isSafeInteger(t.groups) || t.groups < 0) throw new Error(`tiers.${name}.groups: want a whole number, at least 0`);
     if (!SUPPORT.includes(t.support)) throw new Error(`tiers.${name}.support: want one of ${SUPPORT.join(', ')}`);
     if (t.maxMessage > FRAME) throw new Error(`tiers.${name}.maxMessage: at most ${FRAME} bytes (server.mjs's frame cap)`);
   }
@@ -355,10 +359,15 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       pool: lic.operator,
       limits: {
         storage: sold(lic.storage_mb * MB, 'storage'), msgsDay: sold(lic.msgs_day, 'msgsDay'), retentionDays, retention: retentionDays * DAY,
-        maxMessage: pro.maxMessage, mailboxes: pro.mailboxes, groups: lic.gift ? pro.groups : Math.min(lic.groups, pro.groups), support: lic.gift ? pro.support : lic.support,
+        maxMessage: pro.maxMessage, mailboxes: pro.mailboxes, groups: sold(lic.groups, 'groups'), groupMembers: pro.groupMembers, support: lic.gift ? pro.support : lic.support,
       },
     };
   }
+  // The group tier notice of an allowance (the header): free or pro, and its groups.
+  const groupTier = (t) => {
+    const tier = t.pool ? 'pro' : 'free', g = { max: t.limits.groups, members: t.limits.groupMembers };
+    return { code: 'tier', detail: `${tier}: ${g.max} groups made, up to ${g.members} members each`, tier, groups: g };
+  };
   // What the free tier's ceiling counts: every queued message's charge and the identity rows.
   const freeUsed = () => (s.queued.get('*')?.bytes ?? 0) + db.rowBytes();
   const whose = (t) => (t.pool ? 'your operator\'s pool' : 'this identity (free tier)');
@@ -687,17 +696,18 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
 
     // After the broker starts (server.mjs): an operator or licence notice goes to the client once
     // its session is up.
-    attach({ broker: b, notify, sessionOf }) {
+    // Then the group tier (the header), to every login: what contact/group.mjs counts against.
+    attach({ broker: b, notify, inform, sessionOf }) {
       broker = b;
       broker.on('clientReady', (client) => {
         const account = sessionOf(client)?.account, n = account && notices.get(account);
-        if (!n) return;
-        notices.delete(account);
-        notify(client, n.code, n.detail);
+        if (n) { notices.delete(account); notify(client, n.code, n.detail); }
+        if (account && inform) inform(client, groupTier(tierOf(account, clock())));
       });
     },
 
     tierOf,
+    groupTier: (account, now) => groupTier(tierOf(account, now)),
     freeQueue,
     freeUsed,   // GET /stats (stats.mjs): the free tier's ceiling used
   };

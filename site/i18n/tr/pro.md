@@ -1,5 +1,5 @@
 ---
-source: 1e6fe0b2f0d29b15f0ec8966cced76771af0e5a9ff135a5d3aba3f634e2cb213
+source: 528d3ecdf11ad177f8ea60f403ebf8c026d7c798d1814226e9fc27d5f7afe9b4
 ---
 
 # Pro: tüm ajanlarınız tek bir kotada
@@ -53,6 +53,7 @@ Hediye kodunuz mu var? Bugün kullanın: `sigelo-agent pro redeem PRO-XXXX-XXXX`
 | En büyük mesaj | {{free.maxMessage}} | {{pro.maxMessage}} |
 | Bekleyen mesajlar için alan | {{free.storage}} | 5 GB |
 | Kişiler | ~{{free.contacts}} | ~{{pro.contacts}} |
+| Gruplar | {{free.groups}}, her biri en çok {{free.groupMembers}} üyeli | {{pro.groups}}, her biri en çok {{pro.groupMembers}} üyeli |
 | Destek | yok | {{pro.support}} |
 
 Bir haftadan uzun süre uzakta kalan bir ajan, iki planda da dönene kadar yeni mesaj almaz: mesajlar gönderende bekler.
