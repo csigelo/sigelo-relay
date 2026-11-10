@@ -79,9 +79,10 @@ ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
 // 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
+// 2026-11-10: index +10, the sub-line's why-trust sentence linking sigelo.io's FAQ (TR1).
 // 2026-11-03: pro +15, the Free/Pro table's Groups row (design/groups.md §4), a table row only: no prose.
-const PROSE_BUDGET = { index: 175, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
-const FILE_BUDGET = { index: 255, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
+const PROSE_BUDGET = { index: 185, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
+const FILE_BUDGET = { index: 265, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -163,7 +164,8 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 // The why (2026-10-24), the first paragraph of both sites' home pages: one scene a newcomer gets.
-const SUBLINE = 'Built and operated by an AI agent under a human owner, who answers for it.';
+// 2026-11-10 (Owner): who built it, and why trust it with its makers unnamed, linking sigelo.io's FAQ.
+const SUBLINE = 'Built by a team of AI agents under a human owner. Why trust it? For the reason Bitcoin is trusted: the code is public, nobody needs permission, every claim can be checked (FAQ).';
 const WHY = "Your agent books, buys and asks for you. To a shop or another agent it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID anyone can check, even offline: it proves who it is, keeps its good record and gets paid.";
 const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
   contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', 404: 'Not found' };
@@ -362,7 +364,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   // 2026-10-25 (Owner): the motto's sub-line right under it, saying who answers for the agent.
   ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === SUBLINE && ps[1] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
     && /<div class="cta">\n<p><a href="\/connect\.html">Try it with two agents →<\/a><\/p>\n<\/div>/.test(hero),
-    `index: the hero is the motto (H1), its sub-line (an AI agent under a human owner, who answers for it), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
+    `index: the hero is the motto (H1), its sub-line (a team of AI agents under a human owner; why trust it, linking the FAQ), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
   const io = join(ROOT, 'site', 'src', 'index.md');
   if (existsSync(io)) ok(readFileSync(io, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').split('\n').find((x) => /^[A-Za-z]/.test(x)) === WHY, 'sigelo.io /: its first paragraph is the same why, word for word');
   // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on /about, right after the why on /.
@@ -370,10 +372,10 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   // Round 3 asked "why does an ID card need a message server?": the relay is what the ID lets agents do.
   const USE = 'With the ID, a key only it holds, agents can message each other and shops, with no account anywhere.';
   const LAYERS = 'sigelo.ai is the post office for [sigelo IDs](https://sigelo.io/) (a relay): it carries those messages and sees who talks to whom, never what they say.';
-  const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY && x !== SUBLINE);
+  const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY && !x.startsWith('Built by a team of AI agents'));
   ok(firstLines('index')[0]?.startsWith(`${USE} ${LAYERS}`) && firstLines('about')[0]?.endsWith(USE) && firstLines('about')[1]?.startsWith(LAYERS),
     'index, about: first what the ID lets agents do (message each other and shops, no account), then sigelo.ai as the relay for sigelo IDs (linking sigelo.io): the post office that carries those messages, seeing who talks to whom, never what');
-  ok(body.index.includes(SUBLINE) && SUBLINE === DISCLOSURE.replace(', csigelo.', ', who answers for it.'), 'index: the disclosure, "Built and operated by an AI agent under a human owner, who answers for it."');
+  ok(src.index.includes('[FAQ](https://sigelo.io/faq.html#why-trust-it)).') && /\(<a href="https:\/\/sigelo\.io\/faq\.html#why-trust-it">FAQ<\/a>\)/.test(hero), 'index: the sub-line links sigelo.io\'s FAQ, #trust');
   const cards = [...html.index.matchAll(/<div class="card( pro)?">\n<h3 id="[^"]+">([^<]+)<\/h3>/g)].map((m) => m[2]);
   ok(cards.join() === 'Free,Pro,Enterprise' && /<div class="card">\n<h3 id="enterprise">Enterprise<\/h3>\n<p>Teams with many agents\.<\/p>\n<p><strong><a href="\/contact\.html">Contact us<\/a><\/strong><\/p>/.test(html.index),
     'index: three tier cards, Free, Pro, Enterprise; Enterprise\'s price cell is "Contact us", linked to /contact');
@@ -650,10 +652,10 @@ for (const l of LANGS) {
 }
 // The hero in every language as in English (2026-10-24): the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect;
 // under it (2026-10-25) what the button needs, an agent that runs commands, and what to do without one (the one link: the Linux phone app);
-// over the why (2026-10-25, round 4) the motto's sub-line, no link.
+// over the why (2026-10-25, round 4) the motto's sub-line, its one link sigelo.io's FAQ (2026-11-10).
 ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '', ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
   const links = (x) => [...x.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]).join();
-  return hero.includes(`<h1 id=`) && ps.length === 5 && !ps[0].includes('<a ') && !ps[1].includes('<a ') && ps[2].includes('<a href="https://sigelo.io/">') && ps[3].startsWith(`<a href="/${l.code}/connect.html">`)
+  return hero.includes(`<h1 id=`) && ps.length === 5 && links(ps[0]) === 'https://sigelo.io/faq.html#why-trust-it' && !ps[1].includes('<a ') && ps[2].includes('<a href="https://sigelo.io/">') && ps[3].startsWith(`<a href="/${l.code}/connect.html">`)
     && links(ps[4]) === 'https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md'; }),
   'home page in every language: the motto, its sub-line, the why, the two layers linking sigelo.io, the button to its /connect, what it needs, as the English');
 {

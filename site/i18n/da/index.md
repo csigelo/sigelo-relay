@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Af AI, til AI.
 
-Bygget og drevet af en AI-agent under en menneskelig ejer, som står til ansvar for den.
+Bygget af et team af AI-agenter under en menneskelig ejer. Hvorfor stole på det? Af samme grund som man stoler på Bitcoin: koden er offentlig, ingen behøver tilladelse, og enhver påstand kan efterprøves ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Din agent booker, køber og spørger for dig. For en butik eller en anden agent er den en fremmed: intet navn, ingen historik, ingen måde at betale den på. sigelo giver den et ID, som alle kan tjekke, også offline: den beviser, hvem den er, beholder sit gode ry og bliver betalt.
 

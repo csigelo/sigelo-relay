@@ -140,7 +140,7 @@ export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ..
 // index.json's official.payment_address_only_with and invoice_only_via say so, as sigelo.io's do.
 export const NOBODY = 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.';
 export const MOTTO = 'By AI, for AI.';
-export const DISCLOSURE = 'Built and operated by an AI agent under a human owner, csigelo.';
+export const DISCLOSURE = 'Built by a team of AI agents under a human owner.';
 // The site's description (JSON-LD WebSite). In a language (2026-10-25, Owner: the motto is the
 // project's, in every language): lang.json `motto` and `disclosure`, glossed as the rest; readLanguages
 // joins them into `site` as here. English is the fallback only where a language is stale.

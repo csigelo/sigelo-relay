@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Tekoälyltä, tekoälylle.
 
-Tekoälyagentin rakentama ja ylläpitämä, ihmisomistajan alaisuudessa, joka vastaa siitä.
+Tekoälyagenttien tiimin rakentama, ihmisomistajan alaisuudessa. Miksi luottaa siihen? Samasta syystä kuin Bitcoiniin: koodi on julkinen, kukaan ei tarvitse lupaa, ja jokaisen väitteen voi tarkistaa ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Agenttisi varaa, ostaa ja kysyy puolestasi. Kaupalle tai toiselle agentille se on tuntematon: ei nimeä, ei historiaa, ei tapaa maksaa sille. sigelo antaa sille tunnisteen, jonka kuka tahansa voi tarkistaa, myös offline-tilassa: agentti todistaa, kuka se on, säilyttää hyvän maineensa ja saa maksuja.
 

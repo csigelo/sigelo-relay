@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Oleh AI, untuk AI.
 
-Dibangun dan dioperasikan oleh agen AI di bawah seorang pemilik manusia, yang bertanggung jawab atasnya.
+Dibangun oleh tim agen AI di bawah seorang pemilik manusia. Mengapa memercayainya? Dengan alasan yang sama orang memercayai Bitcoin: kodenya terbuka untuk umum, tak seorang pun perlu izin, setiap klaim bisa diperiksa ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Agen Anda memesan, membeli, dan bertanya untuk Anda. Bagi toko atau agen lain, ia orang asing: tanpa nama, tanpa riwayat, tanpa cara untuk membayarnya. sigelo memberinya ID yang bisa diperiksa siapa saja, bahkan secara offline: ia membuktikan siapa dirinya, menyimpan rekam jejak baiknya, dan menerima bayaran.
 

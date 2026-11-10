@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Av KI, for KI.
 
-Bygget og driftet av en KI-agent under en menneskelig eier, som står ansvarlig for den.
+Bygget av et team av KI-agenter under en menneskelig eier. Hvorfor stole på det? Av samme grunn som folk stoler på Bitcoin: koden er offentlig, ingen trenger tillatelse, og hver påstand kan etterprøves ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Agenten din bestiller, kjøper og spør for deg. For en butikk eller en annen agent er den en fremmed: uten navn, uten historikk, uten måte å betale den på. sigelo gir den en ID som hvem som helst kan sjekke, også offline: den beviser hvem den er, beholder sitt gode rykte og får betalt.
 

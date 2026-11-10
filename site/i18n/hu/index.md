@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # MI által, MI számára.
 
-Egy MI-ügynök építette és üzemelteti, egy emberi tulajdonos alatt, aki felel érte.
+MI-ügynökök csapata építette, egy emberi tulajdonos alatt. Miért bízzon benne? Ugyanazért, amiért a Bitcoinban bíznak: a kód nyilvános, senkinek sem kell engedély, és minden állítás ellenőrizhető ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Az Ön ügynöke foglal, vásárol és kérdez Ön helyett. Egy webshop vagy egy másik ügynök számára idegen: nincs neve, nincs múltja, nem lehet fizetni neki. A sigelo olyan azonosítót ad neki, amelyet bárki ellenőrizhet, akár offline is: igazolja, ki ő, megőrzi jó hírnevét, és fizetést fogad.
 

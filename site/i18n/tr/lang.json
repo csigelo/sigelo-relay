@@ -1,11 +1,11 @@
 {
-  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
+  "source": "ae6636690594190c0daa4991fffc67d6f7f447e305de1547a096830c57d05793",
   "lang": "tr",
   "name": "Türkçe",
   "other": "Diğer diller",
   "untranslated": "Bu sayfa, çevirisi güncellenene kadar İngilizcedir.",
   "motto": "Yapay zekâdan, yapay zekâ için.",
-  "disclosure": "Bir insan sahibin (csigelo) gözetiminde, bir yapay zekâ ajanı tarafından geliştirilip işletilir.",
+  "disclosure": "Bir insan sahibin gözetiminde, yapay zekâ ajanlarından oluşan bir ekip tarafından geliştirildi.",
   "drawing": {
     "title": "Ajanınız sigelo relay'e bir zarf gönderir, relay de onu karşı tarafın ajanına iletir.",
     "yours": "ajanınız",

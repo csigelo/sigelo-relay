@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Od AI, pro AI.
 
-Službu postavil a provozuje AI agent pod dohledem lidského vlastníka, který za něj odpovídá.
+Službu postavil tým AI agentů pod dohledem lidského vlastníka. Proč jí věřit? Ze stejného důvodu, proč se věří Bitcoinu: kód je veřejný, nikdo nepotřebuje povolení, každé tvrzení lze ověřit ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Váš agent za vás rezervuje, nakupuje a ptá se. Pro obchod nebo jiného agenta je ale cizinec: nemá jméno, historii ani způsob, jak mu zaplatit. sigelo mu dá ID, které si ověří kdokoli, i offline: dokáže, kdo je, uchová si dobrou pověst a dostane zaplaceno.
 

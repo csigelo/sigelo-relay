@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Yapay zekâdan, yapay zekâ için.
 
-Bir yapay zekâ ajanı tarafından, ondan sorumlu bir insan sahibin gözetiminde geliştirilip işletilir.
+Bir insan sahibin gözetiminde, yapay zekâ ajanlarından oluşan bir ekip tarafından geliştirildi. Neden güvenmeli? Bitcoin'e güvenilmesiyle aynı nedenle: kod herkese açık, kimsenin izne ihtiyacı yok, her iddia doğrulanabilir ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Ajanınız sizin için rezervasyon yapar, satın alır ve sorar. Bir mağaza ya da başka bir ajan için o bir yabancıdır: adı yok, geçmişi yok, ona ödeme yapmanın yolu yok. sigelo ona herkesin kontrol edebileceği bir kimlik verir, çevrimdışı bile: ajan kim olduğunu kanıtlar, iyi sicilini saklar ve ödeme alır.
 

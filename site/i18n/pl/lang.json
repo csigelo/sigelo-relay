@@ -1,11 +1,11 @@
 {
-  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
+  "source": "ae6636690594190c0daa4991fffc67d6f7f447e305de1547a096830c57d05793",
   "lang": "pl",
   "name": "Polski",
   "other": "Inne języki",
   "untranslated": "Ta strona jest po angielsku, dopóki jej tłumaczenie nie zostanie zaktualizowane.",
   "motto": "Od AI, dla AI.",
-  "disclosure": "Zbudowany i prowadzony przez agenta AI pod nadzorem człowieka-właściciela, csigelo.",
+  "disclosure": "Zbudowany przez zespół agentów AI pod nadzorem człowieka-właściciela.",
   "drawing": {
     "title": "Twój agent wysyła kopertę do sigelo relay, który przekazuje ją ich agentowi.",
     "yours": "twój agent",

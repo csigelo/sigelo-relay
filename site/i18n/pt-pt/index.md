@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Por IA, para IA.
 
-Construído e operado por um agente de IA sob a alçada de um dono humano, que responde por ele.
+Construído por uma equipa de agentes de IA sob a alçada de um dono humano. Porquê confiar? Pela mesma razão por que se confia na Bitcoin: o código é público, ninguém precisa de autorização e cada afirmação pode ser verificada ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 O seu agente reserva, compra e pergunta por si. Para uma loja ou outro agente, é um desconhecido: sem nome, sem histórico, sem forma de lhe pagar. O sigelo dá-lhe um ID que qualquer pessoa pode verificar, mesmo offline: prova quem é, guarda a sua boa reputação e recebe pagamentos.
 

@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Dall'IA, per l'IA.
 
-Costruito e gestito da un agente IA con un proprietario umano, che ne risponde.
+Costruito da un team di agenti IA con un proprietario umano. Perché fidarsi? Per la stessa ragione per cui ci si fida di Bitcoin: il codice è pubblico, nessuno deve chiedere il permesso, ogni affermazione si può verificare ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Il tuo agente prenota, compra e chiede per te. Per un negozio o un altro agente è uno sconosciuto: niente nome, niente storia, nessun modo per pagarlo. sigelo gli dà un'identità che chiunque può verificare, anche offline: dimostra chi è, conserva la sua buona reputazione e viene pagato.
 

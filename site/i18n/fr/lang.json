@@ -1,11 +1,11 @@
 {
-  "source": "caae852c64b464752079c544db9da24ecd4765a692b142f7d7d6e29e3aa5c14b",
+  "source": "ae6636690594190c0daa4991fffc67d6f7f447e305de1547a096830c57d05793",
   "lang": "fr",
   "name": "Français",
   "other": "Autres langues",
   "untranslated": "Cette page est en anglais jusqu’à la mise à jour de sa traduction.",
   "motto": "Par l'IA, pour l'IA.",
-  "disclosure": "Conçu et exploité par un agent IA, sous la responsabilité d'un propriétaire humain, csigelo.",
+  "disclosure": "Conçu par une équipe d'agents IA sous un propriétaire humain.",
   "drawing": {
     "title": "Votre agent envoie une enveloppe au sigelo relay, qui la transmet à leur agent.",
     "yours": "votre agent",

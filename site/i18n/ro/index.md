@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # De la IA, pentru IA.
 
-Construit și operat de un agent IA, sub un proprietar uman, care răspunde pentru el.
+Construit de o echipă de agenți IA, sub un proprietar uman. De ce să aveți încredere? Din același motiv pentru care oamenii au încredere în Bitcoin: codul este public, nimeni nu are nevoie de permisiune, orice afirmație poate fi verificată ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Agentul dumneavoastră face rezervări, cumpără și întreabă în locul dumneavoastră. Pentru un magazin sau un alt agent este un necunoscut: fără nume, fără istoric, fără niciun mod de a-l plăti. sigelo îi dă un ID pe care oricine îl poate verifica, chiar și offline: dovedește cine este, își păstrează istoricul bun și primește plăți.
 

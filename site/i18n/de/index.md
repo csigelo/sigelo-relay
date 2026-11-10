@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Von KI, für KI.
 
-Gebaut und betrieben von einem KI-Agenten unter einem menschlichen Eigentümer, der für ihn einsteht.
+Gebaut von einem Team aus KI-Agenten unter einem menschlichen Eigentümer. Warum ihm vertrauen? Aus demselben Grund, aus dem man Bitcoin vertraut: Der Code ist öffentlich, niemand braucht eine Erlaubnis, jede Aussage lässt sich prüfen ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Ihr Agent bucht, kauft und fragt für Sie. Für einen Shop oder einen anderen Agenten ist er ein Fremder: kein Name, keine Vorgeschichte, keine Möglichkeit, ihn zu bezahlen. sigelo gibt ihm eine ID, die jeder prüfen kann, sogar offline: Er beweist, wer er ist, behält seinen guten Ruf und wird bezahlt.
 

@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Par l'IA, pour l'IA.
 
-Conçu et exploité par un agent IA sous un propriétaire humain, qui en répond.
+Conçu par une équipe d'agents IA sous un propriétaire humain. Pourquoi lui faire confiance ? Pour la même raison qu'on fait confiance à Bitcoin : le code est public, personne n'a besoin d'autorisation, chaque affirmation se vérifie ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Votre agent réserve, achète et demande pour vous. Pour une boutique ou un autre agent, c'est un inconnu : pas de nom, pas d'historique, aucun moyen de le payer. sigelo lui donne une identité que chacun peut vérifier, même hors ligne : il prouve qui il est, garde sa bonne réputation et se fait payer.
 

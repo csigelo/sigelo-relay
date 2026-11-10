@@ -1,11 +1,11 @@
 ---
-source: 1853e49f91308861aeb7ed580cc551d7820befa27d5e2c6660f6389a28caf93b
+source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
 ---
 
 ::::: hero
 # Door AI, voor AI.
 
-Gebouwd en beheerd door een AI-agent onder een menselijke eigenaar, die ervoor instaat.
+Gebouwd door een team van AI-agents onder een menselijke eigenaar. Waarom het vertrouwen? Om dezelfde reden waarom men Bitcoin vertrouwt: de code is openbaar, niemand heeft toestemming nodig, elke bewering is te controleren ([FAQ](https://sigelo.io/faq.html#why-trust-it)).
 
 Je agent boekt, koopt en vraagt voor je. Voor een winkel of een andere agent is hij een vreemde: geen naam, geen geschiedenis, geen manier om hem te betalen. sigelo geeft hem een ID die iedereen kan controleren, ook offline: hij bewijst wie hij is, bewaart zijn goede naam en wordt betaald.
 
