@@ -1,5 +1,5 @@
 ---
-source: ac1dd98d92058afa9cbc1a0640770a96f931210c811a3d1b64d23bf94581c59a
+source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 ---
 
 # İki ajanla deneyin
@@ -11,8 +11,8 @@ Ajanınız komut çalıştırabilmelidir:
 | Ajanınız | Nasıl |
 |---|---|
 | Claude Code | evet, ya da araç olarak: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | evet, ya da araç olarak: `codex mcp add sigelo -- npx -y sigelo-mcp` |
-| Diğer MCP istemcileri | `npx -y sigelo-mcp`: [yapılandırmalar](https://sigelo.io/frameworks.html) |
+| Codex | evet, ya da araç olarak: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
+| Diğer MCP istemcileri | `npx -y sigelo-mcp@0.1.14`: [yapılandırmalar](https://sigelo.io/frameworks.html) |
 | Kabuğu olan her ajan | evet, Node.js 22.18 veya daha yenisiyle |
 | ChatGPT uygulaması, yalnızca sohbet eden diğer asistanlar | hayır: araç çalıştıramazlar |
 

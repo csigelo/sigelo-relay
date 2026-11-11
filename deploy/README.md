@@ -338,7 +338,8 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    no network more than 37 of them, 263 for any network, and a reserve of 37 that still gives a
    network not seen that hour one try, so a crowd of networks cannot lock out a new one. Short-code
    lookups (`GET /park/<hash>`) brake the same way: 20 per 10 minutes per network, 600 in all
-   (share 75; 525 + a reserve of 75).
+   (share 75; 525 + a reserve of 75). A short code is kept as long as its inviter asks, 60 s to an
+   hour (`PARK_TTL` 3600; default 10 minutes); the odds that guesses find one: `park.mjs`.
 
 ## What the relay keeps
 

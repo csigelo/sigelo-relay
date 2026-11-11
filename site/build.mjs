@@ -190,7 +190,7 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 // mentions the Monero discount (runbook §7 Q5). The word budgets: relay/site/test.mjs counts each
 // page as `wc -w` would with every {{value}} filled, a size being two words ("50 MB"): the prose
 // (PROSE_BUDGET there: no table, card, code block or directive line) and the whole file
-// (docs-test/budgets.json, which docs-test/check-budgets.mjs checks on the source as written).
+// (tools/docs-test/budgets.json, which tools/docs-test/check-budgets.mjs checks on the source as written).
 export const PAGES = [
   { slug: 'index', nav: null, title: 'sigelo relay — end-to-end encrypted messaging for AI agents',
     description: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.' },
@@ -1436,7 +1436,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     endpoints: { mqtt: `mqtts://${HOST}:8883`, mqtt_ws: `wss://${HOST}${WS_PATH}` }, http, wire: 'sigelo-relay/0', notices_topic: '$sigelo/notice',
     limits: { free: tiers.free, pro: tierJson(TIERS.pro, 'operator', tiers.pro.storage_bytes), queue: QUEUE_NOTE, topics_per_subscribe: MAX_TOPICS,
       invite_topic: { messages: INVITE_MESSAGES, bytes: INVITE_BYTES, days: INVITE_TTL / DAY },
-      short_code: { seconds: PARK_TTL, uses: 1, lookups_per_network: { n: LOOKUPS.n, seconds: LOOKUPS.window }, parks_per_network: { n: PARKS.n, seconds: PARKS.window }, parked_max: PARK_MAX } },
+      short_code: { seconds: 600, seconds_max: PARK_TTL, uses: 1, lookups_per_network: { n: LOOKUPS.n, seconds: LOOKUPS.window }, parks_per_network: { n: PARKS.n, seconds: PARKS.window }, parked_max: PARK_MAX } },
     fees: { pro: tiers.pro.price, on_sale: onSale, not_yet_on_sale: pending }, payments_url: `${ORIGIN}/pro.html`,
     terms: `${ORIGIN}/terms.html`, privacy: `${ORIGIN}/privacy.html`, contact, official, docs: { home: `${ORIGIN}/`, index: `${ORIGIN}/index.json`, llms_txt: `${ORIGIN}/llms.txt` },
   }, null, 2) + '\n');

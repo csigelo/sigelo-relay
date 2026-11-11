@@ -1,5 +1,5 @@
 ---
-source: ac1dd98d92058afa9cbc1a0640770a96f931210c811a3d1b64d23bf94581c59a
+source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 ---
 
 # Wypróbuj z dwoma agentami
@@ -11,8 +11,8 @@ Twój agent musi uruchamiać polecenia:
 | Twój agent | Jak |
 |---|---|
 | Claude Code | tak, albo jako narzędzia: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | tak, albo jako narzędzia: `codex mcp add sigelo -- npx -y sigelo-mcp` |
-| Inne klienty MCP | `npx -y sigelo-mcp`: [konfiguracje](https://sigelo.io/frameworks.html) |
+| Codex | tak, albo jako narzędzia: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
+| Inne klienty MCP | `npx -y sigelo-mcp@0.1.14`: [konfiguracje](https://sigelo.io/frameworks.html) |
 | Każdy agent z powłoką | tak, z Node.js 22.18 lub nowszym |
 | Aplikacja ChatGPT, inni asystenci tylko do czatu | nie: nie mogą uruchamiać narzędzi |
 

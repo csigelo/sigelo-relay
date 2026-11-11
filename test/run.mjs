@@ -29,7 +29,7 @@ import { relayPolicy } from '../allowance.mjs';
 import { mailboxes } from '../mailbox.mjs';
 import { KEEP as PRESENCE_KEEP, MARKER_BYTES, MARKERS, PER_ACCOUNT, PRESENCE_WILL, presence as presenceMarkers } from '../presence.mjs';
 import { solve } from '../pow.mjs';
-import { LOOKUPS_ALL, parking } from '../park.mjs';
+import { LOOKUPS_ALL, PARK_SKEW, PARK_TTL, parking } from '../park.mjs';
 import { CREATED, bundleOf, clientId, identity, password, recovered, rotated, seed, selfSigned } from './fixtures.mjs';
 
 let n = 0, failed = 0;
@@ -1495,7 +1495,18 @@ function walStates(r, name, tag = name) {
   r = await park(alice, { code_hash: h2, invite: longCode(alice), exp: now + 600 });
   const late = await (async () => { now += 600; const x = await fetchPark(h2); now -= 600; return x; })();
   ok(r.json.ok === true && late.status === 404 && late.json.check === 'park_unknown' && pr.park.size() === 0, 'expiry: parked, then fetched 10 minutes later: park_unknown, and gone');
-  // What may be parked: an invite to its parker, at this relay, for at most 10 minutes and within its own life.
+  // An inviter's --ttl: a code for an hour (PARK_TTL), fetched in its last second; one second later, gone.
+  const h3 = hashOf('K7F3Q9ZR'), h4 = hashOf('K7F3Q9ZS');
+  r = await park(alice, { code_hash: h3, invite: longCode(alice), exp: now + 3600 });
+  const r4 = await park(alice, { code_hash: h4, invite: longCode(alice), exp: now + 3600 });
+  const lastSecond = await (async () => { now += 3599; const x = await fetchPark(h3); now -= 3599; return x; })();
+  const past = await (async () => { now += 3600; const x = await fetchPark(h4); now -= 3600; return x; })();
+  ok(PARK_TTL === 3600 && PARK_SKEW === 300 && r.json.ok === true && r.json.exp === now + 3600 && r4.json.ok === true && lastSecond.status === 200 && past.status === 404 && past.json.check === 'park_unknown',
+    `invite --ttl 3600: parked for an hour (PARK_TTL ${PARK_TTL}, PARK_SKEW unchanged ${PARK_SKEW}), fetched in its last second; at the hour, park_unknown (${JSON.stringify(r.json)}, ${lastSecond.status}, ${past.status})`);
+  now += 3600;
+  pr.sweep();
+  now -= 3600;
+  // What may be parked: an invite to its parker, at this relay, for at most an hour and within its own life.
   const refusal = async (id, fields, what) => {
     const x = await park(id, { code_hash: hashOf('ZZZZZZZZ'), invite: longCode(id), exp: now + 600, ...fields });
     ok(x.status === 200 && x.json.ok === false && x.json.check === 'park', `POST /park refuses ${what} (park: ${x.json.detail})`);
@@ -1504,14 +1515,14 @@ function walStates(r, name, tag = name) {
   await refusal(alice, { invite: longCode(alice, { relay: 'relay.other' }) }, 'a code naming another relay');
   await refusal(alice, { invite: longCode(alice, { flip: true }) }, 'a code with a bad checksum');
   await refusal(alice, { invite: 'sgl1' + '2'.repeat(300) }, 'a code past 188 digits');
-  await refusal(alice, { exp: now + 901 }, 'an exp past 10 minutes and the 5 minutes an inviter\'s clock may run ahead');
-  // An inviter's clock ahead of the relay's: parked, for 10 minutes by the relay's clock.
-  r = await park(alice, { code_hash: hashOf('ZZZZZZZY'), invite: longCode(alice), exp: now + 630 });
-  ok(r.json.ok === true && r.json.exp === now + 600 && pr.park.fetch(hashOf('ZZZZZZZY')) !== null, `POST /park: an exp 30 s past 10 minutes (the inviter's clock ahead) parks until 10 minutes from now (${JSON.stringify(r.json)})`);
+  await refusal(alice, { exp: now + 3901 }, 'an exp past an hour and the 5 minutes an inviter\'s clock may run ahead');
+  // An inviter's clock ahead of the relay's: parked, for an hour at most by the relay's clock.
+  r = await park(alice, { code_hash: hashOf('ZZZZZZZY'), invite: longCode(alice), exp: now + 3630 });
+  ok(r.json.ok === true && r.json.exp === now + 3600 && pr.park.fetch(hashOf('ZZZZZZZY')) !== null, `POST /park: an exp 30 s past an hour (the inviter's clock ahead) parks until an hour from now (${JSON.stringify(r.json)})`);
   // Its fetch above left a tombstone until that exp, which counts against the cap: purged, so the cap below counts parked codes only.
-  now += 600;
+  now += 3600;
   pr.sweep();
-  now -= 600;
+  now -= 3600;
   await refusal(alice, { exp: now }, 'an exp already passed');
   await refusal(alice, { invite: longCode(alice, { exp: now + 300 }) }, 'an exp after the code\'s own');
   await refusal(alice, { code_hash: 'K7F3Q9ZP' }, 'a code_hash that is not 64 hex digits (the code itself)');

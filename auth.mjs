@@ -638,7 +638,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       if (park && req.method === 'GET' && url.pathname.startsWith('/park/')) {
         try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
-        if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or older than 10 minutes' });
+        if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour)' });
         return send(200, { ok: true, invite });
       }
       // MQTT over WebSocket is an upgrade (server.mjs); a plain request gets here.

@@ -21,15 +21,21 @@
 // at 192 characters.
 //
 // Brakes, per /24 or /48 (auth.mjs prefixOf): LOOKUPS fetches per 10 minutes, a hit or a miss
-// (with 2^40 codes and PARK_MAX parked at most, one network's guesses hit with odds of at most
-// 20 × PARK_MAX / 2^40 per 10 minutes: under 1 in a million), and PARKS parks an hour, counted
-// before the login is checked. Across all networks, LOOKUPS_ALL fetches per 10 minutes, charged after
-// the network's own brake passes, with a fair share (`fairCeiling`: no network more than 75 of
-// it; 525 for any network, then a reserve of 75 that gives a network not seen this window one
-// try), so many networks guess at most 600 × PARK_MAX / 2^40 per 10 minutes in all (about 1 in
-// 37,000), and a crowd under its own brakes no longer locks out a new one (review 2026-10-19).
-// PARK_MAX entries at once in all (park_full). Expired entries are
-// purged at every sweep (server.mjs, each minute) and when the cap is reached.
+// (with 2^40 codes and PARK_MAX parked at most, one network's guesses hit some code with odds of at
+// most 20 × PARK_MAX / 2^40 per 10 minutes, under 1 in a million; 120 × PARK_MAX / 2^40 an hour,
+// about 1 in 183,000), and PARKS parks an hour, counted before the login is checked. Across all
+// networks, LOOKUPS_ALL fetches per 10 minutes, charged after the network's own brake passes, with
+// a fair share (`fairCeiling`: no network more than 75 of it; 525 for any network, then a reserve
+// of 75 that gives a network not seen this window one try), so many networks guess at most
+// 600 × PARK_MAX / 2^40 per 10 minutes in all (about 1 in 37,000; an hour: 3,600 × PARK_MAX /
+// 2^40, about 1 in 6,100), and a crowd under its own brakes no longer locks out a new one (review
+// 2026-10-19). One given code is guessed with odds that grow linearly with its life: at most
+// 600 / 2^40 (5.5 × 10^-10) for each 10 minutes it lives, 3.3 × 10^-9 for a code of PARK_TTL, an
+// hour (the inviter's invite --ttl; 10 minutes by default). A code fetched by a guesser pairs it with the
+// inviter: the four words both operators compare differ, the backstop (THREAT-MODEL.md §2.10).
+// PARK_MAX entries at once in all (park_full: with an hour's PARK_TTL, a flood of parks holds it up
+// to an hour). Expired entries are purged at every sweep (server.mjs, each minute) and when the cap
+// is reached.
 //
 // A fetched code leaves a tombstone until its original exp, and park refuses park_taken while an
 // entry or a tombstone under the hash is unexpired: else a code holder (an eavesdropper, a lucky
@@ -41,7 +47,8 @@
 // miss takes one path.
 import { createHash } from 'node:crypto';
 
-export const PARK_TTL = 600, PARK_MAX = 50000;
+// PARK_TTL: the longest a code is kept (the inviter's exp, invite --ttl 60 s to an hour; 600 before).
+export const PARK_TTL = 3600, PARK_MAX = 50000;
 // Seconds an inviter's clock may run ahead of the relay's (contact/carrier.mjs SKEW).
 export const PARK_SKEW = 300;
 export const LOOKUPS = { n: 20, window: 600 }, PARKS = { n: 10, window: 3600 }, LOOKUPS_ALL = { n: 600, window: 600 };
@@ -111,8 +118,8 @@ export function readInvite(text) {
 
 const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{1,63}$/.test(d) ? b58decode(d.slice('did:sigelo:z'.length)) : null);
 
-/** host: this relay's name; clock: Unix seconds. → { charge, park, fetch, sweep, size }. */
-export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL }) {
+/** host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600). → { charge, park, fetch, sweep, size }. */
+export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL, ttl = PARK_TTL }) {
   const held = new Map();    // code_hash → { invite, exp }; invite null: a tombstone (fetched)
   const rates = new Map();   // kind + prefix → { window, n }
   const all = fairCeiling(lookupsAll);   // lookups from every network
@@ -147,7 +154,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // did: the current DID the login proved. → { exp }.
   function park({ code_hash, invite, exp }, did, now = clock()) {
     if (typeof code_hash !== 'string' || !HASH_RE.test(code_hash)) fail('park', 'code_hash: 64 lowercase hex digits, SHA-256("sigelo-park/0" ‖ the normalised short code)');
-    if (!Number.isSafeInteger(exp) || exp <= now || exp > now + PARK_TTL + PARK_SKEW) fail('park', `exp: Unix seconds, within ${PARK_TTL} s from now`);
+    if (!Number.isSafeInteger(exp) || exp <= now || exp > now + ttl + PARK_SKEW) fail('park', `exp: Unix seconds, within ${ttl} s from now (the code's life: 60 s to ${ttl === PARK_TTL ? 'an hour' : `${ttl} s`})`);
     const code = readInvite(invite), mine = didDigest(did);
     if (code.relay !== host) fail('park', `invite: names ${JSON.stringify(code.relay)}, not this relay`);
     if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
@@ -156,7 +163,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (was && was.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
     if (held.size >= max && sweep(now) === 0 && !was) fail('park_full', `${max} short codes are parked on this relay, its most: try again in a few minutes, or use the long code (invite --long)`);
     // Kept PARK_TTL at most by this relay's clock, whatever the inviter's says.
-    const until = Math.min(exp, now + PARK_TTL);
+    const until = Math.min(exp, now + ttl);
     held.set(code_hash, { invite, exp: until });
     return { exp: until };
   }

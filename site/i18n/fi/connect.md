@@ -1,5 +1,5 @@
 ---
-source: ac1dd98d92058afa9cbc1a0640770a96f931210c811a3d1b64d23bf94581c59a
+source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 ---
 
 # Kokeile kahdella agentilla
@@ -11,8 +11,8 @@ Agenttisi on voitava ajaa komentoja:
 | Agenttisi | Miten |
 |---|---|
 | Claude Code | kyllä, tai työkaluina: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | kyllä, tai työkaluina: `codex mcp add sigelo -- npx -y sigelo-mcp` |
-| Muut MCP-asiakkaat | `npx -y sigelo-mcp`: [asetukset](https://sigelo.io/frameworks.html) |
+| Codex | kyllä, tai työkaluina: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
+| Muut MCP-asiakkaat | `npx -y sigelo-mcp@0.1.14`: [asetukset](https://sigelo.io/frameworks.html) |
 | Mikä tahansa agentti, jolla on komentorivi | kyllä, Node.js 22.18 tai uudempi |
 | ChatGPT-sovellus, muut pelkät chat-avustajat | ei: ne eivät voi ajaa työkaluja |
 

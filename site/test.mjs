@@ -72,10 +72,10 @@ ok(expected.every((f) => files.has(f)) && files.size === expected.length,
 ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist: every {{value}} filled');
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
-// Every {{value}} filled: a size is two words ("50 MB"), so the source's count (docs-test/check-budgets.mjs)
+// Every {{value}} filled: a size is two words ("50 MB"), so the source's count (tools/docs-test/check-budgets.mjs)
 // is too low. Two budgets. The prose (set 2026-10-14): the words a reader reads as text, so
 // no table, no card (the home page's tier cards), no code block, no container line. The whole file:
-// docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
+// tools/docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
 // 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
@@ -102,12 +102,12 @@ for (const p of PAGES) {
 ok(PAGES.every((p) => FILE_BUDGET[p.slug]) && words(prose('a b\n\n```sh\nx y z\n```\n\n| c | d |\n\n:::: cards\n::: card\nq r s\n:::\n::::\n\n:::: plans\n::: plan\nu v\n:::\n::::\n\n::: cta\nt\n:::\n')) === 3,
   'budget: every page has one; prose drops code blocks, tables, the cards, the plans and container lines, and keeps what is inside other containers');
 ok(words(fill('{{free.storage}} {{pro.maxMessage}}', 'test')) === 4, 'budget: a size value counts as the two words it renders as ("50 MB"), not as one');
-const budgetsFile = join(ROOT, 'docs-test', 'budgets.json');
+const budgetsFile = join(ROOT, 'tools', 'docs-test', 'budgets.json');
 if (existsSync(budgetsFile)) {
   const b = JSON.parse(readFileSync(budgetsFile, 'utf8'));
   const wrong = PAGES.filter((p) => b[`relay/site/${p.slug}.md`] !== budget(p.slug)).map((p) => p.slug);
   const stale = Object.keys(b).filter((k) => k.startsWith('relay/site/') && !k.startsWith(`relay/site/${DARK}/`) && !PAGES.some((p) => k === `relay/site/${p.slug}.md`));
-  ok(wrong.length === 0 && stale.length === 0, `docs-test/budgets.json: the same whole-file budgets for the pages, none for a page that is gone${wrong.length ? ` (differs: ${wrong.join(', ')})` : ''}${stale.length ? ` (stale: ${stale.join(', ')})` : ''}`);
+  ok(wrong.length === 0 && stale.length === 0, `tools/docs-test/budgets.json: the same whole-file budgets for the pages, none for a page that is gone${wrong.length ? ` (differs: ${wrong.join(', ')})` : ''}${stale.length ? ` (stale: ${stale.join(', ')})` : ''}`);
 }
 
 // ---- placeholders: each one in the sources is listed, each listed one is used ------------------
@@ -133,7 +133,8 @@ ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('
   'seller: the trade name "sigelo", a business registered in the EU, legal name and address on request (terms: and on invoices), in privacy.md and terms.md; no company form named on any page');
 
 // ---- contact: one address, receive-only, no form, no account wording ---------------------------
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
+// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.14) is no address.
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z][A-Za-z0-9-]*/g;
 for (const p of PAGES) {
   const mails = [...new Set([...(src[p.slug].match(EMAIL) ?? []), ...(html[p.slug].match(EMAIL) ?? [])])];
   ok(mails.every((m) => m === 'contact@sigelo.io'), `${p.slug}: no e-mail address but contact@sigelo.io${mails.length ? ` (${mails.join(', ')})` : ''}`);
@@ -1259,7 +1260,7 @@ ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === 
 ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
   `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
 ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
-  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
   'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app, Linux phones; no "coming soon")');
 ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
   'connect: the steps render as one numbered list, five items, a code block in each');
@@ -1569,7 +1570,7 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
   const b = existsSync(budgetsFile) ? JSON.parse(readFileSync(budgetsFile, 'utf8')) : null;
   for (const d of dark) {
     const file = `relay/site/${DARK}/${d.slug}.md`, text = readFileSync(join(SITE, DARK, `${d.slug}.md`), 'utf8'), w = words(text);
-    if (b) ok(b[file] <= 220 && w <= b[file], `dark: ${file}: ${w} words, budget ${b[file]} (≤ 220) in docs-test/budgets.json`);
+    if (b) ok(b[file] <= 220 && w <= b[file], `dark: ${file}: ${w} words, budget ${b[file]} (≤ 220) in tools/docs-test/budgets.json`);
     const hits = neverHits(text);
     ok(hits.length === 0 && !/audit|s[t]ripe|credit card|not on sale|invoiced in euros|reverse.charge|excl\.? VAT|net price|\bVAT rate\b/i.test(text),
       `dark: ${d.slug}: no word never written (the relay's list, "audit", the card processor, "not on sale", "Invoiced in euros", reverse charge, net prices)${hits.length ? ` (${hits.join('; ')})` : ''}`);

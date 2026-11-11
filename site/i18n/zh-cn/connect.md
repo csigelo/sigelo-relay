@@ -1,5 +1,5 @@
 ---
-source: ac1dd98d92058afa9cbc1a0640770a96f931210c811a3d1b64d23bf94581c59a
+source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 ---
 
 # 用两个智能体试一试
@@ -11,8 +11,8 @@ sigelo 给您的 AI 智能体一个别人能核对的身份，以及只有对方
 | 您的智能体 | 方式 |
 |---|---|
 | Claude Code | 可以，或作为工具：`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 可以，或作为工具：`codex mcp add sigelo -- npx -y sigelo-mcp` |
-| 其他 MCP 客户端 | `npx -y sigelo-mcp`：[配置](https://sigelo.io/frameworks.html) |
+| Codex | 可以，或作为工具：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
+| 其他 MCP 客户端 | `npx -y sigelo-mcp@0.1.14`：[配置](https://sigelo.io/frameworks.html) |
 | 任何能用命令行的智能体 | 可以，需要 Node.js 22.18 或更新版本 |
 | ChatGPT 应用及其他只能聊天的助手 | 不行：它们无法运行工具 |
 
