@@ -80,9 +80,10 @@ ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist
 // outlive the sentence.
 // 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
 // 2026-11-10: index +10, the sub-line's why-trust sentence linking sigelo.io's FAQ (TR1).
+// 2026-11-11: index +5, the link to the relay's FAQ under the cards; faq, the twelfth page (≤ 420 words asked).
 // 2026-11-03: pro +15, the Free/Pro table's Groups row (design/groups.md §4), a table row only: no prose.
-const PROSE_BUDGET = { index: 185, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
-const FILE_BUDGET = { index: 265, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, about: 205, examples: 200, 404: 40 };
+const PROSE_BUDGET = { index: 190, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
+const FILE_BUDGET = { index: 270, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, faq: 335, about: 205, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
 const extra = (slug) => (slug === 'pro' && r.pending ? words(VENDOR_PENDING) : 0);
 const budget = (slug) => FILE_BUDGET[slug] + extra(slug);
@@ -169,7 +170,7 @@ const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 const SUBLINE = 'Built by a team of AI agents under a human owner. Why trust it? For the reason Bitcoin is trusted: the code is public, nobody needs permission, every claim can be checked (FAQ).';
 const WHY = "Your agent books, buys and asks for you. To a shop or another agent it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID anyone can check, even offline: it proves who it is, keeps its good record and gets paid.";
 const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
-  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', 404: 'Not found' };
+  contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', faq: 'FAQ', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
 // takes its numbers from relay/allowance.mjs TIERS and names the largest message, not a retention: a
 // reader away over a week takes no new messages on either tier (A5 review).
@@ -181,7 +182,7 @@ const HEAD = (pending) => ({
   TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Try it with two agents — sigelo relay',
     pro: 'Pro: all your agents on one allowance — sigelo relay', enterprise: 'Enterprise: teams and swarms of agents — sigelo relay', contact: 'Contact — sigelo relay',
     privacy: 'Privacy: what the relay keeps — sigelo relay', terms: 'Terms of service — sigelo relay', agents: 'For agents: Pro setup and data requests — sigelo relay',
-    about: "About sigelo: your agents' ID — sigelo relay", examples: 'Examples: what you can do with it — sigelo relay', 404: 'Not found — sigelo relay' },
+    about: "About sigelo: your agents' ID — sigelo relay", examples: 'Examples: what you can do with it — sigelo relay', faq: 'FAQ: what the relay sees, keeps and costs — sigelo relay', 404: 'Not found — sigelo relay' },
   DESC: {
     index: 'Connect your AI agent to the agents you trust: a short code pairs them, then they message end-to-end encrypted. No accounts; free for every agent.',
     connect: 'Pair an AI agent on your computer with one on your phone: what to tell each agent, the command it runs, what you see. Codex, Claude Code, any MCP client.',
@@ -195,6 +196,7 @@ const HEAD = (pending) => ({
     agents: 'What an agent runs for its operator on sigelo relay: the Pro setup (operator identity, licence, attestations) and signed erasure or access requests.',
     about: 'What sigelo is: the ID your AI agents carry outside. For people: your own page, your 25 words, agents made yours elsewhere; keys stay home.',
     examples: "Six everyday uses of sigelo: your agent on a server, a file from a friend's agent, a company's agent you can check, a lost server back from 25 words.",
+    faq: 'Six short answers about the sigelo relay: what it sees, what it keeps and for how long, whether it can read messages, the cost, running your own.',
     404: 'No page at this address on sigelo.ai. Start at the home page, Connect or Contact; agents can start at /llms.txt or /index.json.',
   },
 });
@@ -328,7 +330,7 @@ if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8'))
 // ---- header and footer (A10): the wordmark and the links, nothing else (2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.replaceAll(SEAL_INLINE, '').matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
-const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['Privacy', 'privacy'], ['Terms', 'terms']];
+const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['FAQ', 'faq'], ['Privacy', 'privacy'], ['Terms', 'terms']];
 const HEAD_LINKS = ['about', 'connect', 'pro', 'contact']; // the header: About, Get started, Plans, Contact; the rest are footer-only
 // The footer: the wordmark, the links, then one <details> "Other languages" as the last item of its
 // list, nothing else. → { rest, links, summary, langs: [[name, href or null (current), lang]] }.
@@ -355,7 +357,7 @@ for (const p of PAGES) {
     && (head.match(/aria-current="page"/g) ?? []).length === (['index', ...HEAD_LINKS].includes(p.slug) ? 1 : 0),
     `${p.slug}: the header is the wordmark and About · Get started · Plans · Contact, the current page marked`);
 }
-ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEADER.map((p) => p.slug).join() === HEAD_LINKS.join(), 'footer and header: build.mjs FOOTER is the eight links, HEADER the four, in order');
+ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEADER.map((p) => p.slug).join() === HEAD_LINKS.join(), 'footer and header: build.mjs FOOTER is the nine links, HEADER the four, in order');
 // The home page: the motto as its one H1, the why (2026-10-24: a newcomer asked "why does an agent
 // need an identity when going online?"), the two layers, the button to /connect; the disclosure in
 // the body (without the handle: a reader does not know it). The why is sigelo.io's first paragraph too, word for word.
@@ -387,6 +389,40 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
     && src.enterprise.includes('\n## Run your own relay\n') && src.enterprise.includes('(https://github.com/csigelo/sigelo-relay/blob/main/deploy/README.md)')
     && src.enterprise.includes('RELAY_CLOSED_OPERATOR=') && src.enterprise.includes('`/.well-known/sigelo-relay.json`') && !/\d[ \u00a0]?€|\b20\d\d\b/.test(src.enterprise),
     'enterprise: coming soon, as Pro; "Run your own relay" (the deploy README linked, a closed relay, the registry statement); no price, no year; ends with the Contact button');
+}
+// faq (2026-11-11): the relay's six questions, plain answers of 2 to 4 sentences, every number of the
+// relay's a {{value}}; the trust question is sigelo.io's FAQ entry, linked, not repeated. Linked from the
+// footer and from the home page, in every language, by one line under the cards.
+{
+  const FAQ_Q = ['What does the relay see?', 'What does it keep, and for how long?', 'Can it read my messages?', 'What does it cost?',
+    'What if it is down, or turns hostile?', 'Can I run my own?'];
+  const parts = src.faq.split(/^## /m).slice(1).map((x) => [x.slice(0, x.indexOf('\n')), x.slice(x.indexOf('\n')).trim()]);
+  const sentences = (t) => plainText(t).split(/(?<=[.?!])\s+(?=[A-Z])/).filter(Boolean).length;
+  ok(parts.map(([q]) => q).join('|') === FAQ_Q.join('|') && parts.every(([, a]) => !/^#/m.test(a)), `faq: the six questions as ## headings, in order (${parts.map(([q]) => q).join(' · ')})`);
+  ok(parts.every(([, a]) => sentences(a) >= 2 && sentences(a) <= 4), `faq: each answer 2 to 4 sentences (${parts.map(([, a]) => sentences(a)).join(', ')})`);
+  ok(words(fill(src.faq, 'faq')) <= 420 && budget('faq') <= 420, `faq: ${words(fill(src.faq, 'faq'))} words, at most 420 as asked`);
+  ok(FAQ_Q.every((q) => html.faq.includes(`<h2 id="${q.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim().replace(/ +/g, '-')}">${q.replace(/,/g, ',')}</h2>`)) && !/\{#/.test(src.faq),
+    'faq: each question an anchor by its slugified heading, no {#id} syntax');
+  // Numbers: the relay's are {{values}}; typed only the log's address cut and its 7 days (no value exists for those), as privacy.md types them.
+  const typed = (src.faq.replace(/\{\{[\w.]+\}\}/g, '').replace(/\]\([^)]*\)/g, '](x)').match(/\d+/g) ?? []);
+  ok(typed.join() === '24,48,7' && ['free.msgsDay', 'free.maxMessage', 'free.retentionDays', 'pro.retentionDays', 'keep.account.free'].every((k) => src.faq.includes(`{{${k}}}`))
+    && !/\d[  ]?€|%/.test(src.faq), `faq: every number of the relay's a {{value}}; no price typed (Pro's are on /pro), typed only /24, /48 and 7 days${typed.join() === '24,48,7' ? '' : ` (typed: ${typed.join(', ')})`}`);
+  ok(src.faq.includes('(https://sigelo.io/faq.html#why-trust-it)') && !/Bitcoin/.test(src.faq) && src.faq.includes('(https://github.com/csigelo/sigelo-relay)')
+    && src.faq.includes('(/enterprise.html#run-your-own-relay)') && src.faq.includes('(/privacy.html)') && src.faq.includes('(/pro.html)'),
+    'faq: trust is sigelo.io\'s "Why trust it?" entry, linked, not repeated; links Privacy, Plans, the relay\'s source and "Run your own relay"');
+  const io = join(ROOT, 'site', 'src', 'faq.md');
+  if (existsSync(io)) ok(/^## Why trust it\?$/m.test(readFileSync(io, 'utf8')), 'faq: sigelo.io\'s FAQ still has "Why trust it?" (#why-trust-it)');
+  // While Pro is coming soon the FAQ says so; once on sale (pro.md drops VENDOR_PENDING) it must not.
+  ok(/coming soon/.test(src.faq) === (vendorPending(src) === true) && src.faq.includes('Prices include VAT; companies pay by bank transfer, Monero is optional.')
+    && !/audit|\bnot on sale\b|s[t]ripe|\bcards?\b|reverse.charge|net price/i.test(src.faq),
+    'faq: Pro "coming soon" exactly while pro.md says so; VAT included, bank transfer, Monero optional; no "audit", card, net price or "not on sale"');
+  ok(twin.faq.includes('[Privacy](/privacy.md)') && twin.faq.includes('[Plans](/pro.md)') && twin.faq.includes('(/enterprise.md#run-your-own-relay)') && twin.faq.startsWith('# FAQ\n'),
+    'faq.md twin: the page as Markdown, its links to the twins');
+  const FAQ_LINK = '[Questions about the relay →](/faq.html)';
+  ok(src.index.endsWith(`\n::::\n\n${FAQ_LINK}\n`) && /<p><a href="\/faq\.html">Questions about the relay →<\/a><\/p>/.test(html.index),
+    'index: one line under the cards links the FAQ');
+  const tr = LANGS.filter((l) => (l.md.index.match(/\]\(\/faq\.html\)/g) ?? []).length === 1 && /\n::::\n\n\[[^\]\n]+ [→←]\]\(\/faq\.html\)\n$/.test(l.md.index) && !l.md.index.includes(FAQ_LINK));
+  ok(LANGS.length === 30 && tr.length === LANGS.length, `i18n: each language's home page ends with its own FAQ line (${tr.length} of ${LANGS.length})`);
 }
 // pro: the three plans side by side (2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
 // /contact; the 12-month one highlighted, "Best value"; under them one line, VAT included, no rate or reverse charge.
@@ -593,7 +629,7 @@ for (const l of LANGS) {
     const f = footerOf(h);
     ok(f.links.join() === [`sigelo /${l.code}/index.html`, ...FOOT_LINKS.map(([, s]) => `${l.nav[s]} ${TRANSLATED.includes(s) ? `/${l.code}/${s}.html` : `/${s}.html`}`), 'sigelo.io https://sigelo.io/'].join()
       && f.count === 1 && f.summary === l.other && JSON.stringify(f.langs) === JSON.stringify(langList(p, l.code)),
-      `${at}: the footer has the same eight links (Privacy and Terms in English), sigelo.io and "${l.other}", ${l.name} unlinked`);
+      `${at}: the footer has the same nine links (FAQ, Privacy and Terms in English), sigelo.io and "${l.other}", ${l.name} unlinked`);
     const site = g?.['@graph']?.find((x) => x['@type'] === 'WebSite');
     ok(site?.description === l.site && site?.inLanguage === l.lang && l.site !== SITE_DESCRIPTION && glossed(l.code, desc) === desc && glossed(l.code, site.description) === site.description && glossed(l.code, web?.description ?? '') === (web?.description ?? ''),
       `${at}: the meta description, the WebPage's and the WebSite's (lang.json site, in ${l.lang}) are translated and glossed`);

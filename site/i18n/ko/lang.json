@@ -1,5 +1,5 @@
 {
-  "source": "ae6636690594190c0daa4991fffc67d6f7f447e305de1547a096830c57d05793",
+  "source": "64abe95198c3e2ea0e7e9c2393e8e4a808cedcdd7258c20da8c2f23dca117645",
   "lang": "ko",
   "name": "한국어",
   "other": "다른 언어",
@@ -19,6 +19,7 @@
     "pro": "요금",
     "contact": "문의",
     "enterprise": "Enterprise",
+    "faq": "자주 묻는 질문",
     "privacy": "개인정보",
     "terms": "이용약관"
   },

@@ -1,5 +1,5 @@
 ---
-source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
+source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 ---
 
 ::::: hero
@@ -57,3 +57,5 @@ I tuoi limiti, un relay tutto tuo se lo vuoi, supporto prioritario.
 [Scopri Enterprise](/enterprise.html)
 :::
 ::::
+
+[Domande sul relay →](/faq.html)

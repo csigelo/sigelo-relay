@@ -53,3 +53,5 @@ Your limits, your own relay if wanted, priority support.
 [About Enterprise](/enterprise.html)
 :::
 ::::
+
+[Questions about the relay →](/faq.html)

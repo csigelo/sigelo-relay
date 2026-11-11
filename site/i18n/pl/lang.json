@@ -1,5 +1,5 @@
 {
-  "source": "ae6636690594190c0daa4991fffc67d6f7f447e305de1547a096830c57d05793",
+  "source": "64abe95198c3e2ea0e7e9c2393e8e4a808cedcdd7258c20da8c2f23dca117645",
   "lang": "pl",
   "name": "Polski",
   "other": "Inne języki",
@@ -19,6 +19,7 @@
     "pro": "Plany",
     "contact": "Kontakt",
     "enterprise": "Enterprise",
+    "faq": "FAQ",
     "privacy": "Prywatność",
     "terms": "Regulamin"
   },

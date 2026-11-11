@@ -9,7 +9,7 @@
 //   node relay/site/build.mjs --launch  in the private tree: the official statement, then what npm
 //                                       serves; writes relay/site/launch.json when both pass (launchGate)
 //
-// Eleven pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
+// Twelve pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
 // plus what agents and crawlers read: robots.txt (and relay-robots.txt, which nginx serves as
 // relay.sigelo.ai's), sitemap.xml, llms.txt, llms-full.txt, index.json, relay.json (the relay info
 // document of plan §11) and .well-known/security.txt. nginx (relay/deploy/nginx.conf) serves
@@ -179,7 +179,7 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 
 // The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only (the
 // 2026-10-16: the header is About, Get started, Plans, Contact; the footer adds Examples,
-// Enterprise, Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
+// Enterprise, FAQ (2026-11-11), Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
 // steps and erasure requests, what an agent runs for its operator) and the not-found page are in
 // neither: the agents' page is linked from /pro and /privacy and listed in llms.txt, the sitemap and
 // index.json; the not-found page nowhere. The seven pages of TRANSLATED are also in every language
@@ -207,6 +207,8 @@ export const PAGES = [
     description: 'Reach sigelo over SimpleX for questions, invoices and quotes. A payment address comes only with an invoice you asked for, in a conversation you opened.' },
   { slug: 'enterprise', nav: 'Enterprise', foot: true, title: 'Enterprise: teams and swarms of agents',
     description: 'sigelo relay for teams and swarms of AI agents: coming soon. Until then, run your own relay: open source, closed to your operators and their agents.' },
+  { slug: 'faq', nav: 'FAQ', foot: true, title: 'FAQ: what the relay sees, keeps and costs',
+    description: 'Six short answers about the sigelo relay: what it sees, what it keeps and for how long, whether it can read messages, the cost, running your own.' },
   { slug: 'privacy', nav: 'Privacy', foot: true, title: 'Privacy: what the relay keeps',
     description: 'What the sigelo relay and this site keep, and for how long: addresses cut to /24 or /48 for 7 days; never message content. No cookies, no scripts.' },
   { slug: 'terms', nav: 'Terms', foot: true, title: 'Terms of service',
@@ -1098,7 +1100,7 @@ main > .plans { max-width: 62rem; }
 `;
 
 // ---------------------------------------------------------------------------------------------
-// The footer, every page the same: the wordmark, the eight links and "Other languages", nothing else
+// The footer, every page the same: the wordmark, the nine links and "Other languages", nothing else
 // (2026-10-16). The twin ends with the links as Markdown, the page as HTML, with the same
 // links in the same order (relay/site/test.mjs). The seller is named on privacy and terms; how to pay
 // on contact. "Other languages" is a <details> (no script): open, it lists every language by its own
@@ -1244,7 +1246,8 @@ ${MOTTO} ${DISCLOSURE}
 
 - [Enterprise](${ORIGIN}/enterprise.md): teams, swarms
 - [Examples](${ORIGIN}/examples.md): uses
-- [Privacy](${ORIGIN}/privacy.md): what is kept
+- [FAQ](${ORIGIN}/faq.md): answers
+- [Privacy](${ORIGIN}/privacy.md): retention
 - [Terms](${ORIGIN}/terms.md): businesses only, no custody
 ${lit.map((p) => `- [${p.title}](${ORIGIN}/${p.slug}.md)\n`).join('')}- [Source](${REPO}): AGPL-3.0
 `;

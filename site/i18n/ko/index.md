@@ -1,5 +1,5 @@
 ---
-source: 9dfc792e3c0aa373951db838e9b20440394f91cf7982c71e4332ee9a5770ed25
+source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 ---
 
 ::::: hero
@@ -57,3 +57,5 @@ Claude Code나 Codex처럼 명령을 실행하는 에이전트가 필요합니�
 [Enterprise 알아보기](/enterprise.html)
 :::
 ::::
+
+[릴레이에 관한 질문 →](/faq.html)
