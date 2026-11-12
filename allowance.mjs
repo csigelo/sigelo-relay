@@ -36,7 +36,7 @@
 // nothing still succeeds, on the free tier, and is told why ("operator" or "licence") as soon as
 // it is connected. Every login is then told its group tier, once connected: $sigelo/notice {code:
 // "tier", detail, tier: free | pro, groups: {max, members}} (TIERS groups and groupMembers, the
-// licence's groups claim for a pool): groups live in the clients (contact/group.mjs), which count
+// licence's groups claim for a pool): groups live in the clients (apps/contact/group.mjs), which count
 // the groups an identity made and its members against it; the relay counts only messages.
 //
 // A pool: the operator holding a valid licence, and every agent whose last bundle carried a valid
@@ -56,7 +56,7 @@
 // it with the old chain and its operator's attestation, or the operator's public licence, and pooled.
 import { statfsSync } from 'node:fs';
 import { dirname } from 'node:path';
-// licence.ts is sigelo's spend/licence.ts (MIT) byte for byte, copied because relay/ is published
+// licence.ts is sigelo's apps/keeper/licence.ts (MIT) byte for byte, copied because relay/ is published
 // alone; in sigelo's tree relay/site/test.mjs and release/publish.sh --relay refuse a copy that differs.
 import { vendorDid } from './licence.ts';
 import { DID_RE } from './auth.mjs';
@@ -89,7 +89,7 @@ const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes'
 // What a queued message is charged: its payload, at least MESSAGE_FLOOR, plus MESSAGE_ROW for the
 // row that holds it. The payload alone let empty messages queue free of charge: a row of db.mjs's
 // messages table takes 333 bytes on disk with its four index entries (measured over 100,000 empty
-// rows), rounded up here; and no envelope is shorter than one padded block (contact/envelope.mjs
+// rows), rounded up here; and no envelope is shorter than one padded block (apps/contact/envelope.mjs
 // pads the plaintext to a multiple of 256).
 export const MESSAGE_FLOOR = 256, MESSAGE_ROW = 384;
 export const chargeOf = (bytes) => Math.max(bytes, MESSAGE_FLOOR) + MESSAGE_ROW;
@@ -137,7 +137,7 @@ export function freeQueueOf({ blocks, bfree, bavail, bsize }, queued) {
 // network's SUBSCRIBE/UNSUBSCRIBE churn held the thread (PUBACKs elsewhere from 6.5 ms to 220 ms).
 // 10 a second per network is ~80 ms of the thread at that cost. An honest agent claims a few
 // mailboxes per contact per week: 3 or 4 per contact at its first connection (15 for Pro's 90
-// days), so the burst holds a free identity's 128 at once, and an agent with more waits (contact/
+// days), so the burst holds a free identity's 128 at once, and an agent with more waits (apps/contact/
 // carrier.mjs tries again after a pause). Not yet measured on the relay's VPS: its disk sets it.
 // One network can so take about three tenths of the thread, much of it refusals.
 // strikes: refusals in a clock minute after which the connection is closed; going on then costs a
@@ -517,7 +517,7 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
         : `this identity (${lim.burst} at once, ${lim.perSecond} a second)`;
       strike(b, clientId, now);
       // Every refusal is named. A publish dropped without a notice is acknowledged all the same, so
-      // its writer took it for stored (contact/carrier.mjs reported it "sent"); one notice per
+      // its writer took it for stored (apps/contact/carrier.mjs reported it "sent"); one notice per
       // refused packet, and the strikes close a connection past them in a minute.
       const what = { publish: 'messages', subscribe: 'topics subscribed or given up', claim: 'mailboxes claimed or given up' }[kind];
       return { code: 'rate', detail: `too many ${what} from ${who}: dropped; slow down` };
@@ -696,7 +696,7 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
 
     // After the broker starts (server.mjs): an operator or licence notice goes to the client once
     // its session is up.
-    // Then the group tier (the header), to every login: what contact/group.mjs counts against.
+    // Then the group tier (the header), to every login: what apps/contact/group.mjs counts against.
     attach({ broker: b, notify, inform, sessionOf }) {
       broker = b;
       broker.on('clientReady', (client) => {

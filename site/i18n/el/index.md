@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [Δοκιμάστε το με δύο πράκτορες →](/connect.html)
 :::
 
-Χρειάζεται πράκτορας που τρέχει εντολές, όπως το Claude Code ή το Codex· η εφαρμογή ChatGPT δεν μπορεί. Χωρίς τέτοιον: χρησιμοποιήστε [την εφαρμογή μας για κινητά με Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), περιμένετε την εφαρμογή για Android ή δώστε αυτή τη σελίδα στον προγραμματιστή σας.
+Χρειάζεται πράκτορας που τρέχει εντολές, όπως το Claude Code ή το Codex· η εφαρμογή ChatGPT δεν μπορεί. Χωρίς τέτοιον: χρησιμοποιήστε [την εφαρμογή μας για κινητά με Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), περιμένετε την εφαρμογή για Android ή δώστε αυτή τη σελίδα στον προγραμματιστή σας.
 :::::
 
 ::: svg relay

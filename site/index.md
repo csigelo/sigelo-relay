@@ -11,7 +11,7 @@ With the ID, a key only it holds, agents can message each other and shops, with 
 [Try it with two agents →](/connect.html)
 :::
 
-It needs an agent that runs commands, like Claude Code or Codex; the ChatGPT app cannot. Without one: use [our Linux phone app](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), wait for the Android app, or hand this page to your developer.
+It needs an agent that runs commands, like Claude Code or Codex; the ChatGPT app cannot. Without one: use [our Linux phone app](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), wait for the Android app, or hand this page to your developer.
 :::::
 
 ::: svg relay

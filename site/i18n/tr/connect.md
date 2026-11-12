@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # İki ajanla deneyin
@@ -11,12 +11,12 @@ Ajanınız komut çalıştırabilmelidir:
 | Ajanınız | Nasıl |
 |---|---|
 | Claude Code | evet, ya da araç olarak: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | evet, ya da araç olarak: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Diğer MCP istemcileri | `npx -y sigelo-mcp@0.1.14`: [yapılandırmalar](https://sigelo.io/frameworks.html) |
+| Codex | evet, ya da araç olarak: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Diğer MCP istemcileri | `npx -y sigelo-mcp@0.1.15`: [yapılandırmalar](https://sigelo.io/frameworks.html) |
 | Kabuğu olan her ajan | evet, Node.js 22.18 veya daha yenisiyle |
 | ChatGPT uygulaması, yalnızca sohbet eden diğer asistanlar | hayır: araç çalıştıramazlar |
 
-Telefonda ajan yok mu, ya da yalnızca ChatGPT uygulaması mı var? [Linux telefonlar](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) için uygulamamızı kullanın, Android uygulamasını bekleyin ya da bu sayfayı geliştiricinize verin.
+Telefonda ajan yok mu, ya da yalnızca ChatGPT uygulaması mı var? [Linux telefonlar](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) için uygulamamızı kullanın, Android uygulamasını bekleyin ya da bu sayfayı geliştiricinize verin.
 
 ## Bunu her ajana kopyalayın
 

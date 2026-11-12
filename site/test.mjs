@@ -19,7 +19,7 @@
 // bank transfer or Monero, no card; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
 // against the pages and the relay's own code; the numbers, fields and steps the pages promise against
 // the relay's behaviour. In the private tree it also compares the official names with sigelo.io's
-// and relay/licence.ts with spend/licence.ts, and runs the internal runbook's self-test
+// and relay/licence.ts with apps/keeper/licence.ts, and runs the internal runbook's self-test
 // (runbook §11). No network: the registry check of --launch runs here against
 // stand-in registry documents.
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
@@ -134,7 +134,7 @@ ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('
   'seller: the trade name "sigelo", a business registered in the EU, legal name and address on request (terms: and on invoices), in privacy.md and terms.md; no company form named on any page');
 
 // ---- contact: one address, receive-only, no form, no account wording ---------------------------
-// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.14) is no address.
+// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.15) is no address.
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z][A-Za-z0-9-]*/g;
 for (const p of PAGES) {
   const mails = [...new Set([...(src[p.slug].match(EMAIL) ?? []), ...(html[p.slug].match(EMAIL) ?? [])])];
@@ -516,8 +516,8 @@ ok(/^# sigelo relay\n\n> [^\n]+\n/.test(llms) && sections.at(-1) === 'Optional' 
 ok(indexable.every((p) => items.includes(`${ORIGIN}/${p.slug}.md`)) && !items.includes(`${ORIGIN}/404.md`), 'llms.txt: lists every page\'s twin but the not-found page\'s');
 ok(items.every((u) => (u.startsWith(`${ORIGIN}/`) ? files.has(u.slice(ORIGIN.length + 1)) : /^https:\/\/(?:sigelo\.io\/|github\.com\/csigelo\/)/.test(u))),
   'llms.txt: its sigelo.ai links exist in dist, the others go to sigelo.io or github.com/csigelo');
-ok(words(llms) <= 150 && llms.includes(`${MOTTO} ${DISCLOSURE}`) && llms.includes(`New (v${PKG.version.split('.').slice(0, 2).join('.')}), unaudited.`),
-  `llms.txt: ${words(llms)} words ≤ 150, the motto with the disclosure, the version and "unaudited"`);
+ok(words(llms) <= 150 && llms.includes(`${MOTTO} ${DISCLOSURE}`) && llms.includes(`New (v${PKG.version.split('.').slice(0, 2).join('.')}), no outside review yet.`),
+  `llms.txt: ${words(llms)} words ≤ 150, the motto with the disclosure, the version and "no outside review yet"`);
 const full = read('llms-full.txt');
 const inFull = indexable.filter((p) => !PAYMENT_PLACES.includes(pageUrl(p)));
 ok(inFull.length === indexable.length - 1 && inFull.every((p) => full.includes(`Source: ${ORIGIN}/${p.slug}.md\n\n${body[p.slug].trimEnd()}\n`)) && !full.includes('# Not found') && full.includes(`${MOTTO} ${DISCLOSURE}`),
@@ -693,7 +693,7 @@ for (const l of LANGS) {
 ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '', ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
   const links = (x) => [...x.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]).join();
   return hero.includes(`<h1 id=`) && ps.length === 5 && links(ps[0]) === 'https://sigelo.io/faq.html#why-trust-it' && !ps[1].includes('<a ') && ps[2].includes('<a href="https://sigelo.io/">') && ps[3].startsWith(`<a href="/${l.code}/connect.html">`)
-    && links(ps[4]) === 'https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md'; }),
+    && links(ps[4]) === 'https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md'; }),
   'home page in every language: the motto, its sub-line, the why, the two layers linking sigelo.io, the button to its /connect, what it needs, as the English');
 {
   // The home page's title in each language, pinned (the head a search result shows).
@@ -749,10 +749,10 @@ ok(index.relay.queue === QUEUE_NOTE && relayInfo.limits.queue === QUEUE_NOTE && 
   && /^\| Messages wait up to \|[^\n]*\n(?:\|[^\n]*\n)*\nAn agent away over a week takes no new messages until back, on either plan: they wait with the sender\.$/m.test(body.pro)
   && body.connect.includes('Messages wait at sigelo.ai for 14 days for an offline agent; if it is away over a week, the sender keeps new ones.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
   'pro, connect, agents, index.json, relay.json: retention is how long a queued message waits; an agent away over a week takes no new messages (no_reader), whatever the tier');
-const carrier = join(ROOT, 'contact', 'carrier.mjs');
+const carrier = join(ROOT, 'apps', 'contact', 'carrier.mjs');
 if (existsSync(carrier)) {
   const c = await load(carrier);
-  if (c) ok(c.AHEAD === 7 * c.DAY, `pro, QUEUE_NOTE: "a week" is contact/carrier.mjs AHEAD, how far ahead the client claims its mailboxes (private tree; AHEAD = ${c.AHEAD / c.DAY} days)`);
+  if (c) ok(c.AHEAD === 7 * c.DAY, `pro, QUEUE_NOTE: "a week" is apps/contact/carrier.mjs AHEAD, how far ahead the client claims its mailboxes (private tree; AHEAD = ${c.AHEAD / c.DAY} days)`);
 }
 ok(index.motto === MOTTO && index.disclosure === DISCLOSURE && same(index.pages.map((x) => x.slug), indexable.map((p) => p.slug)), 'index.json: motto and disclosure exact; pages = the indexable pages');
 ok(body.agents.includes(index.tiers.pro.client_env) && index.tiers.pro.client_env === `SIGELO_RELAY_RETENTION_DAYS=${allowance?.TIERS.pro.retentionDays}`, 'index.json: tiers.pro.client_env is in agents.md\'s Pro steps, at TIERS.pro\'s retention');
@@ -804,12 +804,12 @@ if (existsSync(ioOfficial)) {
   const o = await load(ioOfficial);
   if (o) ok(same(o.PAYMENT_PLACES, PAYMENT_PLACES), 'official names: PAYMENT_PLACES is site/src/official.mjs\'s (sigelo.io\'s index.json names the same places once the relay is live)');
 }
-// relay/licence.ts is the keeper's spend/licence.ts, copied because relay/ is published alone. In
+// relay/licence.ts is the keeper's apps/keeper/licence.ts, copied because relay/ is published alone. In
 // the private tree a copy that differs would check licences by rules the keeper no longer has.
 if (isPrivateTree()) {
-  const keeper = join(ROOT, 'spend', 'licence.ts');
+  const keeper = join(ROOT, 'apps', 'keeper', 'licence.ts');
   ok(existsSync(keeper) && readFileSync(keeper).equals(readFileSync(join(RELAY, 'licence.ts'))),
-    'licence.ts: spend/licence.ts byte for byte (private tree; after editing that, cp spend/licence.ts relay/licence.ts)');
+    'licence.ts: apps/keeper/licence.ts byte for byte (private tree; after editing that, cp apps/keeper/licence.ts relay/licence.ts)');
 }
 
 // ---- nginx: what the deploy promises (relay/deploy/nginx.conf) ---------------------------------
@@ -1124,7 +1124,7 @@ try {
     mkdirSync(join(root, 'site'), { recursive: true });
     writeFileSync(join(root, 'site', 'build.mjs'), '');
     const why = launchRefusals(root);
-    ok(['SECURITY\\.md', 'site/deploy/nginx\\.conf', 'site/src/official\\.mjs', 'adapters/moadim/sigelo-agent-contact\\.ts'].every((f) => said(why, new RegExp(`^${f}: not found`))),
+    ok(['SECURITY\\.md', 'site/deploy/nginx\\.conf', 'site/src/official\\.mjs', 'apps/agent/sigelo-agent-contact\\.ts'].every((f) => said(why, new RegExp(`^${f}: not found`))),
       'launch gate: in the private tree (site/build.mjs beside relay/), a missing SECURITY.md, sigelo.io nginx.conf, official.mjs or sigelo-agent contact verbs is refused, not skipped');
   }
   // In the private tree, also sigelo.io's own index.json (its build), the SimpleX address the pay
@@ -1133,7 +1133,7 @@ try {
     const SX = SIMPLEX, withSx = `${goodSecurity}- SimpleX: \`${SX}\`\n`;
     const ioBuild = "official: { payment_address_only_with: 'an invoice the buyer asked for', invoice_only_via: 'https://sigelo.io/contact.html' }\n";
     const privateTree = ({ security = withSx, build = ioBuild, official = `export const SIMPLEX = '${SX}';\n`, verbs = '// the contact verbs\n' } = {}) =>
-      tree(security, ioConf('sigelo.ai'), { 'site/build.mjs': build, 'site/src/official.mjs': official, 'adapters/moadim/sigelo-agent-contact.ts': verbs });
+      tree(security, ioConf('sigelo.ai'), { 'site/build.mjs': build, 'site/src/official.mjs': official, 'apps/agent/sigelo-agent-contact.ts': verbs });
     const none = privateTree();
     ok(none.length === 0, `launch gate, private tree: SECURITY.md, sigelo.io's build, nginx and official.mjs and the contact verbs as index.json says: open nothing${none.length ? ` (${none.join('; ')})` : ''}`);
     ok(said(privateTree({ build: "never_sends_by_email_or_chat: ['payment address', 'payment link'], payment_address_only_with: 'x'\n" }), /^site\/build\.mjs: sigelo\.io's index\.json still says/)
@@ -1170,8 +1170,8 @@ try {
   ok(versionAtLeast('0.1.10', '0.1.2') && !versionAtLeast('0.1.1', '0.1.2') && !versionAtLeast(undefined, '0.1.2') && !versionAtLeast('v0.1.2', '0.1.2'), 'versionAtLeast: compares numerically, refuses anything but x.y.z');
   // --launch reads the registry once the tree passes (registryRefusals); here against stand-in documents.
   {
-    const root = join(scratch, `npm-${++k}`); mkdirSync(join(root, 'adapters', 'moadim'), { recursive: true });
-    writeFileSync(join(root, 'adapters', 'moadim', 'package.json'), JSON.stringify({ name: 'sigelo-agent', version: '0.1.2' }));
+    const root = join(scratch, `npm-${++k}`); mkdirSync(join(root, 'apps', 'agent'), { recursive: true });
+    writeFileSync(join(root, 'apps', 'agent', 'package.json'), JSON.stringify({ name: 'sigelo-agent', version: '0.1.2' }));
     const doc = (v, deps = {}, by = 'csigelo') => ({ 'dist-tags': { latest: v }, versions: { [v]: { version: v, dependencies: deps, _npmUser: { name: by } } } });
     const reg = (docs) => registryRefusals({ root, get: async (n) => docs[n] ?? null });
     const good = { 'sigelo-agent': doc('0.1.2', { sigelo: '^0.1.2', 'sigelo-contact': '^0.1.2' }), 'sigelo-contact': doc('0.1.2', { sigelo: '^0.1.2' }) };
@@ -1296,7 +1296,7 @@ ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === 
 ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
   `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
 ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
-  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
   'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app, Linux phones; no "coming soon")');
 ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
   'connect: the steps render as one numbered list, five items, a code block in each');
@@ -1505,10 +1505,10 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
     c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { err += d; }); c.on('close', (status) => res({ status, stdout: out, stderr: err }));
   });
   ok(reg.relayTag('corp.example.com') === 'FNK5' && reg.TAG_LABEL === 'sigelo-relay-tag/0', 'registry: relay tag vector, corp.example.com → FNK5 (first 20 bits of SHA-256("sigelo-relay-tag/0" ‖ host))');
-  const short = join(ROOT, 'contact', 'short.mjs'), crel = join(ROOT, 'contact', 'relays.mjs');
-  if (existsSync(join(ROOT, 'contact', 'node_modules')) && existsSync(short)) {
+  const short = join(ROOT, 'apps', 'contact', 'short.mjs'), crel = join(ROOT, 'apps', 'contact', 'relays.mjs');
+  if (existsSync(join(ROOT, 'apps', 'contact', 'node_modules')) && existsSync(short)) {
     const c = await load(short), cr = await load(crel), hosts = ['relay.sigelo.ai', 'corp.test', '127.0.0.1:8443', 'a.b.c.example'];
-    ok(hosts.every((h) => c.relayTag(h) === reg.relayTag(h)) && cr.RELEASE_DID === reg.RELEASE_DID, 'registry: relay tags and the release DID as contact/short.mjs and contact/relays.mjs have them');
+    ok(hosts.every((h) => c.relayTag(h) === reg.relayTag(h)) && cr.RELEASE_DID === reg.RELEASE_DID, 'registry: relay tags and the release DID as apps/contact/short.mjs and apps/contact/relays.mjs have them');
   }
   const pinFile = join(ROOT, 'release', 'release-identity.json');
   if (existsSync(pinFile)) ok(sigelo.did(JSON.parse(readFileSync(pinFile, 'utf8'))) === reg.RELEASE_DID, `registry: RELEASE_DID is release/release-identity.json's (${reg.RELEASE_DID})`);

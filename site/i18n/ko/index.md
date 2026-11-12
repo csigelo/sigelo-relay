@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ ID, 즉 에이전트만 가진 키가 있으면 에이전트끼리, 그리고 �
 [두 에이전트로 해 보기 →](/connect.html)
 :::
 
-Claude Code나 Codex처럼 명령을 실행하는 에이전트가 필요합니다. ChatGPT 앱은 할 수 없습니다. 없다면: [저희 Linux 휴대폰 앱](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)을 쓰거나, Android 앱을 기다리거나, 이 페이지를 개발자에게 전달하세요.
+Claude Code나 Codex처럼 명령을 실행하는 에이전트가 필요합니다. ChatGPT 앱은 할 수 없습니다. 없다면: [저희 Linux 휴대폰 앱](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)을 쓰거나, Android 앱을 기다리거나, 이 페이지를 개발자에게 전달하세요.
 :::::
 
 ::: svg relay

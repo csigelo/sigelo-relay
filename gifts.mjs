@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/gifts.mjs — Pro gift codes (contract sigelo-gift/0: contact/short.mjs giftHash).
+// relay/gifts.mjs — Pro gift codes (contract sigelo-gift/0: apps/contact/short.mjs giftHash).
 //
 //   POST /gift     {username, client_id, password, code_hash}: the login fields of POST /check
 //                  (auth.mjs: a fresh GET /challenge nonce, signed, spent here) of the OPERATOR

@@ -2,9 +2,9 @@
 // relay/site/registry.mjs — the relay registry sigelo.ai serves as /relays.json (ROADMAP §9 item 4).
 //
 // A relay tag is the first 20 bits of SHA-256(UTF-8 "sigelo-relay-tag/0" ‖ UTF-8 host[:port]) in
-// Crockford's base32 (contact/short.mjs relayTag, copied: relay/ is published alone; test.mjs
+// Crockford's base32 (apps/contact/short.mjs relayTag, copied: relay/ is published alone; test.mjs
 // checks the two agree in sigelo's tree). A short code made on a relay other than relay.sigelo.ai
-// carries it; clients resolve it from what they know, then from this registry (contact/relays.mjs).
+// carries it; clients resolve it from what they know, then from this registry (apps/contact/relays.mjs).
 //
 // Three files:
 //   relays.src.json  the list as maintained, unsigned: {"relays": {<tag>: {host, did, tier?, note?, added}}}.
@@ -25,7 +25,7 @@ export const TAG_LABEL = 'sigelo-relay-tag/0', REGISTRY_CTX = 'sigelo.ai/relays'
 export const WELL_KNOWN = '/.well-known/sigelo-relay.json', HOST_DAYS = 366, REGISTRY_DAYS = 366;
 export const RELEASE_DID = 'did:sigelo:zE1ikihiqKQ7KoFL492kfFrJdUSzPeHNunGnMXLqgVfci';
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-// contact/invite.mjs RELAY: a lowercase host[:port], at most 63 characters (what a long code carries).
+// apps/contact/invite.mjs RELAY: a lowercase host[:port], at most 63 characters (what a long code carries).
 const HOST_RE = /^(?=.{1,63}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::([1-9][0-9]{0,4}))?$/;
 export const isHost = (h) => typeof h === 'string' && HOST_RE.test(h) && !(h.includes(':') && Number(h.split(':')[1]) > 65535);
 export const TAG_RE = /^[0-9A-HJKMNP-TV-Z]{4}$/;

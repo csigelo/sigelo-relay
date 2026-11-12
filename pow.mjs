@@ -61,12 +61,12 @@ export const POW_PREFIX = 'sigelo-relay-pow/0\n';
 // it 26 s on average, 2^24 105 s, 2^26 419 s. So the load
 // raise stops at 24, where every client still gets in; only a network whose good proofs and
 // challenges waiting reach 64 in a day reaches 26 (the header: with the defaults, only by holding
-// challenges), where such a client finds a proof within contact/carrier.mjs's 280 s search about
+// challenges), where such a client finds a proof within apps/contact/carrier.mjs's 280 s search about
 // half the time (1 - e^(-280/419)) and may need a second challenge.
 export const POW_BITS = 22, POW_LOAD_BITS = 24, HOUR = 3600, DAY = 86400;
 export const NETWORK_STEPS = Object.freeze([Object.freeze({ from: 8, add: 2 }), Object.freeze({ from: 64, add: 4 })]);
 // New identities one network may bring in 24 hours (the header), and the difficulty GET /challenge
-// states to a network that has: more than any client searches for (contact/carrier.mjs stops at 26).
+// states to a network that has: more than any client searches for (apps/contact/carrier.mjs stops at 26).
 export const NETWORK_DAY = 64, CLOSED_BITS = 64;
 export const C_RE = /^[0-9]{1,16}$/;
 // Networks whose arrivals and waiting challenges are kept in memory (an address never reaches the

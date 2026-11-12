@@ -751,7 +751,7 @@ const A = topic();
   // A message published while the reader's queue goes out comes after the queue, not into it. Aedes
   // restores the subscriptions before it streams the queue and forwards a live publish at once: one
   // sent at the reader's first delivery arrived 5th of 301, and a contact's envelope more than 64
-  // behind the one opened fails out_of_order (contact/envelope.mjs WINDOW), so 296 were lost.
+  // behind the one opened fails out_of_order (apps/contact/envelope.mjs WINDOW), so 296 were lost.
   await end(a);
   const queuedPs = Array.from({ length: 300 }, (_, i) => Buffer.concat([Buffer.from(`q${String(i).padStart(3, '0')}`), randomBytes(1996)]));
   for (const p of queuedPs) { sent.push(p); await publish(b, A, p); }
@@ -1453,7 +1453,7 @@ function walStates(r, name, tag = name) {
   const pr = await startRelay({ ...cfg, db: join(dir, 'park.db'), park: { max: 3 } });
   const from = lines.length;
   const H = (b) => createHash('sha256').update(b).digest();
-  // A long code (contact/invite.mjs, spelled out here): version 1 | DID digest | secret | exp | relay length | relay | checksum.
+  // A long code (apps/contact/invite.mjs, spelled out here): version 1 | DID digest | secret | exp | relay length | relay | checksum.
   const longCode = (id, { relay = 'relay.test', exp = now + DAY, flip = false } = {}) => {
     const host = Buffer.from(relay), e = Buffer.alloc(4);
     e.writeUInt32BE(exp);

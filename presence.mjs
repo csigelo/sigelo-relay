@@ -3,7 +3,7 @@
 // for the readers it chose, and since when it is not.
 //
 //   p/<32 hex>  a presence topic: one writer, one reader. The writer derives it from the pairing key
-//               (contact/carrier.mjs presenceTopic), so only the pair (and this relay, which sees it
+//               (apps/contact/carrier.mjs presenceTopic), so only the pair (and this relay, which sees it
 //               used) knows it. The first identity to publish to it owns it; another identity's
 //               publish is refused presence_taken. Anyone logged in who names it may subscribe
 //               (granted QoS 0): the marker held is sent at once, as MQTT sends a retained message,

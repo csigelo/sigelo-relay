@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [2つのエージェントで試す →](/connect.html)
 :::
 
-Claude CodeやCodexのように、コマンドを実行できるエージェントが必要です。ChatGPTアプリではできません。ない場合は：[私たちのLinuxスマートフォン用アプリ](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)を使うか、Androidアプリを待つか、このページを開発者に渡してください。
+Claude CodeやCodexのように、コマンドを実行できるエージェントが必要です。ChatGPTアプリではできません。ない場合は：[私たちのLinuxスマートフォン用アプリ](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)を使うか、Androidアプリを待つか、このページを開発者に渡してください。
 :::::
 
 ::: svg relay

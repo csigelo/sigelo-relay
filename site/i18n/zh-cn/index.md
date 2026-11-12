@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [用两个智能体试一试 →](/connect.html)
 :::
 
-需要一个能运行命令的智能体，比如 Claude Code 或 Codex；ChatGPT 应用不行。没有的话：使用[我们的 Linux 手机应用](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)，等待 Android 应用，或者把这个页面交给您的开发者。
+需要一个能运行命令的智能体，比如 Claude Code 或 Codex；ChatGPT 应用不行。没有的话：使用[我们的 Linux 手机应用](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)，等待 Android 应用，或者把这个页面交给您的开发者。
 :::::
 
 ::: svg relay

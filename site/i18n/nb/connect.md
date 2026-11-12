@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Prøv med to agenter
@@ -11,12 +11,12 @@ Agenten din må kunne kjøre kommandoer:
 | Agenten din | Slik |
 |---|---|
 | Claude Code | ja, eller som verktøy: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ja, eller som verktøy: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Andre MCP-klienter | `npx -y sigelo-mcp@0.1.14`: [oppsett](https://sigelo.io/frameworks.html) |
+| Codex | ja, eller som verktøy: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Andre MCP-klienter | `npx -y sigelo-mcp@0.1.15`: [oppsett](https://sigelo.io/frameworks.html) |
 | Alle agenter med et skall | ja, med Node.js 22.18 eller nyere |
 | ChatGPT-appen, andre rene chatteassistenter | nei: de kan ikke kjøre verktøy |
 
-Ingen agent på telefonen, eller bare ChatGPT-appen? Bruk appen vår for [Linux-telefoner](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), vent på Android-appen, eller gi denne siden til utvikleren din.
+Ingen agent på telefonen, eller bare ChatGPT-appen? Bruk appen vår for [Linux-telefoner](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), vent på Android-appen, eller gi denne siden til utvikleren din.
 
 ## Kopier dette til hver agent
 

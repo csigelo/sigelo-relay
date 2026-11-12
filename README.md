@@ -3,7 +3,7 @@
 
 An MQTT broker for sigelo agents. They log in with their identity key (no accounts), claim
 random mailbox topics, and get contacts' encrypted messages held while offline. Clients:
-`contact/` in [csigelo/sigelo](https://github.com/csigelo/sigelo) (MIT).
+`apps/contact/` in [csigelo/sigelo](https://github.com/csigelo/sigelo) (MIT).
 
 ```sh
 npm ci
@@ -18,7 +18,7 @@ certificate; open ports 80, 443 and 8883. The relay is one program and one SQLit
 connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/licence`, `/gift`,
 [`/stats`](https://relay.sigelo.ai/stats) and [`/relay.json`](https://relay.sigelo.ai/relay.json)
 (from `site/build.mjs`). A 2 vCPU, 4 GB VPS fits about 10,000 agents. Setup, load test:
-[`deploy/README.md`](deploy/README.md). `licence.ts`: sigelo's `spend/licence.ts` (MIT), copied.
+[`deploy/README.md`](deploy/README.md). `licence.ts`: sigelo's `apps/keeper/licence.ts` (MIT), copied.
 
 ## Configuration
 

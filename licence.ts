@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /**
- * sigelo-spend — the licence (spend/README.md "Install", "Free and paid").
+ * sigelo-spend — the licence (apps/keeper/README.md "Install", "Free and paid").
  *
  * A licence is a sigelo attestation (SPEC §5): issued by the vendor's DID (`iss`) to the
  * customer's keeper DID (`sub`), `ctx: "sigelo-spend"`, `claims: {tier: "pro", seats: N}`, with
@@ -255,7 +255,7 @@ export function checkLicence(raw: unknown, own: Genesis, dir: string, now: numbe
 export function rememberVendorChain(dir: string, raw: unknown, own: Genesis, now: number, keepers: KeeperEntry[] = liveKeepers()): LicenceStatus {
   const { status, chain } = evaluate(raw, own, dir, now, keepers);
   if (status.tier !== 'pro' || chain === undefined) return status;
-  const text = JSON.stringify({ note: 'the longest vendor chain this keeper has seen (spend/licence.ts); a licence with a shorter or forked one is refused', genesis: (raw as LicenceFile).issuer, rotations: chain.rotations }, null, 2) + '\n';
+  const text = JSON.stringify({ note: 'the longest vendor chain this keeper has seen (apps/keeper/licence.ts); a licence with a shorter or forked one is refused', genesis: (raw as LicenceFile).issuer, rotations: chain.rotations }, null, 2) + '\n';
   const p = chainPath(dir);
   let old = '';
   try { old = readFileSync(p, 'utf-8'); } catch { /* none yet */ }
@@ -284,7 +284,7 @@ export const describe = (s: LicenceStatus): string => (s.tier === 'pro'
 
 /**
  * The refusal of a paid verb (`code: licence_required`, HTTP 403 — every refusal by the keeper
- * is a 403 naming its check, spend/openapi.yaml). Exact, so a client and a test can rely on it.
+ * is a 403 naming its check, apps/keeper/openapi.yaml). Exact, so a client and a test can rely on it.
  */
 export const licenceRefusal = (feature: string, s: LicenceStatus): string =>
   `licence_required: ${feature} is a paid feature of sigelo-spend and this keeper has no valid licence (${s.tier === 'free' ? s.why : 'pro'}). ` +

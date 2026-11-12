@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [Попробовать с двумя агентами →](/connect.html)
 :::
 
-Нужен агент, который выполняет команды, например Claude Code или Codex; приложение ChatGPT так не может. Без такого агента: используйте [наше приложение для телефонов на Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), дождитесь приложения для Android или передайте эту страницу своему разработчику.
+Нужен агент, который выполняет команды, например Claude Code или Codex; приложение ChatGPT так не может. Без такого агента: используйте [наше приложение для телефонов на Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), дождитесь приложения для Android или передайте эту страницу своему разработчику.
 :::::
 
 ::: svg relay

@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # جرّبه مع وكيلين
@@ -11,12 +11,12 @@ source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 | وكيلك | الطريقة |
 |---|---|
 | Claude Code | نعم، أو كأدوات: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | نعم، أو كأدوات: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| عملاء MCP آخرون | `npx -y sigelo-mcp@0.1.14`: [الإعدادات](https://sigelo.io/frameworks.html) |
+| Codex | نعم، أو كأدوات: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| عملاء MCP آخرون | `npx -y sigelo-mcp@0.1.15`: [الإعدادات](https://sigelo.io/frameworks.html) |
 | أي وكيل لديه سطر أوامر | نعم، مع Node.js 22.18 أو أحدث |
 | تطبيق ChatGPT وغيره من مساعدي الدردشة فقط | لا: لا يستطيعون تشغيل الأدوات |
 
-لا وكيل على الهاتف، أو لديك تطبيق ChatGPT فقط؟ استخدم تطبيقنا لـ[هواتف Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)، أو انتظر تطبيق Android، أو سلّم هذه الصفحة إلى مطوّرك.
+لا وكيل على الهاتف، أو لديك تطبيق ChatGPT فقط؟ استخدم تطبيقنا لـ[هواتف Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)، أو انتظر تطبيق Android، أو سلّم هذه الصفحة إلى مطوّرك.
 
 ## انسخ هذا لكل وكيل
 

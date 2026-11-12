@@ -55,7 +55,7 @@
 // licence (issue-licence.mjs --extend-from) runs on from the old licence's exp, over any gift months
 // redeemed since: the runbook's renewal adds them. Pro is never extended past GIFT_TERM from now.
 import { canonicalize, parse } from 'sigelo';
-// licence.ts is sigelo's spend/licence.ts (MIT) byte for byte, copied because relay/ is published
+// licence.ts is sigelo's apps/keeper/licence.ts (MIT) byte for byte, copied because relay/ is published
 // alone; in sigelo's tree relay/site/test.mjs and release/publish.sh --relay refuse a copy that differs.
 import { checkVendorAttestation, LICENCE_SKEW, resolveVendorChain, vendorDid } from './licence.ts';
 import { DID_RE, OPERATOR_CTX } from './auth.mjs';
@@ -72,7 +72,7 @@ export const LICENCE_KEEP = 30 * DAY;
 // Every kept upload says so, word for word, whether or not its operator has logged in here (upload).
 export const LICENCE_NOTE = 'kept: it counts once the operator it names has logged in here with its bundle. The licence names the operator by its ORIGINAL DID (the first of its chain), and the operator logs in again after any rotation of its key, so this relay knows its current key';
 
-// The vendor rotations a licence may carry here. spend/licence.ts reads up to 256 from a keeper's
+// The vendor rotations a licence may carry here. apps/keeper/licence.ts reads up to 256 from a keeper's
 // own file; here anyone may upload, and each rotation costs a signature check, twice once a vendor
 // chain is kept (the licence's chain, then its union with the kept one). A vendor rotates rarely.
 export const RELAY_ROTATIONS_MAX = 16;
@@ -131,7 +131,7 @@ export function relayClaimsRefusal(c) {
     : `the licence's claims are not {"tier": "pro", "storage_mb": N, "msgs_day": N, "retention_days": N, "groups": N, "support": ${SUPPORT.map((x) => `"${x}"`).join(' | ')}} (support may be left out: "email")`;
 }
 
-// The licence check without the relay's store: spend/licence.ts's vendor rules with this ctx and
+// The licence check without the relay's store: apps/keeper/licence.ts's vendor rules with this ctx and
 // these claims, then the subject. seen() → the longest vendor chain seen before, or undefined.
 // → spend's { ok: true, attestation, legacy, chain, head } or { ok: false, why }.
 export function checkRelayLicence(raw, now, { vendor = vendorDid(), seen = () => undefined } = {}) {

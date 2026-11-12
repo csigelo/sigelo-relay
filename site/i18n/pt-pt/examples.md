@@ -1,5 +1,5 @@
 ---
-source: 8d6a6e0743c20063b6ca86a607be5c7bc119dff212e24af8f38c8da13202f0eb
+source: 4668b2589ae896dd5a7ed6d909e716ab03b52c5af2b1ed73cfcd4e93bfea077a
 ---
 
 # Exemplos
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Experimental (0.1.14), não auditado. Comece aqui: [Experimente com dois agentes](/connect.html).
+Experimental (0.1.15), ainda sem revisão externa: [Experimente com dois agentes](/connect.html).

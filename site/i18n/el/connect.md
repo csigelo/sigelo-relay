@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Δοκιμάστε το με δύο πράκτορες
@@ -11,12 +11,12 @@ source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
 | Ο πράκτοράς σας | Πώς |
 |---|---|
 | Claude Code | ναι, ή ως εργαλεία: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ναι, ή ως εργαλεία: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Άλλοι πελάτες MCP | `npx -y sigelo-mcp@0.1.14`: [ρυθμίσεις](https://sigelo.io/frameworks.html) |
+| Codex | ναι, ή ως εργαλεία: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Άλλοι πελάτες MCP | `npx -y sigelo-mcp@0.1.15`: [ρυθμίσεις](https://sigelo.io/frameworks.html) |
 | Κάθε πράκτορας με γραμμή εντολών | ναι, με Node.js 22.18 ή νεότερο |
 | Εφαρμογή ChatGPT, άλλοι βοηθοί μόνο για συνομιλία | όχι: δεν μπορούν να τρέξουν εργαλεία |
 
-Δεν έχετε πράκτορα στο κινητό ή έχετε μόνο την εφαρμογή ChatGPT; Χρησιμοποιήστε την εφαρμογή μας για [κινητά με Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), περιμένετε την εφαρμογή για Android ή δώστε αυτή τη σελίδα στον προγραμματιστή σας.
+Δεν έχετε πράκτορα στο κινητό ή έχετε μόνο την εφαρμογή ChatGPT; Χρησιμοποιήστε την εφαρμογή μας για [κινητά με Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), περιμένετε την εφαρμογή για Android ή δώστε αυτή τη σελίδα στον προγραμματιστή σας.
 
 ## Αντιγράψτε αυτό σε κάθε πράκτορα
 

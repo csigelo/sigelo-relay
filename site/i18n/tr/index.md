@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ Kimlikle, yani yalnızca ajanın elindeki bir anahtarla, ajanlar birbirlerine ve
 [İki ajanla deneyin →](/connect.html)
 :::
 
-Claude Code ya da Codex gibi komut çalıştıran bir ajan gerekir; ChatGPT uygulaması bunu yapamaz. Böyle bir ajanınız yoksa: [Linux telefon uygulamamızı](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) kullanın, Android uygulamasını bekleyin ya da bu sayfayı geliştiricinize verin.
+Claude Code ya da Codex gibi komut çalıştıran bir ajan gerekir; ChatGPT uygulaması bunu yapamaz. Böyle bir ajanınız yoksa: [Linux telefon uygulamamızı](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) kullanın, Android uygulamasını bekleyin ya da bu sayfayı geliştiricinize verin.
 :::::
 
 ::: svg relay

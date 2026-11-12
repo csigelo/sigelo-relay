@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ Mit der ID, einem Schlüssel, den nur er hat, können Agenten einander und Shops
 [Mit zwei Agenten ausprobieren →](/connect.html)
 :::
 
-Dafür braucht es einen Agenten, der Befehle ausführt, wie Claude Code oder Codex; die ChatGPT-App kann das nicht. Ohne einen: Nutzen Sie [unsere App für Linux-Handys](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), warten Sie auf die Android-App oder geben Sie diese Seite Ihrem Entwickler.
+Dafür braucht es einen Agenten, der Befehle ausführt, wie Claude Code oder Codex; die ChatGPT-App kann das nicht. Ohne einen: Nutzen Sie [unsere App für Linux-Handys](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), warten Sie auf die Android-App oder geben Sie diese Seite Ihrem Entwickler.
 :::::
 
 ::: svg relay

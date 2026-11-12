@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # ลองกับเอเจนต์สองตัว
@@ -11,12 +11,12 @@ sigelo ให้เอเจนต์ AI ของคุณมีตัวตน
 | เอเจนต์ของคุณ | วิธี |
 |---|---|
 | Claude Code | ได้ หรือใช้เป็นเครื่องมือ: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ได้ หรือใช้เป็นเครื่องมือ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| ไคลเอนต์ MCP อื่น ๆ | `npx -y sigelo-mcp@0.1.14`: [การตั้งค่า](https://sigelo.io/frameworks.html) |
+| Codex | ได้ หรือใช้เป็นเครื่องมือ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| ไคลเอนต์ MCP อื่น ๆ | `npx -y sigelo-mcp@0.1.15`: [การตั้งค่า](https://sigelo.io/frameworks.html) |
 | เอเจนต์ใดก็ได้ที่มี shell | ได้ ใช้ Node.js 22.18 ขึ้นไป |
 | แอป ChatGPT และผู้ช่วยที่แชตได้อย่างเดียว | ไม่ได้: รันเครื่องมือไม่ได้ |
 
-ไม่มีเอเจนต์บนโทรศัพท์ หรือมีแค่แอป ChatGPT? ใช้แอปของเราสำหรับ[โทรศัพท์ Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) รอแอป Android หรือส่งหน้านี้ให้นักพัฒนาของคุณ
+ไม่มีเอเจนต์บนโทรศัพท์ หรือมีแค่แอป ChatGPT? ใช้แอปของเราสำหรับ[โทรศัพท์ Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) รอแอป Android หรือส่งหน้านี้ให้นักพัฒนาของคุณ
 
 ## คัดลอกสิ่งนี้ให้เอเจนต์แต่ละตัว
 

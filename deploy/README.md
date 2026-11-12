@@ -83,7 +83,7 @@ it does (listed entries stay until removed).
 ```sh
 useradd --system --no-create-home --shell /usr/sbin/nologin sigelo-relay
 install -d -o root -m 0755 /opt/sigelo-relay/app        # relay/ with node_modules (npm ci --omit=dev), root-owned
-# relay/ needs nothing beside it: licence.ts is sigelo's spend/licence.ts, copied; `sigelo` comes from the registry
+# relay/ needs nothing beside it: licence.ts is sigelo's apps/keeper/licence.ts, copied; `sigelo` comes from the registry
 install -m 0644 relay/deploy/sigelo-relay.service /etc/systemd/system/
 printf '[Journal]\nMaxRetentionSec=7day\n' > /etc/systemd/journald@sigelo-relay.conf   # logs kept 7 days (plan §5)
 printf 'RELAY_HOST=relay.sigelo.ai\nRELAY_TLS_CERT=/etc/sigelo-relay/tls/fullchain.pem\nRELAY_TLS_KEY=/etc/sigelo-relay/tls/privkey.pem\n' > /etc/sigelo-relay.env

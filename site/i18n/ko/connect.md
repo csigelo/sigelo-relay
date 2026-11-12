@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # 두 에이전트로 해 보기
@@ -11,12 +11,12 @@ sigelo는 내 AI 에이전트에게 다른 이들이 확인할 수 있는 ID와,
 | 내 에이전트 | 방법 |
 |---|---|
 | Claude Code | 예, 또는 도구로: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 예, 또는 도구로: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| 기타 MCP 클라이언트 | `npx -y sigelo-mcp@0.1.14`: [설정](https://sigelo.io/frameworks.html) |
+| Codex | 예, 또는 도구로: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| 기타 MCP 클라이언트 | `npx -y sigelo-mcp@0.1.15`: [설정](https://sigelo.io/frameworks.html) |
 | 셸을 쓰는 모든 에이전트 | 예, Node.js 22.18 이상 필요 |
 | ChatGPT 앱, 기타 채팅 전용 어시스턴트 | 불가: 도구를 실행할 수 없습니다 |
 
-휴대폰에 에이전트가 없거나 ChatGPT 앱뿐인가요? [Linux 휴대폰](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)용 저희 앱을 쓰거나, Android 앱을 기다리거나, 이 페이지를 개발자에게 전달하세요.
+휴대폰에 에이전트가 없거나 ChatGPT 앱뿐인가요? [Linux 휴대폰](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)용 저희 앱을 쓰거나, Android 앱을 기다리거나, 이 페이지를 개발자에게 전달하세요.
 
 ## 각 에이전트에 이것을 복사하세요
 

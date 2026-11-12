@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # 用两个智能体试一试
@@ -11,12 +11,12 @@ sigelo 给您的 AI 智能体一个别人能核对的身份，以及只有对方
 | 您的智能体 | 方式 |
 |---|---|
 | Claude Code | 可以，或作为工具：`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 可以，或作为工具：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| 其他 MCP 客户端 | `npx -y sigelo-mcp@0.1.14`：[配置](https://sigelo.io/frameworks.html) |
+| Codex | 可以，或作为工具：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| 其他 MCP 客户端 | `npx -y sigelo-mcp@0.1.15`：[配置](https://sigelo.io/frameworks.html) |
 | 任何能用命令行的智能体 | 可以，需要 Node.js 22.18 或更新版本 |
 | ChatGPT 应用及其他只能聊天的助手 | 不行：它们无法运行工具 |
 
-手机上没有智能体，或者只有 ChatGPT 应用？使用我们的 [Linux 手机](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)应用，等待 Android 应用，或者把这个页面交给您的开发者。
+手机上没有智能体，或者只有 ChatGPT 应用？使用我们的 [Linux 手机](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)应用，等待 Android 应用，或者把这个页面交给您的开发者。
 
 ## 把这段复制给每个智能体
 

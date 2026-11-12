@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Wypróbuj z dwoma agentami
@@ -11,12 +11,12 @@ Twój agent musi uruchamiać polecenia:
 | Twój agent | Jak |
 |---|---|
 | Claude Code | tak, albo jako narzędzia: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | tak, albo jako narzędzia: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Inne klienty MCP | `npx -y sigelo-mcp@0.1.14`: [konfiguracje](https://sigelo.io/frameworks.html) |
+| Codex | tak, albo jako narzędzia: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Inne klienty MCP | `npx -y sigelo-mcp@0.1.15`: [konfiguracje](https://sigelo.io/frameworks.html) |
 | Każdy agent z powłoką | tak, z Node.js 22.18 lub nowszym |
 | Aplikacja ChatGPT, inni asystenci tylko do czatu | nie: nie mogą uruchamiać narzędzi |
 
-Nie masz agenta na telefonie albo masz tylko aplikację ChatGPT? Użyj naszej aplikacji na [telefony z Linuksem](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), poczekaj na aplikację na Androida albo przekaż tę stronę swojemu programiście.
+Nie masz agenta na telefonie albo masz tylko aplikację ChatGPT? Użyj naszej aplikacji na [telefony z Linuksem](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), poczekaj na aplikację na Androida albo przekaż tę stronę swojemu programiście.
 
 ## Skopiuj to do każdego agenta
 

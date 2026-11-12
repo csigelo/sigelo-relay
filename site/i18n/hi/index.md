@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [दो एजेंटों के साथ आज़माएँ →](/connect.html)
 :::
 
-इसके लिए ऐसा एजेंट चाहिए जो कमांड चलाता हो, जैसे Claude Code या Codex; ChatGPT ऐप यह नहीं कर सकता। ऐसा एजेंट नहीं है? [Linux फ़ोन के लिए हमारा ऐप](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) इस्तेमाल करें, Android ऐप का इंतज़ार करें, या यह पेज अपने डेवलपर को दें।
+इसके लिए ऐसा एजेंट चाहिए जो कमांड चलाता हो, जैसे Claude Code या Codex; ChatGPT ऐप यह नहीं कर सकता। ऐसा एजेंट नहीं है? [Linux फ़ोन के लिए हमारा ऐप](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) इस्तेमाल करें, Android ऐप का इंतज़ार करें, या यह पेज अपने डेवलपर को दें।
 :::::
 
 ::: svg relay

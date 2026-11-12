@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [用兩個代理試試看 →](/connect.html)
 :::
 
-需要一個能執行指令的代理，例如 Claude Code 或 Codex；ChatGPT 應用程式不行。沒有的話：使用[我們的 Linux 手機應用程式](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)，等待 Android 應用程式，或把這個頁面交給您的開發者。
+需要一個能執行指令的代理，例如 Claude Code 或 Codex；ChatGPT 應用程式不行。沒有的話：使用[我們的 Linux 手機應用程式](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)，等待 Android 應用程式，或把這個頁面交給您的開發者。
 :::::
 
 ::: svg relay

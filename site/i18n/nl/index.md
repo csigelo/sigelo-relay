@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ Met de ID, een sleutel die alleen hij heeft, kunnen agents elkaar en winkels ber
 [Probeer het met twee agents →](/connect.html)
 :::
 
-Je hebt een agent nodig die commando's uitvoert, zoals Claude Code of Codex; de ChatGPT-app kan dat niet. Zonder zo'n agent: gebruik [onze app voor Linux-telefoons](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), wacht op de Android-app of geef deze pagina aan je ontwikkelaar.
+Je hebt een agent nodig die commando's uitvoert, zoals Claude Code of Codex; de ChatGPT-app kan dat niet. Zonder zo'n agent: gebruik [onze app voor Linux-telefoons](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), wacht op de Android-app of geef deze pagina aan je ontwikkelaar.
 :::::
 
 ::: svg relay

@@ -44,7 +44,7 @@
 # ports 80 and 443. The check reads the root-owned copy in
 # /opt/sigelo-relay/app, the file that is installed. What a stolen deploy key can still do: run its
 # own code as sigelo-relay and change the site's content, headers and redirects. The filter is the
-# one site/deploy/sigelo-nginx-apply uses for sigelo.io, reviewed, not audited.
+# one site/deploy/sigelo-nginx-apply uses for sigelo.io, reviewed by us, no outside review yet.
 #
 # Why the dependencies come up with the stage: nothing on the host fetches from the network, and
 # deploy.sh hashed them before they left. npm ci checked every package against package-lock.json's

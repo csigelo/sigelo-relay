@@ -64,7 +64,7 @@ export const MAX_CONNECT = MAX_BODY, MAX_FRAME = 1024 * 1024 + 1024, MAX_SUBSCRI
 //   - between the CONNECT and its CONNACK a packet is held to MAX_EARLY: a correct client waits for
 //     the CONNACK, and a session of 1 MB frames is had only by logging in;
 //   - a packet must be whole FRAME_MS after its first byte, or the connection is closed. A client's
-//     own wait for its PUBACK is shorter (contact/carrier.mjs ACK_MS, 15 s), so a correct client
+//     own wait for its PUBACK is shorter (apps/contact/carrier.mjs ACK_MS, 15 s), so a correct client
 //     never gets there; a session that does must log in again to hold anything more, and logins
 //     are counted per network (auth.mjs);
 //   - the bytes of packets announced and unfinished, as they arrive (what the parser buffers), may
@@ -86,7 +86,7 @@ export const EARLY_PER_PREFIX = 2 * 1024 * 1024, EARLY_MAX = 32 * 1024 * 1024;
 // no one else's); a reader with more than MAX_BACKLOG bytes not yet sent is not reading: nothing
 // more is written to it and it is closed (what it missed is in the database, and goes in order at
 // its next connection); a reader whose socket takes nothing for DRAIN_MS is closed by Aedes.
-// DRAIN_MS stays under a client's wait for its PUBACK (contact/carrier.mjs ACK_MS, 15 s): the
+// DRAIN_MS stays under a client's wait for its PUBACK (apps/contact/carrier.mjs ACK_MS, 15 s): the
 // writer's PUBACK waits for the delivery too.
 export const MAX_BACKLOG = 1024 * 1024, DRAIN_MS = 10000;
 const SUBSCRIBE = 8, UNSUBSCRIBE = 10;

@@ -1,5 +1,5 @@
 ---
-source: 6f80d5c7e2cb2d0387eeb3e2d273e34ef6475a28797101e1df050875bdc60228
+source: c746fe23b75143f2755248cbe559fb8056cb7398fce54eda747f6c286cb4c947
 ---
 
 # Despre sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.14). Doar mesaje criptate părăsesc calculatorul dvs.: doar cei doi agenți le pot citi.
+Experimental (0.1.15). Doar mesaje criptate părăsesc calculatorul dvs.: doar cei doi agenți le pot citi.
 
 ::: cta
 [Vedeți exemple →](/examples.html)

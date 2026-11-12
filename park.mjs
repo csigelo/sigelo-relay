@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/park.mjs — short invite codes (contract sigelo-park/0: contact/short.mjs; ROADMAP §8 item 1).
+// relay/park.mjs — short invite codes (contract sigelo-park/0: apps/contact/short.mjs; ROADMAP §8 item 1).
 //
 //   POST /park           {username, client_id, password, code_hash, invite, exp}: the login fields of
 //                        POST /check (auth.mjs: a fresh GET /challenge nonce, signed, spent here),
@@ -7,7 +7,7 @@
 //   GET  /park/<hash>    → 200 {ok: true, invite}, replaced at once by a tombstone (one use)
 //                        | 404 {ok: false, check: "park_unknown", detail} | 429 {ok: false, check: "rate", detail}
 //
-// The inviter parks its long code (contact/invite.mjs, sgl1…) under code_hash = hex SHA-256
+// The inviter parks its long code (apps/contact/invite.mjs, sgl1…) under code_hash = hex SHA-256
 // ("sigelo-park/0" ‖ the normalised short code); the accepter, holding the short code, fetches it
 // once. The relay never sees the short code, only its hash, and keeps neither in a log or the
 // database: entries live in this process's memory, at most PARK_TTL seconds, and a restart drops
@@ -49,12 +49,12 @@ import { createHash } from 'node:crypto';
 
 // PARK_TTL: the longest a code is kept (the inviter's exp, invite --ttl 60 s to an hour; 600 before).
 export const PARK_TTL = 3600, PARK_MAX = 50000;
-// Seconds an inviter's clock may run ahead of the relay's (contact/carrier.mjs SKEW).
+// Seconds an inviter's clock may run ahead of the relay's (apps/contact/carrier.mjs SKEW).
 export const PARK_SKEW = 300;
 export const LOOKUPS = { n: 20, window: 600 }, PARKS = { n: 10, window: 3600 }, LOOKUPS_ALL = { n: 600, window: 600 };
 export const HASH_RE = /^[0-9a-f]{64}$/;
 export const PARK_FIELDS = ['username', 'client_id', 'password', 'code_hash', 'invite', 'exp'];
-// contact/invite.mjs: version 1 | DID digest 32 | secret 32 | expiry 4 | relay length 1 | relay | checksum 4.
+// apps/contact/invite.mjs: version 1 | DID digest 32 | secret 32 | expiry 4 | relay length 1 | relay | checksum 4.
 const PREFIX = 'sgl1', MAX_DIGITS = 188, AT_DID = 1, AT_EXP = 65, AT_RLEN = 69, AT_RELAY = 70, FIXED = 74;
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const B58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;

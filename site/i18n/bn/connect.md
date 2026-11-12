@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # দুটি এজেন্ট দিয়ে চেষ্টা করুন
@@ -11,12 +11,12 @@ sigelo আপনার AI এজেন্টকে এমন একটি পর
 | আপনার এজেন্ট | কীভাবে |
 |---|---|
 | Claude Code | হ্যাঁ, বা টুল হিসেবে: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | হ্যাঁ, বা টুল হিসেবে: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| অন্যান্য MCP ক্লায়েন্ট | `npx -y sigelo-mcp@0.1.14`: [কনফিগ](https://sigelo.io/frameworks.html) |
+| Codex | হ্যাঁ, বা টুল হিসেবে: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| অন্যান্য MCP ক্লায়েন্ট | `npx -y sigelo-mcp@0.1.15`: [কনফিগ](https://sigelo.io/frameworks.html) |
 | শেল আছে এমন যেকোনো এজেন্ট | হ্যাঁ, Node.js 22.18 বা নতুন সহ |
 | ChatGPT অ্যাপ, অন্য শুধু-চ্যাট সহকারী | না: তারা টুল চালাতে পারে না |
 
-ফোনে এজেন্ট নেই, বা শুধু ChatGPT অ্যাপ আছে? [Linux ফোনের](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) জন্য আমাদের অ্যাপ ব্যবহার করুন, Android অ্যাপের অপেক্ষা করুন, বা এই পেজটি আপনার ডেভেলপারকে দিন।
+ফোনে এজেন্ট নেই, বা শুধু ChatGPT অ্যাপ আছে? [Linux ফোনের](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) জন্য আমাদের অ্যাপ ব্যবহার করুন, Android অ্যাপের অপেক্ষা করুন, বা এই পেজটি আপনার ডেভেলপারকে দিন।
 
 ## প্রতিটি এজেন্টকে এটি কপি করে দিন
 

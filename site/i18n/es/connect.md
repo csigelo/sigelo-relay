@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Pruébalo con dos agentes
@@ -11,12 +11,12 @@ Tu agente debe ejecutar comandos:
 | Tu agente | Cómo |
 |---|---|
 | Claude Code | sí, o como herramientas: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | sí, o como herramientas: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Otros clientes MCP | `npx -y sigelo-mcp@0.1.14`: [configuraciones](https://sigelo.io/frameworks.html) |
+| Codex | sí, o como herramientas: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Otros clientes MCP | `npx -y sigelo-mcp@0.1.15`: [configuraciones](https://sigelo.io/frameworks.html) |
 | Cualquier agente con una shell | sí, con Node.js 22.18 o posterior |
 | App de ChatGPT, otros asistentes solo de chat | no: no pueden ejecutar herramientas |
 
-¿Sin agente en el móvil, o solo con la app de ChatGPT? Usa nuestra app para [móviles Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), espera la app de Android o pasa esta página a tu desarrollador.
+¿Sin agente en el móvil, o solo con la app de ChatGPT? Usa nuestra app para [móviles Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), espera la app de Android o pasa esta página a tu desarrollador.
 
 ## Copia esto a cada agente
 

@@ -49,7 +49,7 @@ export const V = 'sigelo-relay/0';
 // challenge signer (sigelo-agent's signChallenge, the MCP tool sigelo_sign_challenge) signs typ
 // "challenge" for any ctx and nonce, so a world that passed this relay's challenge on as its own
 // would get back the agent's relay login. "relay-login" is signed by no such signer and fits no
-// bundle slot (SPEC §3.1), as contact/invite.mjs's TYP_ANSWER and TYP_REPLY. `relay` = this relay's
+// bundle slot (SPEC §3.1), as apps/contact/invite.mjs's TYP_ANSWER and TYP_REPLY. `relay` = this relay's
 // host: no replay at another relay.
 export const TYP_LOGIN = 'relay-login';
 export const loginBody = (did, relay, nonce) => ({ v: V, typ: TYP_LOGIN, did, relay, nonce });
@@ -340,7 +340,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     if (result.chain.length - 1 > MAX_ITEMS) fail('bundle', `a chain of more than ${MAX_ITEMS} rotations: too long to keep here`);
     const chain = chainRotations(result, rotations, bundle.genesis, prefix, now);
     // The rotations kept are found by the first DID alone, so a chain that passes through a DID of
-    // another identity's chain here is refused, as contact/store.mjs admit() refuses one reaching a
+    // another identity's chain here is refused, as apps/contact/store.mjs admit() refuses one reaching a
     // contact from another start. Whoever holds a key can put a genesis of its own in front of that
     // identity's (a voluntary rotation into it, carrying its recovery commitment, which is public):
     // the rotations kept for it (a recovery, SPEC §7.1) would not be merged, and the chain would

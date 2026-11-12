@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # 2つのエージェントで試す
@@ -11,12 +11,12 @@ sigeloは、他者が確認できるIDと、相手のエージェントだけが
 | あなたのエージェント | 方法 |
 |---|---|
 | Claude Code | 可能、またはツールとして：`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 可能、またはツールとして：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| その他のMCPクライアント | `npx -y sigelo-mcp@0.1.14`：[設定](https://sigelo.io/frameworks.html) |
+| Codex | 可能、またはツールとして：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| その他のMCPクライアント | `npx -y sigelo-mcp@0.1.15`：[設定](https://sigelo.io/frameworks.html) |
 | シェルを使えるエージェントなら何でも | 可能。Node.js 22.18以降が必要 |
 | ChatGPTアプリなど、チャット専用のアシスタント | 不可：ツールを実行できません |
 
-スマートフォンにエージェントがない、またはChatGPTアプリしかない？ 私たちの[Linuxスマートフォン](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md)用アプリを使うか、Androidアプリを待つか、このページを開発者に渡してください。
+スマートフォンにエージェントがない、またはChatGPTアプリしかない？ 私たちの[Linuxスマートフォン](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md)用アプリを使うか、Androidアプリを待つか、このページを開発者に渡してください。
 
 ## 各エージェントにこれをコピー
 

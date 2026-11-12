@@ -451,7 +451,7 @@ export const VALUES = Object.freeze({
 });
 // Retention is how long a queued message waits, not how long its reader may stay away: the relay
 // queues only to a mailbox its reader holds (no_reader otherwise), and the client claims about a
-// week ahead on every tier (contact/carrier.mjs AHEAD, which relay/site/test.mjs checks in the
+// week ahead on every tier (apps/contact/carrier.mjs AHEAD, which relay/site/test.mjs checks in the
 // private tree). pro.md says so under its table; index.json and relay.json carry this sentence.
 export const QUEUE_NOTE = 'retention_days is how long a queued message waits. The relay queues only to mailboxes its reader holds, and clients claim them about a week ahead on every tier, so a reader away longer takes no new messages until it is back (senders get no_reader; sigelo-agent keeps them and sends them again).';
 // {{name}} → its value; an unknown name stops the build (a typo would ship a raw token).
@@ -670,7 +670,7 @@ export function recordRefusals(site = SITE) {
 // the contact verbs only from CONTACT_VERBS_SINCE, through the sigelo-contact package it depends on;
 // launchRefusals reads the source, which is ahead of npm until the release is published. So --launch,
 // once everything else passes, reads the registry (no credentials): the latest sigelo-agent at least
-// this tree's (adapters/moadim/package.json) and depending on sigelo-contact, the latest sigelo-contact
+// this tree's (apps/agent/package.json) and depending on sigelo-contact, the latest sigelo-contact
 // at least that too, each published by NPM_USER (SECURITY.md names no other publisher). get(name) → the
 // package's registry document, null when npm has none, or throws. → { why: [why …], npm: { name: version } }.
 export const NPM_REGISTRY = 'https://registry.npmjs.org';
@@ -686,7 +686,7 @@ export async function npmPackument(name) {
   return res.json();
 }
 export async function registryRefusals({ root = ROOT, get = npmPackument } = {}) {
-  const want = JSON.parse(readFileSync(join(root, 'adapters', 'moadim', 'package.json'), 'utf8')).version;
+  const want = JSON.parse(readFileSync(join(root, 'apps', 'agent', 'package.json'), 'utf8')).version;
   const why = [], npm = {};
   let docs;
   try { docs = await Promise.all(LAUNCH_PACKAGES.map((n) => get(n))); } catch (e) {
@@ -706,10 +706,10 @@ export function launchRefusals(root = ROOT) {
   const why = [];
   const security = join(root, 'SECURITY.md'), io = join(root, 'site', 'deploy', 'nginx.conf');
   const ioBuild = join(root, 'site', 'build.mjs'), ioOfficial = join(root, 'site', 'src', 'official.mjs');
-  const verbs = join(root, 'adapters', 'moadim', 'sigelo-agent-contact.ts');
+  const verbs = join(root, 'apps', 'agent', 'sigelo-agent-contact.ts');
   const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : null);
   if (isPrivateTree(root)) {
-    for (const [f, label] of [[security, 'SECURITY.md'], [io, 'site/deploy/nginx.conf'], [ioOfficial, 'site/src/official.mjs'], [verbs, 'adapters/moadim/sigelo-agent-contact.ts']]) {
+    for (const [f, label] of [[security, 'SECURITY.md'], [io, 'site/deploy/nginx.conf'], [ioOfficial, 'site/src/official.mjs'], [verbs, 'apps/agent/sigelo-agent-contact.ts']]) {
       if (!existsSync(f)) why.push(`${label}: not found beside relay/ in the private tree`);
     }
   }
@@ -734,7 +734,7 @@ export function launchRefusals(root = ROOT) {
   }
   const v = read(verbs);
   if (v !== null && /not in the npm release of sigelo-agent/.test(v)) {
-    why.push('adapters/moadim/sigelo-agent-contact.ts: the contact verbs still refuse when sigelo-agent is installed from npm, so connect.md\'s `npm i -g sigelo-agent` then `sigelo-agent invite` fails');
+    why.push('apps/agent/sigelo-agent-contact.ts: the contact verbs still refuse when sigelo-agent is installed from npm, so connect.md\'s `npm i -g sigelo-agent` then `sigelo-agent invite` fails');
   }
   const n = read(io);
   if (n !== null) {
@@ -1224,7 +1224,7 @@ const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths
 function llmsTxt(version, pending, lit = []) {
   return `# sigelo relay
 
-> Your agent talks to another agent, yours or someone else's: a person says an 8-character code; then they message end to end; the relay cannot read it, but sees who talks to whom. Login by sigelo identity, no accounts. Messages wait while one is offline. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), unaudited.
+> Your agent talks to another, yours or someone else's: a person says an 8-character code; then they message end-to-end; the relay cannot read it, but sees who talks to whom. Login by sigelo identity, no accounts. Messages wait while one is offline. MQTT 3.1.1 over TLS at ${HOST}:8883. Not A2A. New (v${version}), no outside review yet.
 
 ${MOTTO} ${DISCLOSURE}
 
@@ -1376,7 +1376,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
   // index.json (SEO spec §4.5, §4.10) and relay.json (plan §11): data only, generated from the same
   // constants as the pages.
   // groups: the chat groups one identity makes (max) and the members of each, the maker included
-  // (contact/group.mjs counts them; each login is told its own: allowance.mjs's "tier" notice).
+  // (apps/contact/group.mjs counts them; each login is told its own: allowance.mjs's "tier" notice).
   const tierJson = (t, per, storage) => ({ per, messages_day: t.msgsDay, retention_days: t.retentionDays, max_message_bytes: t.maxMessage, storage_bytes: storage, mailboxes: t.mailboxes,
     groups: { max: t.groups, members: t.groupMembers }, support: support(t) });
   const tiers = {
@@ -1534,7 +1534,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const r = build({ final: process.argv.includes('--final') });
     console.log(`relay/site/dist: ${r.pages} pages (+ .md twins)${r.languages.length ? `, ${TRANSLATED.length} in ${r.languages.join(', ')}` : ''} and the agent files, from ${r.built.commit?.slice(0, 12) ?? 'no git commit'}${r.built.dirty ? ' (relay/ has uncommitted changes)' : ''}`);
     const label = { DRAFT: "DRAFT — the terms' draft mark (terms.md)", SELLER: 'SELLER — the name the pages give the seller (relay/site/build.mjs)',
-      'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in spend/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
+      'vendor DID': 'vendor DID — the relay pins licence.ts\'s placeholder and pro.md does not say Pro is coming soon: set RELAY_VENDOR_DID, or the real DID at D1 (in apps/keeper/licence.ts, copied to relay/licence.ts), or put VENDOR_PENDING back on pro.md' };
     for (const f of r.stale) console.log(`warning: stale: ${f}: its URL serves the English page until refreshed (node relay/site/build.mjs --stale)`);
     if (r.dark.length && !r.disclosed) console.log(`dark: ${r.dark.join(', ')} in relay/site/${DIST_NAME}-${DARK}/ only (DISCLOSED false: not in dist, never deployed)`);
     console.log(r.registry.ok ? `relays.json: ${r.registry.relays} relays, signed` : `warning: not served: ${r.registry.why}`);

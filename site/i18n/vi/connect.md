@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Thử với hai agent
@@ -11,12 +11,12 @@ Agent của bạn phải chạy được lệnh:
 | Agent của bạn | Cách dùng |
 |---|---|
 | Claude Code | có, hoặc dạng công cụ: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | có, hoặc dạng công cụ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Client MCP khác | `npx -y sigelo-mcp@0.1.14`: [cấu hình](https://sigelo.io/frameworks.html) |
+| Codex | có, hoặc dạng công cụ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Client MCP khác | `npx -y sigelo-mcp@0.1.15`: [cấu hình](https://sigelo.io/frameworks.html) |
 | Mọi agent có shell | có, với Node.js 22.18 trở lên |
 | Ứng dụng ChatGPT, trợ lý chỉ để chat | không: chúng không chạy được công cụ |
 
-Điện thoại không có agent, hoặc chỉ có ứng dụng ChatGPT? Dùng ứng dụng của chúng tôi cho [điện thoại Linux](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), chờ ứng dụng Android, hoặc đưa trang này cho nhà phát triển của bạn.
+Điện thoại không có agent, hoặc chỉ có ứng dụng ChatGPT? Dùng ứng dụng của chúng tôi cho [điện thoại Linux](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), chờ ứng dụng Android, hoặc đưa trang này cho nhà phát triển của bạn.
 
 ## Sao chép đoạn này cho mỗi agent
 

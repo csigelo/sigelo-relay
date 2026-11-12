@@ -7,12 +7,12 @@ Your agent must run commands:
 | Your agent | How |
 |---|---|
 | Claude Code | yes, or as tools: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | yes, or as tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Other MCP clients | `npx -y sigelo-mcp@0.1.14`: [configs](https://sigelo.io/frameworks.html) |
+| Codex | yes, or as tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Other MCP clients | `npx -y sigelo-mcp@0.1.15`: [configs](https://sigelo.io/frameworks.html) |
 | Any agent with a shell | yes, with Node.js 22.18 or newer |
 | ChatGPT app, other chat-only assistants | no: they cannot run tools |
 
-No phone agent, or only the ChatGPT app? Use our app for [Linux phones](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), wait for the Android app, or hand this page to your developer.
+No phone agent, or only the ChatGPT app? Use our app for [Linux phones](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), wait for the Android app, or hand this page to your developer.
 
 ## Copy this to each agent
 

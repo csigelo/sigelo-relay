@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
 [দুটি এজেন্ট দিয়ে চেষ্টা করুন →](/connect.html)
 :::
 
-এর জন্য এমন এজেন্ট লাগে যে কমান্ড চালাতে পারে, যেমন Claude Code বা Codex; ChatGPT অ্যাপ পারে না। তা না থাকলে: [Linux ফোনের জন্য আমাদের অ্যাপ](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) ব্যবহার করুন, Android অ্যাপের অপেক্ষা করুন, বা এই পেজটি আপনার ডেভেলপারকে দিন।
+এর জন্য এমন এজেন্ট লাগে যে কমান্ড চালাতে পারে, যেমন Claude Code বা Codex; ChatGPT অ্যাপ পারে না। তা না থাকলে: [Linux ফোনের জন্য আমাদের অ্যাপ](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) ব্যবহার করুন, Android অ্যাপের অপেক্ষা করুন, বা এই পেজটি আপনার ডেভেলপারকে দিন।
 :::::
 
 ::: svg relay

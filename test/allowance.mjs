@@ -92,7 +92,7 @@ const mqttConnect = ({ username, clientId: cid, password: pw, will }, r = relay,
   c.once('close', () => resolve({ error: new Error('closed') }));
 });
 // Log in as id. opts: bundle (an object, or false for none), pow (true: solve it; a string: send
-// it; false: none; absent: as contact/carrier.mjs does, a proof at the identity's first login to
+// it; false: none; absent: as apps/contact/carrier.mjs does, a proof at the identity's first login to
 // that relay, none after), local (the client's loopback address), ip (the X-Real-IP of its GET
 // /challenge: the network its proof counts against), will (the CONNECT's).
 const proved = new Set();   // relay port + original DID of each login with a proof that connected
@@ -394,7 +394,7 @@ const erin = identity('erin');
     `3 new identities from one /24 log in; then its GET /challenge states ${closed}, and a 4th with a good proof on a challenge issued before is refused "pow" (${why4.detail})`);
   // Review finding, recorded rather than changed (relay/README.md says it): the cap closes the
   // network to a licensed operator's new agents too. GET /challenge states 64 before the relay sees
-  // any bundle, and contact/carrier.mjs searches no more than 26 bits; here the agent holds a
+  // any bundle, and apps/contact/carrier.mjs searches no more than 26 bits; here the agent holds a
   // challenge from before the cap, a good proof and its operator attestation, and is refused all
   // the same. An exemption is the orchestrator's decision (this suite pins what is shipped).
   const cA = { username: agC.did, clientId: clientId(agC), password: password(agC, chA.challenge, { bundle: withVouch(agC, opC, vouch(opC, agC)), extra: { pow: solve(HOST, agC.original, chA.challenge.nonce, chA.pow_bits) } }) };
@@ -738,7 +738,7 @@ let annC, benC, K;
   ok(reissued.ok && tierOf(ann).pool === POOL, 'the vendor reissues the operator\'s licence under its new key: ann pools again, without a new login');
   // The licence check alone, as the issuer's own test runs it: the same rules without the store.
   const alone = checkRelayLicence(licence(opy, { vendor: vendor2 }), now, { vendor: vendor.original });
-  ok(alone.ok === true && alone.chain.chain.length === 2 && checkRelayLicence(licence(opy), now, { vendor: other.original }).why.includes('not the vendor'), 'checkRelayLicence: the vendor rules of spend/licence.ts with ctx sigelo-relay');
+  ok(alone.ok === true && alone.chain.chain.length === 2 && checkRelayLicence(licence(opy), now, { vendor: other.original }).why.includes('not the vendor'), 'checkRelayLicence: the vendor rules of apps/keeper/licence.ts with ctx sigelo-relay');
 }
 
 // ================================================================ a reissue ends a term early
@@ -823,7 +823,7 @@ const fresh = (name, extra = {}) => {
   ok(await until(() => got(rc, X).length === 4), 'a burst of 4 publishes (configured: 4, then 2 a second) is delivered');
   sc.box.length = 0;
   // Every refusal named, each with its PUBLISH's packet id: a publish dropped without a notice was
-  // acknowledged all the same, and its writer reported it sent (contact/carrier.mjs).
+  // acknowledged all the same, and its writer reported it sent (apps/contact/carrier.mjs).
   const ids = [];
   wire = await wireOf(sc, async () => {
     for (let i = 0; i < 2; i++) await new Promise((resolve) => sc.publish(X, randomBytes(300), { qos: 1 }, (e, p) => { ids.push(p?.messageId); resolve(); }));
@@ -1772,8 +1772,8 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ gift codes (gifts.mjs, POST /gift, operator.mjs gift)
 // A relay of its own, with its own clock, so months can pass and it can restart. Codes are made
-// here as the offline issuer makes them, and hashed as contact/short.mjs giftHash does,
-// spelled out (relay/ is published without contact/): SHA-256("sigelo-gift/0" ‖ 8 characters).
+// here as the offline issuer makes them, and hashed as apps/contact/short.mjs giftHash does,
+// spelled out (relay/ is published without apps/contact/): SHA-256("sigelo-gift/0" ‖ 8 characters).
 {
   const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
   const code = () => [...randomBytes(8)].map((b) => ALPHA[b & 31]).join('');

@@ -1,5 +1,5 @@
 ---
-source: 04fb4414ab8867fc65fd92b0f9b5b4504a04de8edcba70a91499643427f0c1fe
+source: ca65b7714cdebe2baf176b02ef9bfcbe7bdae5d55fcb790819743d75a6bbfc19
 ---
 
 ::::: hero
@@ -15,7 +15,7 @@ Tunnisteen, avaimen jota vain agentilla itsellään on, avulla agentit voivat l�
 [Kokeile kahdella agentilla →](/connect.html)
 :::
 
-Tarvitset agentin, joka ajaa komentoja, kuten Claude Code tai Codex; ChatGPT-sovellus ei pysty siihen. Ilman sellaista: käytä [Linux-puhelinsovellustamme](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md), odota Android-sovellusta tai anna tämä sivu kehittäjällesi.
+Tarvitset agentin, joka ajaa komentoja, kuten Claude Code tai Codex; ChatGPT-sovellus ei pysty siihen. Ilman sellaista: käytä [Linux-puhelinsovellustamme](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md), odota Android-sovellusta tai anna tämä sivu kehittäjällesi.
 :::::
 
 ::: svg relay

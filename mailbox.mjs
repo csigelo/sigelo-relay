@@ -7,7 +7,7 @@
 //               it or at the retention limit (7 days, to the start of that UTC day: db.mjs keeps
 //               times by the day). Idle mailboxes go after retention + 7 days.
 //               No new claim while the disk is 70 % full; the claims held keep working.
-//   i/<32 hex>  an invite topic (contact/invite.mjs: answer and reply): claimed the same way,
+//   i/<32 hex>  an invite topic (apps/contact/invite.mjs: answer and reply): claimed the same way,
 //               holds 4 messages / 64 KB, dies at the first answer its reader acknowledges or 7
 //               days after the claim, to the end of that UTC day (the longest invite expiry: the
 //               relay cannot read the code's).
@@ -18,7 +18,7 @@
 //               PUBLISH's notice also carries its packet id (`id`). The notice is written before the
 //               PUBACK, SUBACK or UNSUBACK of the request it refuses: a client keeps one request in
 //               flight and takes a notice that comes before the acknowledgement as that request's
-//               refusal (contact/carrier.mjs). Aedes writes a QoS 0 publish in a setImmediate and an
+//               refusal (apps/contact/carrier.mjs). Aedes writes a QoS 0 publish in a setImmediate and an
 //               acknowledgement as soon as the hook calls back, so a hook that refuses calls back once
 //               its notice is written (notify).
 //
@@ -29,7 +29,7 @@
 // Order: a reader gets its messages in the order they were stored (seq), across its topics. At a
 // connect Aedes restores the subscriptions before it streams the queue, and forwards a live publish
 // at once: one published while the queue went out overtook it, by hundreds of messages, and an
-// envelope more than 64 behind the one opened fails out_of_order (contact/envelope.mjs WINDOW). So
+// envelope more than 64 behind the one opened fails out_of_order (apps/contact/envelope.mjs WINDOW). So
 // while a connection's queue goes out, live publishes to that reader are held (they stay stored),
 // and the queue is read again, for what is not yet sent on this connection, until a read finds
 // nothing; from then on live publishes are forwarded, except one the queue has already sent.
@@ -52,7 +52,7 @@ export const RETENTION = 7 * DAY, IDLE_GRACE = 7 * DAY, ACCOUNT_KEEP = 30 * DAY;
 // stalled it 605 ms before the CONNACK), and a restore draws on no brake but the login rate (30 a
 // minute per network): an agent may hold its whole pool's 16,384 mailboxes, and it replayed them
 // at every CONNECT. 256 cost about what the login itself does. The rest stay claimed: a client
-// subscribes to the topics it wants (contact/carrier.mjs does at every connection), on the
+// subscribes to the topics it wants (apps/contact/carrier.mjs does at every connection), on the
 // subscribe brake, and a topic it holds takes no claim token.
 export const RESTORE_MAX = 256;
 // The rows one read of a reader's queue reads at most (queued). Read whole, a queue of 64,000 was

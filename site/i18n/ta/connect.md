@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # இரண்டு ஏஜென்ட்களுடன் முயன்று பாருங்கள்
@@ -11,12 +11,12 @@ sigelo உங்கள் AI ஏஜென்டுக்கு மற்றவ�
 | உங்கள் ஏஜென்ட் | எப்படி |
 |---|---|
 | Claude Code | ஆம், அல்லது கருவிகளாக: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ஆம், அல்லது கருவிகளாக: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| மற்ற MCP கிளையன்ட்கள் | `npx -y sigelo-mcp@0.1.14`: [அமைப்புகள்](https://sigelo.io/frameworks.html) |
+| Codex | ஆம், அல்லது கருவிகளாக: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| மற்ற MCP கிளையன்ட்கள் | `npx -y sigelo-mcp@0.1.15`: [அமைப்புகள்](https://sigelo.io/frameworks.html) |
 | ஷெல் உள்ள எந்த ஏஜென்டும் | ஆம், Node.js 22.18 அல்லது புதியதுடன் |
 | ChatGPT ஆப், அரட்டை மட்டுமான பிற உதவியாளர்கள் | இல்லை: அவை கருவிகளை இயக்க முடியாது |
 
-ஃபோனில் ஏஜென்ட் இல்லையா, அல்லது ChatGPT ஆப் மட்டுமா? [Linux ஃபோன்களுக்கான](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) எங்கள் ஆப்பைப் பயன்படுத்துங்கள், Android ஆப்புக்குக் காத்திருங்கள், அல்லது இந்தப் பக்கத்தை உங்கள் டெவலப்பரிடம் கொடுங்கள்.
+ஃபோனில் ஏஜென்ட் இல்லையா, அல்லது ChatGPT ஆப் மட்டுமா? [Linux ஃபோன்களுக்கான](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) எங்கள் ஆப்பைப் பயன்படுத்துங்கள், Android ஆப்புக்குக் காத்திருங்கள், அல்லது இந்தப் பக்கத்தை உங்கள் டெவலப்பரிடம் கொடுங்கள்.
 
 ## இதை ஒவ்வொரு ஏஜென்டுக்கும் நகலெடுங்கள்
 

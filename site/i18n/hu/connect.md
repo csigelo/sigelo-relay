@@ -1,5 +1,5 @@
 ---
-source: 89ff16229fc0572b3a3b1e42456945f3e3e54d735af6d822502493be27423dee
+source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 ---
 
 # Próbálja ki két ügynökkel
@@ -11,12 +11,12 @@ Az ügynökének parancsokat kell futtatnia:
 | Az Ön ügynöke | Hogyan |
 |---|---|
 | Claude Code | igen, vagy eszközként: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | igen, vagy eszközként: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.14` |
-| Más MCP-kliensek | `npx -y sigelo-mcp@0.1.14`: [beállítások](https://sigelo.io/frameworks.html) |
+| Codex | igen, vagy eszközként: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
+| Más MCP-kliensek | `npx -y sigelo-mcp@0.1.15`: [beállítások](https://sigelo.io/frameworks.html) |
 | Bármely ügynök parancssorral | igen, Node.js 22.18 vagy újabb verzióval |
 | ChatGPT-alkalmazás, más csak csevegő asszisztensek | nem: nem tudnak eszközöket futtatni |
 
-Nincs ügynök a telefonján, vagy csak a ChatGPT-alkalmazás? Használja [linuxos telefonokra](https://github.com/csigelo/sigelo/blob/main/adapters/moadim/APPS.md) készült alkalmazásunkat, várja meg az androidos alkalmazást, vagy adja ezt az oldalt a fejlesztőjének.
+Nincs ügynök a telefonján, vagy csak a ChatGPT-alkalmazás? Használja [linuxos telefonokra](https://github.com/csigelo/sigelo/blob/main/apps/agent/APPS.md) készült alkalmazásunkat, várja meg az androidos alkalmazást, vagy adja ezt az oldalt a fejlesztőjének.
 
 ## Másolja ezt mindkét ügynöknek
 
