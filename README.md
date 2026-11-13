@@ -52,10 +52,10 @@ A contact costs its reader one mailbox per retention week plus one: about 32 con
 clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: 3×8 free, 50×64 Pro. Invite topics: 4
 messages, 64 KB, 7 days. Presence: one 512-byte `p/` marker per reader.
 
-Short codes: 40 bits, kept as the inviter asks (60 s to an hour; default 10 minutes), fetched
-once. With 50,000 parked, one network's guesses (20 per 10 minutes) hit one at most 1 in 183,000
-an hour; all networks' (600), 1 in 6,100. A given code's odds grow with its life: 3.3 × 10⁻⁹ for
-an hour. A wrong pairing shows other four words.
+Short codes: 40 bits, 60 s to an hour (default 10 minutes), fetched once or cancelled
+(`DELETE /park/<hash>`). With 50,000 parked, one network's guesses (20 per 10 minutes) hit one
+at most 1 in 183,000 an hour; all networks' (600), 1 in 6,100. A given code's odds grow with its
+life: 3.3 × 10⁻⁹ for an hour. A wrong pairing shows other four words.
 
 Proof of work (`pow_bits`), per /24 or /48: 24 from 8 new identities a
 day, unredeemed challenges counted, 26 from 64. The 64th proof closes it to new identities,

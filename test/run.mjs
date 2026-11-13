@@ -1612,6 +1612,63 @@ function walStates(r, name, tag = name) {
   const probe = await parkAt(bob, { code_hash: hashOf('AAAAAAAA'), invite: longCode(bob), exp: now + 600 }, '100.65.0.1');
   ok(first.json.ok === true && probe.status === 429 && probe.json.check === 'rate', `POST /park is charged against the lookup brakes: a network's second park past its share is rate, not park_taken (${probe.status} ${JSON.stringify(probe.json)})`);
   await pr5.close();
+  // "Cancel this code": DELETE /park/<hash>, the login fields in a JSON body, the parker only.
+  const pr6 = await startRelay({ ...cfg, db: join(dir, 'park-cancel.db') });
+  let net6 = 0;
+  const ip6 = () => `10.200.${++net6}.7`;
+  const login6 = async (id, ip, signer = id) => { const { challenge } = await getChallenge(id.did, pr6, ip); return { username: id.did, client_id: clientId(id), password: password(signer, challenge) }; };
+  const park6 = async (id, fields, ip = ip6()) => {
+    const res = await fetch(`${base(pr6)}/park`, { method: 'POST', headers: realIp(ip), body: JSON.stringify({ ...await login6(id, ip), ...fields }) });
+    return { status: res.status, json: await res.json() };
+  };
+  const cancel6 = async (id, hash, { ip = ip6(), signer = id, body } = {}) => {
+    const res = await fetch(`${base(pr6)}/park/${hash}`, { method: 'DELETE', headers: realIp(ip), body: body ?? JSON.stringify(await login6(id, ip, signer)) });
+    return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') };
+  };
+  const get6 = async (hash, ip = ip6()) => { const res = await fetch(`${base(pr6)}/park/${hash}`, { headers: realIp(ip) }); return { status: res.status, json: await res.json(), after: res.headers.get('retry-after') }; };
+  const hC = hashOf('CANCEL01');
+  ok((await park6(alice, { code_hash: hC, invite: longCode(alice), exp: now + 600 })).json.ok === true && pr6.park.size() === 1, 'cancel: alice parks a code');
+  const notHers = await cancel6(bob, hC), nobody = await cancel6(alice, hashOf('CANCEL99')), junkHash = await cancel6(alice, 'K7F3-Q9ZP');
+  ok([notHers, nobody, junkHash].every((x) => x.status === 404 && x.json.ok === false && x.json.check === 'park_unknown') && JSON.stringify(notHers.json) === JSON.stringify(nobody.json) && JSON.stringify(nobody.json) === JSON.stringify(junkHash.json) && pr6.park.size() === 1,
+    `DELETE /park/<hash> by another identity: park_unknown (404), word for word as a hash nobody parked and a malformed one, and the code stays (${JSON.stringify(notHers.json)})`);
+  const forgedCancel = await cancel6(alice, hC, { signer: bob });
+  ok(forgedCancel.status === 200 && forgedCancel.json.ok === false && ['bundle', 'sig'].includes(forgedCancel.json.check) && pr6.park.size() === 1, `a cancel whose login is signed by another key cancels nothing (${forgedCancel.json.check})`);
+  const bad = await cancel6(alice, hC, { body: JSON.stringify({ username: alice.did }) });
+  ok(bad.status === 400 && /username, client_id, password/.test(bad.json.error), `a cancel without the three login fields: 400 (${bad.json.error})`);
+  const cancelled = await cancel6(alice, hC), gone = await get6(hC);
+  ok(cancelled.status === 200 && JSON.stringify(cancelled.json) === '{"ok":true}' && pr6.park.size() === 0 && gone.status === 404 && gone.json.check === 'park_unknown',
+    `DELETE /park/<hash> by its parker: 200 {ok: true}, and the next GET is park_unknown (${JSON.stringify(cancelled.json)}; ${gone.status})`);
+  const twice = await cancel6(alice, hC);
+  ok(twice.status === 200 && twice.json.ok === true, 'a second cancel of the same code: 200 {ok: true} (idempotent)');
+  const reparkC = await park6(bob, { code_hash: hC, invite: longCode(bob), exp: now + 600 }), reparkA = await park6(alice, { code_hash: hC, invite: longCode(alice), exp: now + 600 });
+  ok(reparkC.json.check === 'park_taken' && reparkA.json.check === 'park_taken' && (await get6(hC)).status === 404, `a cancelled hash is a tombstone until its exp: nobody parks under it (park_taken), its GET stays park_unknown (${reparkC.json.check})`);
+  now += 600; pr6.sweep();
+  ok((await park6(bob, { code_hash: hC, invite: longCode(bob), exp: now + 600 })).json.ok === true, 'at the cancelled code\'s exp its hash is free again');
+  ok((await cancel6(alice, hC)).status === 404, 'and the earlier parker cannot cancel the new entry: park_unknown');
+  // A code already used (fetched): its parker's cancel is 200, nothing changes for the accepter.
+  const hU = hashOf('CANCEL02');
+  await park6(alice, { code_hash: hU, invite: longCode(alice), exp: now + 600 });
+  const used = await get6(hU), usedCancel = await cancel6(alice, hU);
+  ok(used.status === 200 && usedCancel.status === 200 && usedCancel.json.ok === true, 'a cancel of a code already fetched: 200 {ok: true}');
+  // An expired code: park_unknown, as a GET.
+  const hE = hashOf('CANCEL03');
+  await park6(alice, { code_hash: hE, invite: longCode(alice), exp: now + 60 });
+  now += 60;
+  ok((await cancel6(alice, hE)).status === 404, 'a cancel at the code\'s exp: park_unknown');
+  // Brakes: a cancel is a lookup, charged before the body and the login, with GET /park/<hash>.
+  const cs = [];
+  for (let i = 0; i < 20; i++) cs.push((await cancel6(alice, hC, { ip: '192.0.2.150', body: '{}' })).status);
+  const c21 = await cancel6(alice, hC, { ip: '192.0.2.151' }), g21 = await get6(hashOf('CANCEL04'), '192.0.2.152');
+  ok(cs.every((x) => x === 400) && c21.status === 429 && c21.json.check === 'rate' && c21.after === String(600 - (now % 600)) && g21.status === 429,
+    `DELETE /park/<hash>: 20 per 10 minutes per /24 with the GETs, counted before the body and the login: the 21st rate (429), and a GET from that network too (${cs.slice(0, 3).join()}…; ${c21.status} ${c21.after}; ${g21.status})`);
+  await pr6.close();
+  // The relay-wide lookup ceiling too: a network's share 1 of 8, its second cancel is rate.
+  const pr7 = await startRelay({ ...cfg, db: join(dir, 'park-cancel-all.db'), park: { lookupsAll: { n: 8, window: 600 } } });
+  const del7 = async (ip) => (await fetch(`${base(pr7)}/park/${hashOf('CANCEL05')}`, { method: 'DELETE', headers: realIp(ip), body: '{}' })).status;
+  const d1 = await del7('100.66.0.1'), d2 = await del7('100.66.0.2');
+  ok(d1 === 400 && d2 === 429, `DELETE /park/<hash> is charged against LOOKUPS_ALL: past a network's share, rate (${d1}, ${d2})`);
+  await pr7.close();
+  now -= 660;
   now -= 661;
 }
 

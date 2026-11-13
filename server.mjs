@@ -10,8 +10,8 @@
 //     RELAY_TLS_CERT, RELAY_TLS_KEY   PEM paths: MQTT over TLS on RELAY_TLS_PORT (default 8883),
 //                       all interfaces; SIGHUP re-reads both files (certbot's deploy hook)
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
-//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park and GET /park/<hash> (short
-//                       invite codes: park.mjs), POST /licence, POST /gift (gift codes:
+//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park, GET and DELETE /park/<hash>
+//                       (short invite codes: park.mjs), POST /licence, POST /gift (gift codes:
 //                       gifts.mjs), GET /stats (counts only: stats.mjs) and MQTT over WebSocket
 //                       (an upgrade at /mqtt, subprotocol mqtt) on 127.0.0.1 for nginx (default
 //                       8791). Each takes the client's address from X-Real-IP, believed from

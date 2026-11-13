@@ -6,7 +6,16 @@
 //                        then what to park → {ok: true, exp} | {ok: false, check, detail}
 //   GET  /park/<hash>    → 200 {ok: true, invite}, replaced at once by a tombstone (one use)
 //                        | 404 {ok: false, check: "park_unknown", detail} | 429 {ok: false, check: "rate", detail}
+//   DELETE /park/<hash>  {username, client_id, password}: the same login fields (a fresh nonce, spent
+//                        here), and only the identity that parked the entry → 200 {ok: true}, the entry
+//                        a tombstone until its exp (again, or already fetched: 200 {ok: true})
+//                        | 404 {ok: false, check: "park_unknown", detail}: unknown, expired, or parked
+//                        by another identity, one answer for all three (no oracle about whose it is)
+//                        | 200 {ok: false, check, detail}: the login failed, as POST /park | 429 rate
 //
+// DELETE with a JSON body: Node's http and fetch, and nginx's proxy_pass (relay/deploy/nginx.conf,
+// location ^~ /park/), carry it as POST's, so there is no second route. A client that never
+// cancels sees nothing new: GET and POST are unchanged, and the label stays sigelo-park/0.
 // The inviter parks its long code (apps/contact/invite.mjs, sgl1…) under code_hash = hex SHA-256
 // ("sigelo-park/0" ‖ the normalised short code); the accepter, holding the short code, fetches it
 // once. The relay never sees the short code, only its hash, and keeps neither in a log or the
@@ -45,6 +54,12 @@
 // it is taken, so auth.mjs charges it as a lookup too (the brakes above), never a free oracle.
 // A miss and a hit cost one Map lookup each; a malformed hash looks up the empty string, so every
 // miss takes one path.
+//
+// Cancel ("Cancel this code", apps/contact/carrier.mjs cancelInvite): the entry keeps its parker's
+// account (auth.mjs: the hash of the original DID, so a key rotation in between still cancels) and
+// a cancel by that account turns it into the tombstone a fetch leaves, until the original exp: a
+// code holder cannot park its own long code under the hash (park_taken, as above). It reaches the
+// hash, so it is charged as a lookup before the body or the login (LOOKUPS, then LOOKUPS_ALL).
 import { createHash } from 'node:crypto';
 
 // PARK_TTL: the longest a code is kept (the inviter's exp, invite --ttl 60 s to an hour; 600 before).
@@ -54,6 +69,8 @@ export const PARK_SKEW = 300;
 export const LOOKUPS = { n: 20, window: 600 }, PARKS = { n: 10, window: 3600 }, LOOKUPS_ALL = { n: 600, window: 600 };
 export const HASH_RE = /^[0-9a-f]{64}$/;
 export const PARK_FIELDS = ['username', 'client_id', 'password', 'code_hash', 'invite', 'exp'];
+// DELETE /park/<hash>: the login fields only, the hash in the path.
+export const CANCEL_FIELDS = ['username', 'client_id', 'password'];
 // apps/contact/invite.mjs: version 1 | DID digest 32 | secret 32 | expiry 4 | relay length 1 | relay | checksum 4.
 const PREFIX = 'sgl1', MAX_DIGITS = 188, AT_DID = 1, AT_EXP = 65, AT_RLEN = 69, AT_RELAY = 70, FIXED = 74;
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -118,9 +135,9 @@ export function readInvite(text) {
 
 const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{1,63}$/.test(d) ? b58decode(d.slice('did:sigelo:z'.length)) : null);
 
-/** host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600). → { charge, park, fetch, sweep, size }. */
+/** host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600). → { charge, park, fetch, cancel, sweep, size }. */
 export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL, ttl = PARK_TTL }) {
-  const held = new Map();    // code_hash → { invite, exp }; invite null: a tombstone (fetched)
+  const held = new Map();    // code_hash → { invite, exp, owner }; invite null: a tombstone (fetched or cancelled)
   const rates = new Map();   // kind + prefix → { window, n }
   const all = fairCeiling(lookupsAll);   // lookups from every network
 
@@ -151,8 +168,8 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     return n;
   }
 
-  // did: the current DID the login proved. → { exp }.
-  function park({ code_hash, invite, exp }, did, now = clock()) {
+  // did: the current DID the login proved; owner: its account (auth.mjs), who may cancel. → { exp }.
+  function park({ code_hash, invite, exp }, did, now = clock(), owner = did) {
     if (typeof code_hash !== 'string' || !HASH_RE.test(code_hash)) fail('park', 'code_hash: 64 lowercase hex digits, SHA-256("sigelo-park/0" ‖ the normalised short code)');
     if (!Number.isSafeInteger(exp) || exp <= now || exp > now + ttl + PARK_SKEW) fail('park', `exp: Unix seconds, within ${ttl} s from now (the code's life: 60 s to ${ttl === PARK_TTL ? 'an hour' : `${ttl} s`})`);
     const code = readInvite(invite), mine = didDigest(did);
@@ -164,7 +181,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (held.size >= max && sweep(now) === 0 && !was) fail('park_full', `${max} short codes are parked on this relay, its most: try again in a few minutes, or use the long code (invite --long)`);
     // Kept PARK_TTL at most by this relay's clock, whatever the inviter's says.
     const until = Math.min(exp, now + ttl);
-    held.set(code_hash, { invite, exp: until });
+    held.set(code_hash, { invite, exp: until, owner });
     return { exp: until };
   }
 
@@ -176,11 +193,23 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (e === undefined) return null;
     if (e.exp <= now) { held.delete(k); return null; }
     if (e.invite === null) return null;
-    held.set(k, { invite: null, exp: e.exp });
+    held.set(k, { invite: null, exp: e.exp, owner: e.owner });
     return e.invite;
+  }
+
+  // owner: the account the login proved. → true: a tombstone now (or already one); false: unknown,
+  // expired, malformed, or another's (one answer).
+  function cancel(hash, owner, now = clock()) {
+    const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
+    const e = held.get(k);
+    if (e === undefined) return false;
+    if (e.exp <= now) { held.delete(k); return false; }
+    if (owner === undefined || e.owner !== owner) return false;
+    if (e.invite !== null) held.set(k, { invite: null, exp: e.exp, owner });
+    return true;
   }
 
   // size: the codes parked, not yet fetched (tombstones count against max, not here).
   const size = () => { let n = 0; for (const e of held.values()) if (e.invite !== null) n++; return n; };
-  return { charge, park, fetch, sweep, size };
+  return { charge, park, fetch, cancel, sweep, size };
 }

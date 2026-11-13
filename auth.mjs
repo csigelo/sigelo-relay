@@ -10,7 +10,7 @@
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
 //   POST /check   {username, client_id, password, clean?} → {ok: true} | {ok: false, check, detail}
 //   GET  /stats   the relay's counts, no identifier (stats.mjs)
-//   POST /park, GET /park/<hash>   short invite codes (park.mjs), when a parking is given
+//   POST /park, GET /park/<hash>, DELETE /park/<hash>   short invite codes (park.mjs), when a parking is given
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
 //   POST /gift    {username, client_id, password, code_hash}: a gift code redeemed by the operator
@@ -41,7 +41,7 @@ import { createServer } from 'node:http';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { canonicalize, commitmentOf, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
-import { PARK_FIELDS, ParkError } from './park.mjs';
+import { CANCEL_FIELDS, PARK_FIELDS, ParkError } from './park.mjs';
 import { GIFT_FIELDS } from './gifts.mjs';
 
 export const V = 'sigelo-relay/0';
@@ -611,7 +611,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity parks after its first login with proof of work: run inbox, then invite again' });
         // park_taken says whether a hash is held: charged as a lookup, its network's and the relay-wide.
         try { park.charge('lookup', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
-        try { return send(200, { ok: true, ...park.park(body, body.username, clock()) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
+        try { return send(200, { ok: true, ...park.park(body, body.username, clock(), o.session.account) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
       }
       // Gift codes (gifts.mjs): the brake first, before the body or the login, as /park. Neither the
       // hash nor anything of the code is logged, nor quoted in a refusal.
@@ -641,9 +641,25 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour)' });
         return send(200, { ok: true, invite });
       }
+      // Cancel a parked code (park.mjs): reaching the hash is a lookup, charged before the body or the
+      // login; then the parker's login; a miss and another's entry answer the same 404.
+      if (park && req.method === 'DELETE' && url.pathname.startsWith('/park/')) {
+        const prefix = httpPrefix(req);
+        try { park.charge('lookup', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
+        let body;
+        try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
+        if (!isObject(body) || Object.keys(body).length !== CANCEL_FIELDS.length || !CANCEL_FIELDS.every((k) => typeof body[k] === 'string')) {
+          throw httpFail(400, `want {${CANCEL_FIELDS.join(', ')}}: POST /check's login fields, the hash in the path`);
+        }
+        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        if (o.check === 'internal') throw httpFail(503, o.detail);
+        if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
+        if (park.cancel(url.pathname.slice('/park/'.length), o.session.account, clock())) return send(200, { ok: true });
+        return send(404, { ok: false, check: 'park_unknown', detail: 'no code of yours parked under this hash: mistyped, or expired' });
+      }
       // MQTT over WebSocket is an upgrade (server.mjs); a plain request gets here.
       if (url.pathname === WS_PATH) throw httpFail(426, 'MQTT over WebSocket: send a WebSocket upgrade with subprotocol mqtt');
-      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>' : ''}`);
+      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>, DELETE /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);
       send(e.status ?? 500, { error: e.status ? e.message : 'internal error' }, e.retryAfter);
