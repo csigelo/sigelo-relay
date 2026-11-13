@@ -10,7 +10,7 @@
 //     RELAY_TLS_CERT, RELAY_TLS_KEY   PEM paths: MQTT over TLS on RELAY_TLS_PORT (default 8883),
 //                       all interfaces; SIGHUP re-reads both files (certbot's deploy hook)
 //     RELAY_TCP_PORT    plain MQTT on 127.0.0.1 only (tests; unset = off)
-//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park, GET and DELETE /park/<hash>
+//     RELAY_HTTP_PORT   GET /challenge, POST /check, POST /park, GET, POST and DELETE /park/<hash>
 //                       (short invite codes: park.mjs), POST /licence, POST /gift (gift codes:
 //                       gifts.mjs), GET /stats (counts only: stats.mjs) and MQTT over WebSocket
 //                       (an upgrade at /mqtt, subprotocol mqtt) on 127.0.0.1 for nginx (default
@@ -274,15 +274,16 @@ export async function startRelay(cfg) {
   const closed = cfg.closed ? closedRelay({ db, host: cfg.host, operators: cfg.closed }) : null;
   // GET /stats: counts only (stats.mjs), and a closed relay's operators; sessions read from auth once it exists.
   const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy, closed: closed?.operators ?? null });
-  // Short invite codes, in memory only (park.mjs); cfg.park: its limits, for tests.
-  const park = parking({ host: cfg.host, clock, ...cfg.park });
+  // Short invite codes, in memory only, and public codes, in the database (park.mjs); cfg.park:
+  // its limits, for tests. Pro: an account that draws on a licence (allowance.mjs pool).
+  const park = parking({ host: cfg.host, clock, db, pro: (account, now) => (policy.pool?.(account, now) ?? null) !== null, ...cfg.park });
   a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
     unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park, closed });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
   // Presence markers (presence.mjs): the relay's offline goes to the readers through the broker.
   const presence = presenceMarkers({ clock, publish: (packet) => broker.publish(packet, () => {}), policy });
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence, guard: park.guard });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -398,6 +399,7 @@ export async function startRelay(cfg) {
     http.closeAllConnections();
     await Promise.all([stopped, closeServer(http)]);
     m.close();
+    park.sweep(clock());   // the public codes' counts of the day to the file (park.mjs)
     db.close();
   }
   return { broker, db, auth: a, mailboxes: m, presence, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };

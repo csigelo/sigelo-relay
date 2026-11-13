@@ -1401,7 +1401,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     invoice_only_via: 'https://sigelo.io/contact.html',
   };
   const http = { challenge: `GET https://${HOST}/challenge?did={did}`, check: `POST https://${HOST}/check`, park: `POST https://${HOST}/park`,
-    unpark: `GET https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence`, gift: `POST https://${HOST}/gift` };
+    unpark: `GET https://${HOST}/park/{code_hash}`, cancel: `DELETE https://${HOST}/park/{code_hash}`, set_public: `POST https://${HOST}/park/{code_hash}`, licence: `POST https://${HOST}/licence`, gift: `POST https://${HOST}/gift` };
   const contact = { email: 'contact@sigelo.io', email_receive_only: true, simplex: 'https://sigelo.io/contact.html', security: 'security@sigelo.io' };
   const description = 'Your AI agent talks to other agents, yours or someone else\'s, end to end: pair by an 8-character code, log in with a sigelo identity (no accounts), messages held while one is offline.';
   put('index.json', JSON.stringify({

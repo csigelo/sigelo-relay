@@ -60,7 +60,24 @@
 // a cancel by that account turns it into the tombstone a fetch leaves, until the original exp: a
 // code holder cannot park its own long code under the hash (park_taken, as above). It reaches the
 // hash, so it is charged as a lookup before the body or the login (LOOKUPS, then LOOKUPS_ALL).
-import { createHash } from 'node:crypto';
+//
+// Public codes (contract sigelo-public/0, design/public-invite.md): a long code of version 2 (sgl2…)
+// parked by POST /park with an optional `cap`, under SHA-256("sigelo-public/0" ‖ the PUB code), by
+// an identity on Pro only (public_pro), at most PUBLIC_PER_ACCOUNT live per account (public_full),
+// for up to PUBLIC_TTL_MAX. Its answer topic, an ordinary mailbox m/<32 hex> = HKDF-SHA256(the
+// code's secret, no salt, "sigelo-public/0 answer topic", 16), must be claimed by the parker first
+// (public_topic): a joiner holds the secret too. Kept in SQLite (table public_codes, a row per code,
+// WITHOUT ROWID, rebuilt in key order by the sweep), so it survives a restart: the long code names
+// its inviter's DID, which the relay stores nowhere else in the clear; here the inviter publishes
+// it. GET /park/<hash> of a live public code hands it out without spending it, charged to a brake
+// of its own (PUBLIC_FETCHES per network, PUBLIC_FETCHES_ALL relay-wide), never LOOKUPS: the hash
+// is public, so it guesses nothing; any other hash is charged as before, so no free oracle. A
+// paused one answers 409 public_paused. POST /park/<hash> {login, paused?, cap?} sets either, the
+// parker only. DELETE /park/<hash> leaves a tombstone row until its exp. The mailbox's publishes go
+// through `guard` (mailbox.mjs): revoked or expired (public_revoked), paused (public_paused), the
+// day's cap reached (public_cap), one answer per account per code per UTC day (public_once). The
+// day's count is kept in memory and written by the sweep each minute.
+import { createHash, hkdfSync } from 'node:crypto';
 
 // PARK_TTL: the longest a code is kept (the inviter's exp, invite --ttl 60 s to an hour; 600 before).
 export const PARK_TTL = 3600, PARK_MAX = 50000;
@@ -71,8 +88,30 @@ export const HASH_RE = /^[0-9a-f]{64}$/;
 export const PARK_FIELDS = ['username', 'client_id', 'password', 'code_hash', 'invite', 'exp'];
 // DELETE /park/<hash>: the login fields only, the hash in the path.
 export const CANCEL_FIELDS = ['username', 'client_id', 'password'];
+// Public codes (the header): a year at most, 3 per account, 50 answers a day unless set (1 to 500).
+export const PUBLIC_V = 'sigelo-public/0', PUBLIC_TTL_MAX = 366 * 86400, PUBLIC_PER_ACCOUNT = 3, PUBLIC_CAP = 50, PUBLIC_CAP_MAX = 500;
+export const PUBLIC_FETCHES = { n: 60, window: 600 }, PUBLIC_FETCHES_ALL = { n: 6000, window: 600 };
+export const PUBLIC_ANSWER_LABEL = 'sigelo-public/0 answer topic';
+// POST /park/<hash>: the login fields, then paused and/or cap.
+export const SET_FIELDS = ['username', 'client_id', 'password'], SET_OPTIONAL = ['paused', 'cap'];
+const DAY = 86400;
+const PUBLIC_SCHEMA = `
+CREATE TABLE IF NOT EXISTS public_codes (
+  code_hash TEXT PRIMARY KEY,           -- hex SHA-256("sigelo-public/0" ‖ the PUB code)
+  invite    TEXT,                       -- the long code (sgl2…), as its inviter publishes it; NULL: revoked (a tombstone until exp)
+  owner     TEXT NOT NULL,              -- the parker's account (auth.mjs), who may set and revoke
+  topic     TEXT NOT NULL,              -- its answer topic, m/<32 hex>
+  exp       INTEGER NOT NULL,           -- the end of the UTC day it ends on
+  paused    INTEGER NOT NULL DEFAULT 0,
+  cap       INTEGER NOT NULL,           -- answers a UTC day
+  day       INTEGER NOT NULL DEFAULT 0, -- the UTC day (unix seconds / 86400) that n counts
+  n         INTEGER NOT NULL DEFAULT 0  -- answers taken that day
+) STRICT, WITHOUT ROWID;
+`;
+/** The answer topic of a public code from its 32-byte secret: m/ + hex HKDF-SHA256(secret, no salt, PUBLIC_ANSWER_LABEL, 16). */
+export const publicTopic = (secret) => 'm/' + Buffer.from(hkdfSync('sha256', secret, Buffer.alloc(0), PUBLIC_ANSWER_LABEL, 16)).toString('hex');
 // apps/contact/invite.mjs: version 1 | DID digest 32 | secret 32 | expiry 4 | relay length 1 | relay | checksum 4.
-const PREFIX = 'sgl1', MAX_DIGITS = 188, AT_DID = 1, AT_EXP = 65, AT_RLEN = 69, AT_RELAY = 70, FIXED = 74;
+const MAX_DIGITS = 188, AT_DID = 1, AT_EXP = 65, AT_RLEN = 69, AT_RELAY = 70, FIXED = 74;
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const B58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
 
@@ -120,40 +159,76 @@ function b58decode(s) {
   return Buffer.from([...new Array(zeros).fill(0), ...out.reverse()]);
 }
 
-/** The long code's inviter DID digest, relay and expiry, or throws park. */
-export function readInvite(text) {
-  if (typeof text !== 'string' || !text.startsWith(PREFIX)) fail('park', 'invite: not a long code (sgl1…)');
-  const digits = text.slice(PREFIX.length);
-  if (digits.length === 0 || digits.length > MAX_DIGITS || !B58_RE.test(digits)) fail('park', 'invite: not a long code (sgl1…)');
+/** The long code's inviter DID digest, secret, relay and expiry, or throws park. version: 1 (a short code's), 2 (a public code's). */
+export function readInvite(text, version = 1) {
+  const prefix = `sgl${version}`;
+  if (typeof text !== 'string' || !text.startsWith(prefix)) fail('park', `invite: not a long code (${prefix}…)`);
+  const digits = text.slice(prefix.length);
+  if (digits.length === 0 || digits.length > MAX_DIGITS || !B58_RE.test(digits)) fail('park', `invite: not a long code (${prefix}…)`);
   const b = b58decode(digits);
   if (b.length < FIXED + 1) fail('park', 'invite: too short');
   const sum = createHash('sha256').update(b.subarray(0, b.length - 4)).digest();
   if (!sum.subarray(0, 4).equals(b.subarray(b.length - 4))) fail('park', 'invite: checksum');
-  if (b[0] !== 1 || b.length !== FIXED + b[AT_RLEN]) fail('park', 'invite: not a version 1 code');
-  return { digest: b.subarray(AT_DID, AT_DID + 32), exp: b.readUInt32BE(AT_EXP), relay: b.subarray(AT_RELAY, AT_RELAY + b[AT_RLEN]).toString('latin1') };
+  if (b[0] !== version || b.length !== FIXED + b[AT_RLEN]) fail('park', `invite: not a version ${version} code${version === 1 ? '' : ' (sgl2…, a public code)'}`);
+  return { version: b[0], digest: b.subarray(AT_DID, AT_DID + 32), secret: b.subarray(AT_DID + 32, AT_EXP), exp: b.readUInt32BE(AT_EXP), relay: b.subarray(AT_RELAY, AT_RELAY + b[AT_RLEN]).toString('latin1') };
 }
 
 const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{1,63}$/.test(d) ? b58decode(d.slice('did:sigelo:z'.length)) : null);
 
-/** host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600). → { charge, park, fetch, cancel, sweep, size }. */
-export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL, ttl = PARK_TTL }) {
+/**
+ * host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600).
+ * db: relay/db.mjs, for public codes (none: POST /park refuses them); pro(account, now): whether the
+ * account draws on a Pro licence (allowance.mjs pool); claimOf(topic): db.mjs claim.
+ * → { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics }.
+ */
+export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL, ttl = PARK_TTL,
+  db = null, pro = () => false, publicFetches = PUBLIC_FETCHES, publicFetchesAll = PUBLIC_FETCHES_ALL, perAccount = PUBLIC_PER_ACCOUNT }) {
   const held = new Map();    // code_hash → { invite, exp, owner }; invite null: a tombstone (fetched or cancelled)
   const rates = new Map();   // kind + prefix → { window, n }
   const all = fairCeiling(lookupsAll);   // lookups from every network
+  const allPublic = fairCeiling(publicFetchesAll);   // public-code fetches from every network
+  const rules = { lookup: lookups, park: parks, public: publicFetches };
+  // Public codes: code_hash → { invite, owner, topic, exp, paused, cap, day, n, dirty }, and topic → code_hash;
+  // once: code_hash → Set of the accounts answered today (memory only).
+  const pub = new Map(), byTopic = new Map(), once = new Map();
+  let q = null;
+  if (db) {
+    db.rebuild(PUBLIC_SCHEMA, ['public_codes']);
+    db.keepSorted(PUBLIC_SCHEMA, ['public_codes']);
+    const p = (sql) => db.raw.prepare(sql);
+    q = {
+      all: p('SELECT * FROM public_codes'),
+      put: p('INSERT OR REPLACE INTO public_codes (code_hash, invite, owner, topic, exp, paused, cap, day, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+      state: p('UPDATE public_codes SET invite = ?, paused = ?, cap = ? WHERE code_hash = ?'),
+      count: p('UPDATE public_codes SET day = ?, n = ? WHERE code_hash = ?'),
+      drop: p('DELETE FROM public_codes WHERE code_hash = ?'),
+    };
+    for (const r of q.all.all()) {
+      pub.set(r.code_hash, { invite: r.invite, owner: r.owner, topic: r.topic, exp: r.exp, paused: r.paused === 1, cap: r.cap, day: r.day, n: r.n, dirty: false });
+      byTopic.set(r.topic, r.code_hash);
+    }
+  }
+  const write = (fn) => db.settle(() => db.tx(fn));
 
-  // Fixed windows per prefix, as auth.mjs charge. → throws rate.
+  // Fixed windows per prefix, as auth.mjs charge. kind: lookup, park, public. → throws rate.
   function charge(kind, prefix, now) {
-    const rule = kind === 'lookup' ? lookups : parks, w = Math.floor(now / rule.window), k = `${kind} ${prefix}`;
+    const rule = rules[kind], w = Math.floor(now / rule.window), k = `${kind} ${prefix}`;
     let r = rates.get(k);
     if (!r || r.window !== w) {
-      if (rates.size > 100000) for (const [p, x] of rates) if (x.window !== Math.floor(now / (p.startsWith('lookup ') ? lookups : parks).window)) rates.delete(p);
+      if (rates.size > 100000) for (const [p, x] of rates) if (x.window !== Math.floor(now / rules[p.slice(0, p.indexOf(' '))].window)) rates.delete(p);
       r = { window: w, n: 0 };
       rates.set(k, r);
     }
     if (++r.n > rule.n) {
       rated(w, rule.window, now, kind === 'lookup'
         ? `more than ${rule.n} short-code lookups from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`
-        : `more than ${rule.n} short codes parked from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`);
+        : kind === 'public' ? `more than ${rule.n} public-code lookups from this network in ${rule.window / 60} minutes: wait, or use the sgl2 code`
+          : `more than ${rule.n} short codes parked from this network in ${rule.window / 60} minutes: wait, or use the long code (invite --long)`);
+    }
+    if (kind === 'public') {
+      const o = allPublic(prefix, now);
+      if (o !== undefined) rated(o.w, o.window, now, `more public-code lookups on this relay than it serves in ${o.window / 60} minutes: wait, or use the sgl2 code`);
+      return;
     }
     if (kind !== 'lookup') return;
     const o = all(prefix, now);
@@ -162,22 +237,66 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
       : `more than ${lookupsAll.n} short-code lookups on this relay in ${o.window / 60} minutes: wait, or use the long code (invite --long)`);
   }
 
+  // Public codes: expired rows go, and the day's counts are written (the header).
   function sweep(now = clock()) {
     let n = 0;
     for (const [h, e] of held) if (e.exp <= now) { held.delete(h); n++; }
+    if (db) {
+      const gone = [...pub].filter(([, e]) => e.exp <= now), dirty = [...pub].filter(([, e]) => e.dirty && e.exp > now);
+      if (gone.length || dirty.length) {
+        db.tx(() => {
+          for (const [h, e] of gone) { q.drop.run(h); pub.delete(h); byTopic.delete(e.topic); once.delete(h); }
+          for (const [h, e] of dirty) { q.count.run(e.day, e.n, h); e.dirty = false; }
+        });
+      }
+      const today = Math.floor(now / DAY);
+      for (const [h, e] of pub) if (e.day !== today) once.delete(h);
+    }
     return n;
   }
 
-  // did: the current DID the login proved; owner: its account (auth.mjs), who may cancel. → { exp }.
-  function park({ code_hash, invite, exp }, did, now = clock(), owner = did) {
+  const isCap = (c) => Number.isSafeInteger(c) && c >= 1 && c <= PUBLIC_CAP_MAX;
+  // A public code (the header). claimOf(topic): who holds its answer topic. → { exp, public: true, cap, topic }.
+  function parkPublic({ code_hash, invite, exp, cap = PUBLIC_CAP }, did, now, owner, claimOf) {
+    if (!db) fail('park', 'invite: this relay takes no public codes (sgl2…)');
+    if (!pro(owner, now)) fail('public_pro', 'a public code comes with Pro (one allowance for all your agents: sigelo.io/pro.html); this identity holds no Pro on this relay');
+    if (!isCap(cap)) fail('park', `cap: answers a day, 1 to ${PUBLIC_CAP_MAX}`);
+    if (!Number.isSafeInteger(exp) || exp <= now || exp > now + PUBLIC_TTL_MAX + PARK_SKEW) fail('park', `exp: Unix seconds, within ${PUBLIC_TTL_MAX} s (a year) from now`);
+    const code = readInvite(invite, 2), mine = didDigest(did);
+    if (code.relay !== host) fail('park', `invite: names ${JSON.stringify(code.relay)}, not this relay`);
+    if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
+    if (exp > code.exp) fail('park', 'exp: after the invite\'s own expiry');
+    const was = held.get(code_hash), had = pub.get(code_hash);
+    if ((was && was.exp > now) || (had && had.exp > now)) fail('park_taken', 'a code is parked under this hash: make another');
+    let mineLive = 0;
+    for (const e of pub.values()) if (e.owner === owner && e.invite !== null && e.exp > now) mineLive++;
+    if (mineLive >= perAccount) fail('public_full', `this identity has ${perAccount} public codes on this relay, its most: revoke one first`);
+    const topic = publicTopic(code.secret);
+    if (claimOf(topic)?.account !== owner) fail('public_topic', 'claim the code\'s answer topic before parking it (a joiner holds its secret too)');
+    // Kept to the end of its UTC day, at most a year by this relay's clock.
+    const until = Math.floor((Math.min(exp, now + PUBLIC_TTL_MAX) + DAY - 1) / DAY) * DAY;
+    if (had) byTopic.delete(had.topic);
+    write(() => q.put.run(code_hash, invite, owner, topic, until, 0, cap, 0, 0));
+    pub.set(code_hash, { invite, owner, topic, exp: until, paused: false, cap, day: 0, n: 0, dirty: false });
+    byTopic.set(topic, code_hash);
+    once.delete(code_hash);
+    return { exp: until, public: true, cap, topic };
+  }
+
+  // did: the current DID the login proved; owner: its account (auth.mjs), who may cancel. A long code
+  // of version 2 is a public code (parkPublic). → { exp }.
+  function park(body, did, now = clock(), owner = did, claimOf = () => undefined) {
+    const { code_hash, invite, exp } = body;
     if (typeof code_hash !== 'string' || !HASH_RE.test(code_hash)) fail('park', 'code_hash: 64 lowercase hex digits, SHA-256("sigelo-park/0" ‖ the normalised short code)');
+    if (typeof invite === 'string' && invite.startsWith('sgl2')) return parkPublic(body, did, now, owner, claimOf);
+    if (Object.hasOwn(body, 'cap')) fail('park', 'cap: only with a public code (sgl2…)');
     if (!Number.isSafeInteger(exp) || exp <= now || exp > now + ttl + PARK_SKEW) fail('park', `exp: Unix seconds, within ${ttl} s from now (the code's life: 60 s to ${ttl === PARK_TTL ? 'an hour' : `${ttl} s`})`);
     const code = readInvite(invite), mine = didDigest(did);
     if (code.relay !== host) fail('park', `invite: names ${JSON.stringify(code.relay)}, not this relay`);
     if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
     if (exp > code.exp) fail('park', 'exp: after the invite\'s own expiry');
     const was = held.get(code_hash);
-    if (was && was.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
+    if ((was && was.exp > now) || pub.get(code_hash)?.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
     if (held.size >= max && sweep(now) === 0 && !was) fail('park_full', `${max} short codes are parked on this relay, its most: try again in a few minutes, or use the long code (invite --long)`);
     // Kept PARK_TTL at most by this relay's clock, whatever the inviter's says.
     const until = Math.min(exp, now + ttl);
@@ -189,6 +308,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // (unknown, fetched, expired, malformed).
   function fetch(hash, now = clock()) {
     const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
+    if (pub.has(k)) return null;
     const e = held.get(k);
     if (e === undefined) return null;
     if (e.exp <= now) { held.delete(k); return null; }
@@ -201,6 +321,12 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // expired, malformed, or another's (one answer).
   function cancel(hash, owner, now = clock()) {
     const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
+    const p = pub.get(k);
+    if (p !== undefined) {
+      if (p.exp <= now || owner === undefined || p.owner !== owner) return false;
+      if (p.invite !== null) { write(() => q.state.run(null, p.paused ? 1 : 0, p.cap, k)); p.invite = null; }
+      return true;
+    }
     const e = held.get(k);
     if (e === undefined) return false;
     if (e.exp <= now) { held.delete(k); return false; }
@@ -209,7 +335,55 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     return true;
   }
 
-  // size: the codes parked, not yet fetched (tombstones count against max, not here).
+  // A public code under this hash: null (none: a short code's hash, or nothing), { gone: true }
+  // (revoked or expired), or { invite, paused, exp, cap }. Read before any brake (auth.mjs): the
+  // hash is public, so it says nothing a guesser wants.
+  function publicOf(hash, now = clock()) {
+    const e = typeof hash === 'string' ? pub.get(hash) : undefined;
+    if (e === undefined) return null;
+    if (e.invite === null || e.exp <= now) return { gone: true };
+    return { invite: e.invite, paused: e.paused, exp: e.exp, cap: e.cap };
+  }
+
+  // The parker sets paused and/or cap. → { paused, cap } | null (unknown, revoked, expired, another's: one answer).
+  function set(hash, owner, { paused, cap }, now = clock()) {
+    if (paused !== undefined && typeof paused !== 'boolean') fail('park', 'paused: true or false');
+    if (cap !== undefined && !isCap(cap)) fail('park', `cap: answers a day, 1 to ${PUBLIC_CAP_MAX}`);
+    const e = typeof hash === 'string' ? pub.get(hash) : undefined;
+    if (e === undefined || e.invite === null || e.exp <= now || owner === undefined || e.owner !== owner) return null;
+    const p = paused ?? e.paused, c = cap ?? e.cap;
+    write(() => q.state.run(e.invite, p ? 1 : 0, c, hash));
+    e.paused = p; e.cap = c;
+    return { paused: p, cap: c };
+  }
+
+  // mailbox.mjs: a publish to `topic` by `account`. check → undefined (not a public code's topic, or
+  // taken) or { code, detail }; count, once it is stored.
+  const guard = {
+    check(topic, account, now = clock()) {
+      const h = byTopic.get(topic);
+      if (h === undefined) return undefined;
+      const e = pub.get(h), today = Math.floor(now / DAY);
+      if (e.invite === null || e.exp <= now) return { code: 'public_revoked', detail: 'this public code was revoked or has ended: ask its owner for its new one' };
+      if (e.paused) return { code: 'public_paused', detail: 'this public code is paused by its owner: try again later' };
+      if (e.day === today && e.n >= e.cap) return { code: 'public_cap', detail: `this public code took its ${e.cap} new chats today: try again after 00:00 UTC` };
+      if (once.get(h)?.has(account) && e.day === today) return { code: 'public_once', detail: 'this identity answered this public code today already: one a day' };
+      return undefined;
+    },
+    count(topic, account, now = clock()) {
+      const h = byTopic.get(topic);
+      if (h === undefined) return;
+      const e = pub.get(h), today = Math.floor(now / DAY);
+      if (e.day !== today) { e.day = today; e.n = 0; once.delete(h); }
+      e.n++; e.dirty = true;
+      let s = once.get(h);
+      if (!s) { s = new Set(); once.set(h, s); }
+      s.add(account);
+    },
+  };
+
+  // size: the codes parked, not yet fetched (tombstones count against max, not here). publics: the public codes held, live or not.
   const size = () => { let n = 0; for (const e of held.values()) if (e.invite !== null) n++; return n; };
-  return { charge, park, fetch, cancel, sweep, size };
+  const publics = () => pub.size;
+  return { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics };
 }

@@ -78,8 +78,10 @@ const live = (c, now) => c !== undefined && !c.dead && (c.expires === null || c.
 // kept; idle mailboxes go retention + 7 days after their last use, never sooner than 14 days),
 // tidy (its own retention, run inside the sweep's transaction: db.mjs sweep) and accountKept
 // (an idle account the sweep keeps). members: closed.mjs's on a closed relay (its kept and tidy too).
-// presence: presence.mjs's, for p/ topics (none: they are refused as any other topic).
-export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null }) {
+// presence: presence.mjs's, for p/ topics (none: they are refused as any other topic). guard:
+// park.mjs's, for the mailboxes of public codes: check(topic, writer, now) refuses (paused, cap,
+// revoked, one a day), count(topic, writer, now) once a publish is stored.
+export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null, guard = null }) {
   // The row each queued message is stored in, by its payload Buffer. Aedes wraps a publish in new
   // packet objects on its way to the reader but always passes the payload Buffer along by
   // reference, and the payload is all the relay knows a message by; a weak key frees with it.
@@ -143,6 +145,8 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     // one fails epoch_unknown at the reader) while it believed each one sent. Only a writer who
     // knows the topic learns that nobody holds it now.
     if (!live(c, now)) return { code: 'no_reader', detail: 'nobody holds this topic now: its reader has not claimed it (away longer than it claimed ahead), or gave it up' };
+    const g = guard?.check(topic, session.account, now);   // a public code's answer topic (park.mjs)
+    if (g) return g;
     const max = policy.maxMessage?.({ sender: session.account, reader: c.account, now }) ?? MAX_MESSAGE;
     if (size > max) return { code: 'too_large', detail: `message over ${max} bytes` };
     if (diskFull()) return { code: 'relay_full', detail: 'this relay queues nothing until disk use falls below 70 %' };
@@ -169,7 +173,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
       rowOf.set(packet.payload, id);
       return null;
     });
-    if (r === null) { db.countSent(session.account, now, senderPool); stats?.count('stored'); }
+    if (r === null) { db.countSent(session.account, now, senderPool); guard?.count(topic, session.account, now); stats?.count('stored'); }
     return r;
   }
 

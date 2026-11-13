@@ -10,7 +10,8 @@
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
 //   POST /check   {username, client_id, password, clean?} → {ok: true} | {ok: false, check, detail}
 //   GET  /stats   the relay's counts, no identifier (stats.mjs)
-//   POST /park, GET /park/<hash>, DELETE /park/<hash>   short invite codes (park.mjs), when a parking is given
+//   POST /park, GET /park/<hash>, DELETE /park/<hash>   short invite codes (park.mjs), when a parking is given;
+//                 POST /park/<hash> {login, paused?, cap?} sets a public code's (sigelo-public/0)
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
 //   POST /gift    {username, client_id, password, code_hash}: a gift code redeemed by the operator
@@ -41,7 +42,7 @@ import { createServer } from 'node:http';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { canonicalize, commitmentOf, did as didOf, keygen, parseBytes, verify, verifySig } from 'sigelo';
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
-import { CANCEL_FIELDS, PARK_FIELDS, ParkError } from './park.mjs';
+import { CANCEL_FIELDS, PARK_FIELDS, ParkError, SET_FIELDS, SET_OPTIONAL } from './park.mjs';
 import { GIFT_FIELDS } from './gifts.mjs';
 
 export const V = 'sigelo-relay/0';
@@ -600,7 +601,8 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         try { park.charge('park', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         let body;
         try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
-        if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
+        // cap: a public code's (park.mjs), optional.
+        if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length + (Object.hasOwn(body, 'cap') ? 1 : 0) || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
           || typeof body.username !== 'string' || typeof body.client_id !== 'string' || typeof body.password !== 'string') {
           throw httpFail(400, `want {${PARK_FIELDS.join(', ')}}: POST /check's login fields, then what to park`);
         }
@@ -611,7 +613,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!o.session.durable) return send(200, { ok: false, check: 'pow', detail: 'a new identity parks after its first login with proof of work: run inbox, then invite again' });
         // park_taken says whether a hash is held: charged as a lookup, its network's and the relay-wide.
         try { park.charge('lookup', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
-        try { return send(200, { ok: true, ...park.park(body, body.username, clock(), o.session.account) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
+        try { return send(200, { ok: true, ...park.park(body, body.username, clock(), o.session.account, (t) => db.claim(t)) }); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
       }
       // Gift codes (gifts.mjs): the brake first, before the body or the login, as /park. Neither the
       // hash nor anything of the code is logged, nor quoted in a refusal.
@@ -636,6 +638,14 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         return send(200, r);
       }
       if (park && req.method === 'GET' && url.pathname.startsWith('/park/')) {
+        // A public code (park.mjs): its own brake, never spent; any other hash a lookup, as before.
+        const pub = park.publicOf(url.pathname.slice('/park/'.length), clock());
+        if (pub !== null) {
+          try { park.charge('public', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
+          if (pub.gone) return send(404, { ok: false, check: 'park_unknown', detail: 'this public code was revoked by its owner, or has ended' });
+          if (pub.paused) return send(409, { ok: false, check: 'public_paused', detail: 'this public code is paused by its owner: try again later' });
+          return send(200, { ok: true, invite: pub.invite, public: true, exp: pub.exp });
+        }
         try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour)' });
@@ -657,9 +667,28 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (park.cancel(url.pathname.slice('/park/'.length), o.session.account, clock())) return send(200, { ok: true });
         return send(404, { ok: false, check: 'park_unknown', detail: 'no code of yours parked under this hash: mistyped, or expired' });
       }
+      // A public code's settings (park.mjs set): a lookup, then the parker's login; a miss and
+      // another's code answer the same 404.
+      if (park && req.method === 'POST' && url.pathname.startsWith('/park/')) {
+        const prefix = httpPrefix(req);
+        try { park.charge('lookup', prefix, clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
+        let body;
+        try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
+        const keys = isObject(body) ? Object.keys(body) : [];
+        if (!isObject(body) || !SET_FIELDS.every((k) => typeof body[k] === 'string') || !keys.every((k) => SET_FIELDS.includes(k) || SET_OPTIONAL.includes(k)) || keys.length === SET_FIELDS.length) {
+          throw httpFail(400, `want {${SET_FIELDS.join(', ')}, paused?, cap?}: POST /check's login fields, then at least one setting`);
+        }
+        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        if (o.check === 'internal') throw httpFail(503, o.detail);
+        if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
+        let r;
+        try { r = park.set(url.pathname.slice('/park/'.length), o.session.account, { paused: body.paused, cap: body.cap }, clock()); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
+        if (r === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no public code of yours under this hash: mistyped, revoked, or ended' });
+        return send(200, { ok: true, ...r });
+      }
       // MQTT over WebSocket is an upgrade (server.mjs); a plain request gets here.
       if (url.pathname === WS_PATH) throw httpFail(426, 'MQTT over WebSocket: send a WebSocket upgrade with subprotocol mqtt');
-      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>, DELETE /park/<hash>' : ''}`);
+      throw httpFail(['/challenge', '/check', '/park'].includes(url.pathname) || (policy.gift && url.pathname === '/gift') ? 405 : 404, `no ${req.method} ${url.pathname}: GET /challenge?did=…, POST /check${park ? ', POST /park, GET /park/<hash>, POST /park/<hash>, DELETE /park/<hash>' : ''}`);
     } catch (e) {
       if (!e.status) log(`http bug ${e.name}`);
       send(e.status ?? 500, { error: e.status ? e.message : 'internal error' }, e.retryAfter);
