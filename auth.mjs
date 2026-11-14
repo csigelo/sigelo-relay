@@ -577,7 +577,9 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const d = url.searchParams.get('did') ?? '';
     if (!DID_RE.test(d)) throw httpFail(400, 'did: want ?did=did:sigelo:z… (your current DID, in full)');
     const now = clock();
-    try { charge('challenge', prefix, now, 1, loginRate, `more than ${loginRate} challenges a minute from this network: wait`); } catch (e) { throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
+    // Twice the login rate: a waiting client fetches a challenge per login, and every device behind one
+    // address shares the count. Logged like a refused login (stats too), so a 429 shows in the journal.
+    try { charge('challenge', prefix, now, 1, loginRate * 2, `more than ${loginRate * 2} challenges a minute from this network (every device behind this address counts, retries included): wait`); } catch (e) { log(`refused ${prefix} challenge_rate`); stats?.count('login_refused', 'challenge_rate'); throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
     // pow_bits: the difficulty a new identity must meet with this nonce (M4: by the network asking
     // and what it holds unredeemed, pow.mjs, which counts this one from now on); 0 = none asked (a
     // closed relay asks none: closed.mjs). A

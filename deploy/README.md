@@ -21,7 +21,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_TLS_CERT`, `RELAY_TLS_KEY` | none | PEM files; MQTT over TLS on `RELAY_TLS_PORT` (8883), all interfaces; SIGHUP re-reads them |
 | `RELAY_TCP_PORT` | off | plain MQTT on 127.0.0.1, for tests |
 | `RELAY_HTTP_PORT` | 8791 | `/challenge`, `/check`, `/park`, `/licence`, `/gift`, `/stats` and MQTT over WebSocket (`/mqtt`) on 127.0.0.1, for nginx |
-| `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together, and separately GET /challenge |
+| `RELAY_LOGIN_RATE` | 30 | a minute per /24 (IPv4) or /48 (IPv6): CONNECTs and POST /check together; GET /challenge separately at twice this (every device behind one address counts; a refusal is logged `challenge_rate`) |
 | `RELAY_MAX_SESSIONS` | 16000 | sessions connected at once (about 2 GB over TLS, under the unit's 3 GB): past it a CONNECT gets `relay_full` |
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to. Until the vendor ceremony it is the placeholder and no licence verifies: Pro is not on sale, and the site says so |

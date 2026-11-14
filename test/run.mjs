@@ -524,9 +524,9 @@ let a, b;
   await refused(carol, { ip: '2001:db8:3::1' }, 'rate', 'the third CONNECT from 127.0.0.0/24 in that minute', slow);
   r1.client.end(true); r2.client.end(true);
   const ask = (ip) => fetch(`${base(slow)}/challenge?did=${encodeURIComponent(carol.did)}`, { headers: realIp(ip) }).then((x) => x.status);
-  const asked = [await ask('2001:db8:9::1'), await ask('2001:db8:9::2'), await ask('2001:db8:9:ffff::3'), await ask('2001:db8:a::1')];
-  ok(asked.join() === '200,200,429,200', `GET /challenge: two a minute per /48 by X-Real-IP, the third 429, another /48 unaffected (${asked.join()})`);
-  const asked429 = await fetch(`${base(slow)}/challenge?did=${encodeURIComponent(carol.did)}`, { headers: realIp('2001:db8:9::4') });
+  const asked = [await ask('2001:db8:9::1'), await ask('2001:db8:9::2'), await ask('2001:db8:9::3'), await ask('2001:db8:9::4'), await ask('2001:db8:9:ffff::5'), await ask('2001:db8:a::1')];
+  ok(asked.join() === '200,200,200,200,429,200', `GET /challenge: four a minute per /48 by X-Real-IP (twice the login rate), the fifth 429, another /48 unaffected (${asked.join()})`);
+  const asked429 = await fetch(`${base(slow)}/challenge?did=${encodeURIComponent(carol.did)}`, { headers: realIp('2001:db8:9::6') });
   ok(asked429.status === 429 && asked429.headers.get('retry-after') === String(60 - (now % 60)), `GET /challenge 429: Retry-After = the seconds left in the minute (${asked429.headers.get('retry-after')}, want ${60 - (now % 60)})`);
   await asked429.body?.cancel();
   const freshCheck = async (challengeIp, ip) => {

@@ -30,7 +30,7 @@ connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/l
 | `RELAY_HTTP_PORT`, `RELAY_TCP_PORT` | 8791, off | 127.0.0.1: HTTP for nginx, MQTT for tests |
 | `RELAY_LOGIN_RATE` | 30 | logins a minute per /24, /48 |
 | `RELAY_MAX_SESSIONS`, `_PER_PREFIX` | 16000, 1000 | sessions at once, in all, per /24 or /48 |
-| `RELAY_POW_BITS` | 6 | proof of work per new identity |
+| `RELAY_POW_BITS` | 6 | a new identity's proof of work; 0: login suffices |
 | `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 8, 1000 | past that many new identities an hour |
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities a day per /24 or /48 |
 | `RELAY_POW_CHECKS` | 4 | proofs checked at once |
