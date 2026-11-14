@@ -22,7 +22,7 @@
 //     RELAY_MAX_SESSIONS   sessions connected at once (default 16000: ~2 GB over TLS)
 //     RELAY_MAX_PER_PREFIX sessions connected at once per /24 or /48 (default 1000)
 //     RELAY_VENDOR_DID, RELAY_PRO_STORAGE_MB, RELAY_POW_BITS, RELAY_POW_LOAD_BITS, RELAY_POW_LOAD,
-//     RELAY_POW_NETWORK_DAY, RELAY_FREE_QUEUE_MB   allowances, proof of work and licences:
+//     RELAY_POW_NETWORK_DAY, RELAY_POW_CHECKS, RELAY_FREE_QUEUE_MB   allowances, proof of work and licences:
 //                       allowance.mjs relayPolicyFromEnv
 //     RELAY_CLOSED_OPERATOR  a closed relay: the original DIDs of its operators, comma-separated
 //                       (at most 8). It admits them and the identities they attest for it, and

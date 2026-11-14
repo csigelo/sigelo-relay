@@ -35,7 +35,7 @@ const dir = mkdtempSync(join(tmpdir(), 'sigelo-relay-closed-'));
 let now = Date.parse('2026-10-21T00:00:00Z') / 1000;
 const op = identity('closed operator'), agent = identity('closed agent'), stranger = identity('closed stranger'), other = identity('closed other operator');
 const cfg = { host: HOST, db: join(dir, 'relay.db'), tcpPort: 0, httpPort: 0, loginRate: 100000, verifyBudget: 1e9, clock: () => now, diskUsed: () => 0.1, log: () => {},
-  closed: [op.original], policy: (ctx) => relayPolicy(ctx, { pow: { bits: 8, loadBits: 12, loadPerHour: 1000 } }) };
+  closed: [op.original], policy: (ctx) => relayPolicy(ctx, { pow: { bits: 4, loadBits: 8, loadPerHour: 1000, cost: { m: 8, t: 1, p: 1 } } }) };
 const relay = await startRelay(cfg);
 const base = `http://127.0.0.1:${relay.ports.http}`;
 const count = (sql, ...p) => relay.db.raw.prepare(sql).get(...p).n;
@@ -53,7 +53,7 @@ const mqttConnect = ({ username, clientId: cid, password: pw }) => new Promise((
 // Log in as id with `bundle` (default: its chain alone); pow: solve the challenge's bits. → { client?, check }.
 async function login(id, { bundle = bundleOf(id), pow = false } = {}) {
   const { challenge, pow_bits } = await getChallenge(id.did);
-  const extra = pow ? { pow: solve(HOST, id.original, challenge.nonce, Math.max(pow_bits, 8)) } : {};
+  const extra = pow ? { pow: await solve(HOST, id.original, challenge.nonce, Math.max(pow_bits, 4), { m: 8, t: 1, p: 1 }) } : {};
   const creds = { username: id.did, clientId: clientId(id), password: password(id, challenge, { bundle, extra }) };
   const r = await mqttConnect(creds);
   const c = (await postJson('/check', { username: creds.username, client_id: creds.clientId, password: creds.password })).json;
@@ -83,7 +83,7 @@ try {
 
   // ---- no proof of work is asked
   const ch = await getChallenge(stranger.did);
-  ok(ch.pow_bits === 0, `GET /challenge on a closed relay: pow_bits 0 (${ch.pow_bits}), M4's policy asking 8 elsewhere`);
+  ok(ch.pow_bits === 0 && ch.pow === undefined, `GET /challenge on a closed relay: pow_bits 0 (${ch.pow_bits}) and no function stated, M4's policy asking 4 elsewhere`);
 
   // ---- the operator and an identity it attests
   const o1 = await login(op);

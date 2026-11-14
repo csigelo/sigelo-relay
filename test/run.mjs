@@ -192,7 +192,8 @@ const closed = (c) => new Promise((resolve) => { if (c.disconnected || !c.connec
   const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve(code ?? signal)));
   const up = await until(() => /^sigelo relay: mqtt tls :\d+, tcp 127\.0\.0\.1:\d+, http 127\.0\.0\.1:\d+$/m.test(out), 15000);
   const ch = up ? await (await fetch(`http://127.0.0.1:${out.match(/http 127\.0\.0\.1:(\d+)/)[1]}/challenge?did=${encodeURIComponent(alice.did)}`)).json() : {};
-  ok(up && ch.pow_bits === 22, `node server.mjs from its environment: TLS, TCP and HTTP listening, the M4 policy in place (pow_bits ${ch.pow_bits}: the default 22)`);
+  ok(up && ch.pow_bits === 6 && JSON.stringify(ch.pow) === '{"v":1,"alg":"argon2id","m":65536,"t":3,"p":1}',
+    `node server.mjs from its environment: TLS, TCP and HTTP listening, the M4 policy in place (pow_bits ${ch.pow_bits}: the default 6; pow ${JSON.stringify(ch.pow)}: Argon2id, 64 MiB, 3 passes, 1 lane)`);
   child.kill('SIGHUP');
   const reloaded = await until(() => out.includes('tls reloaded'), 5000);
   child.kill('SIGTERM');
@@ -1192,10 +1193,10 @@ function walStates(r, name, tag = name) {
   // and left both in the WAL: a fresh DID logging in an hour later, at no cost, made the pairing
   // appear on demand. The tidy now runs inside the sweep's transaction.
   const W = await startRelay({ ...cfg, db: join(dir, 'wal-m4.db'), log: () => {},
-    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 8, loadBits: 12, loadPerHour: 1000 }, freeQueue: 64 * 1024 * 1024 }) });
+    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 4, loadBits: 8, loadPerHour: 1000, cost: { m: 8, t: 1, p: 1 } }, freeQueue: 64 * 1024 * 1024 }) });
   const proven = async (id) => {
-    const { challenge, pow_bits } = await getChallenge(id.did, W);
-    return (await mqttConnect({ username: id.did, clientId: clientId(id), clean: false, password: password(id, challenge, { extra: { pow: solve('relay.test', id.original, challenge.nonce, pow_bits) } }) }, W)).client;
+    const { challenge, pow_bits, pow } = await getChallenge(id.did, W);
+    return (await mqttConnect({ username: id.did, clientId: clientId(id), clean: false, password: password(id, challenge, { extra: { pow: await solve('relay.test', id.original, challenge.nonce, pow_bits, pow) } }) }, W)).client;
   };
   const [wa, wb] = [await proven(alice), await proven(bob)];
   const T = topic();
@@ -1225,10 +1226,10 @@ function walStates(r, name, tag = name) {
   // account and claim. Now a claim's day waits in memory for the sweep, as a login's does, and
   // what must be written at once is followed by a checkpoint that empties the WAL (db.mjs settle).
   const W = await startRelay({ ...cfg, db: join(dir, 'wal-order.db'), log: () => {},
-    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 8, loadBits: 12, loadPerHour: 1000 }, freeQueue: 64 * 1024 * 1024 }) });
+    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 4, loadBits: 8, loadPerHour: 1000, cost: { m: 8, t: 1, p: 1 } }, freeQueue: 64 * 1024 * 1024 }) });
   const proven = async (id) => {
-    const { challenge, pow_bits } = await getChallenge(id.did, W);
-    return (await mqttConnect({ username: id.did, clientId: clientId(id), clean: false, password: password(id, challenge, { extra: { pow: solve('relay.test', id.original, challenge.nonce, pow_bits) } }) }, W)).client;
+    const { challenge, pow_bits, pow } = await getChallenge(id.did, W);
+    return (await mqttConnect({ username: id.did, clientId: clientId(id), clean: false, password: password(id, challenge, { extra: { pow: await solve('relay.test', id.original, challenge.nonce, pow_bits, pow) } }) }, W)).client;
   };
   const ann = identity('ann wal'), ben = identity('ben wal'), zed = identity('zed wal'), ann1 = rotated(ann, 'ann wal 1');
   everyone.push(ann, ben, zed, ann1);
@@ -1277,7 +1278,7 @@ function walStates(r, name, tag = name) {
   // order, which is a hash's, and nothing more. inOrder → the pages of these tables and their
   // indexes whose cells do not lie so.
   const C = await startRelay({ ...cfg, db: join(dir, 'cells.db'), log: () => {},
-    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 0, loadBits: 0, loadPerHour: 1000 }, freeQueue: 64 * 1024 * 1024 }) });
+    policy: (ctx) => relayPolicy(ctx, { pow: { bits: 0, loadBits: 0, loadPerHour: 1000, cost: { m: 8, t: 1, p: 1 } }, freeQueue: 64 * 1024 * 1024 }) });
   const NAMES = ['accounts', 'claims', 'claims_client', 'claims_account', 'chain_dids', 'chain_dids_account', 'pow_proofs', 'pool_members', 'pool_members_operator', 'vouched', 'licences', 'licences_current', 'operator_retired'];
   const outOfOrder = () => {
     const x = new DatabaseSync(join(dir, 'cells.db'), { readOnly: true }), size = x.prepare('PRAGMA page_size').get().page_size;

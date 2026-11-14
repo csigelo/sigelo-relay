@@ -30,9 +30,10 @@ connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/l
 | `RELAY_HTTP_PORT`, `RELAY_TCP_PORT` | 8791, off | 127.0.0.1: HTTP for nginx, MQTT for tests |
 | `RELAY_LOGIN_RATE` | 30 | logins a minute per /24, /48 |
 | `RELAY_MAX_SESSIONS`, `_PER_PREFIX` | 16000, 1000 | sessions at once, in all, per /24 or /48 |
-| `RELAY_POW_BITS` | 22 | proof of work per new identity |
-| `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 24, 1000 | past that many new identities an hour |
+| `RELAY_POW_BITS` | 6 | proof of work per new identity |
+| `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 8, 1000 | past that many new identities an hour |
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities a day per /24 or /48 |
+| `RELAY_POW_CHECKS` | 4 | proofs checked at once |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else a placeholder | vendor genesis licences chain to |
 | `RELAY_PRO_STORAGE_MB` | 1024 | the most a Pro pool queues |
 | `RELAY_FREE_QUEUE_MB` | half the disk's room below 70 % | free tier's ceiling: messages, identity rows |
@@ -57,10 +58,10 @@ Short codes: 40 bits, 60 s to an hour (default 10 minutes), fetched once or canc
 at most 1 in 183,000 an hour; all networks' (600), 1 in 6,100. A given code's odds grow with its
 life: 3.3 × 10⁻⁹ for an hour. A wrong pairing shows other four words.
 
-Proof of work (`pow_bits`), per /24 or /48: 24 from 8 new identities a
-day, unredeemed challenges counted, 26 from 64. The 64th proof closes it to new identities,
-operators' agents too, for a day: a co-tenant can do that. Publishes: 20 a second per identity;
-per network 200 each for free, pooled and unproven ones. At 70 % disk: no new identity, mailbox
+Proof of work: 2^`pow_bits` Argon2id tries of 64 MiB (0.5 s each on a phone), one to check. Per
+/24 or /48: 8 from 8 new identities a day, unredeemed challenges counted, 10 from 64. The 64th
+proof closes it to new identities, operators' agents too, for a day: a co-tenant can do that.
+Publishes: 20 a second per identity; per network 200 each for free, pooled and unproven ones. At 70 % disk: no new identity, mailbox
 or message. Refusals reach the client by name on `$sigelo/notice`.
 
 ## What it logs and keeps

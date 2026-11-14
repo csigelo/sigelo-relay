@@ -26,9 +26,10 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to. Until the vendor ceremony it is the placeholder and no licence verifies: Pro is not on sale, and the site says so |
 | `RELAY_PRO_STORAGE_MB` | 5120 (pro.md sells 5 GB) | the most storage any Pro pool gets, whatever its licence says; set the same where the site is built |
-| `RELAY_POW_BITS` | 22 | the proof of work a new identity sends once |
-| `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 24, 1000 | the proof asked once more than `RELAY_POW_LOAD` new identities have proven work in a clock hour, for that hour and the next |
-| `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A native SHA-256 finds 26 bits in seconds, so this count, not the bits, bounds what one network mints |
+| `RELAY_POW_BITS` | 6 | the proof of work a new identity sends once: 2^bits Argon2id evaluations on average (64 MiB, 3 passes, 1 lane; 485 ms each on a phone-class core, so 31 s) |
+| `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 8, 1000 | the proof asked once more than `RELAY_POW_LOAD` new identities have proven work in a clock hour, for that hour and the next |
+| `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A minter with native Argon2id on 8 phone cores does 13 evaluations a second (the day's 64 then take ~19 minutes), so this count, not the bits, bounds what one network mints |
+| `RELAY_POW_CHECKS` | 4 | proofs the relay evaluates at once, each in a worker thread, ~0.5 s of a core and 64 MiB (256 MiB at most by default); 4 times as many wait their turn, and a login with a proof past those is refused `rate` before its nonce is spent, so the same CONNECT is good again while the nonce lives |
 | `RELAY_FREE_QUEUE_MB` | half the room below 70 % on the database's disk at start | the free tier's ceiling: every queued message and every identity row (accounts with their chains, claims, chain DIDs) counted; past it free readers take nothing more, free identities no new mailbox, and no new free identity, nor a longer chain of one, is stored (one recovery edge still is, so an owner takes a stolen key back). Set it on a disk whose other files keep growing |
 | `RELAY_CLOSED_OPERATOR` | unset (open) | a closed relay: the original DIDs of its operators, comma-separated, at most 8 (Closed relay) |
 
@@ -262,8 +263,9 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    Never a SPEC §5.2 challenge: an agent's `sign-challenge` signs those for any world, and that
    world could log in. The nonce is opaque (32 bytes, base64url) and carries its own proof, so the
    relay stores nothing until it is used; a restart voids the outstanding ones.
-   `pow_bits`: what a new identity's proof must meet now (`RELAY_POW_BITS`, more under load). Over
-   the rate: 429.
+   `pow_bits`: what a new identity's proof must meet now (`RELAY_POW_BITS`, more under load);
+   `pow`: `{v: 1, alg: "argon2id", m: 65536, t: 3, p: 1}`, the function it is computed with (absent
+   on a closed relay). Over the rate: 429.
 2. MQTT CONNECT, protocol 3.1.1, clean session **off**, keepalive 1 to 600 s (0 is refused:
    CONNACK 6): client id `s` + 24 hex of SHA-256(original DID), username = current DID, password =
    JCS of `{v:"sigelo-relay/0", nonce, sig, bundle?, pow?}`, `sig` over `"sigelo\n"` ‖ JCS(login
@@ -279,7 +281,8 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    DID) with their issuers; other attestations, bindings and issuers are not read. Bundles from one /24 or
    /48 may cost 256 signature checks a minute (a bundle of 64 rotations costs 65). Before its
    first claim or message a new identity logs in once with `pow`: a string of 1 to 16 decimal
-   digits `c` such that SHA-256(`"sigelo-relay-pow/0\n"` ‖ host ‖ original DID ‖ nonce ‖ `c`) has
+   digits `c` such that Argon2id(password `"sigelo-relay-pow/1\n"` ‖ host ‖ original DID ‖ nonce ‖
+   `c`, salt the first 16 bytes of SHA-256(nonce), `pow`'s m KiB, t passes, p lanes, 32 bytes) has
    `pow_bits` leading zero bits (64 to a network that brought `RELAY_POW_NETWORK_DAY` new
    identities in 24 hours: none more from it until then). Until then nothing is stored for it (no account, chain or pool
    row): a login costs no work, so rows for every fresh DID would let free identities fill the disk.

@@ -63,7 +63,7 @@ import { DID_RE } from './auth.mjs';
 import { ACCOUNT_ROW, CLAIM_ROW, DAY, DID_ROW, chainRowBytes, dayOf } from './db.mjs';
 import { LICENCE_RATE, SUPPORT, operators } from './operator.mjs';
 import { SCHEMA as GIFT_SCHEMA, UNKNOWN as GIFT_UNKNOWN, giftBrake, giftStore } from './gifts.mjs';
-import { C_RE, NETWORK_DAY, NETWORK_STEPS, POW_BITS, POW_LOAD_BITS, powCheck } from './pow.mjs';
+import { C_RE, CHECKS, NETWORK_DAY, NETWORK_STEPS, POW_BITS, POW_LOAD_BITS, powCheck } from './pow.mjs';
 
 export const KB = 1024, MB = 1024 * KB;
 // server.mjs closes a connection whose packet is over 1 MB plus its header room: no tier may allow
@@ -167,7 +167,7 @@ const KINDS = ['publish', 'subscribe', 'claim'];
 // file. Many networks (IPv6 address rotation) still beat it: plan §10, R15.
 export const FREE_SHARES = 64;
 const SHARE_PREFIXES = 100000;
-// New identities proving work in an hour above which the proof rises to 24 bits (RELAY_POW_LOAD).
+// New identities proving work in an hour above which the proof rises to 8 bits (RELAY_POW_LOAD).
 export const POW_LOAD = 1000;
 const TIDY_EVERY = 3600;
 const NOTICES = 10000, BUCKETS = 100000;
@@ -273,7 +273,7 @@ function diskOf(db) {
 
 // ctx: what server.mjs passes a policy factory, { db, host, clock, log }. config: { vendor (the
 // pinned vendor genesis DID; default licence.ts's vendorDid()), tiers ({free, pro} as TIERS;
-// a key left out keeps TIERS's), pow ({bits, loadBits, loadPerHour, steps, perDay}, pow.mjs), licenceRate
+// a key left out keeps TIERS's), pow ({bits, loadBits, loadPerHour, steps, perDay, cost, checks}, pow.mjs), licenceRate
 // (POST /licence per prefix and minute), gifts ({tries, triesAll}: POST /gift's brakes, gifts.mjs),
 // rate (as RATE; a key left out keeps RATE's), freeQueue (bytes; default freeQueueOf the database's disk at start), freeShares
 // (as FREE_SHARES) }.
@@ -526,13 +526,16 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
     // pow) counts as a strike too (RATE).
     strike({ account, clientId, now }) { strike(bucketsOf(account, now), clientId, now); },
 
-    // Every login (auth.mjs, before the account is touched). A proof is hashed once per identity:
+    // Every login (auth.mjs, before the account is touched). A proof is evaluated once per identity:
     // from an identity that has proven work already, only its shape is checked. bits, network: what
     // the login's nonce states (auth.mjs): the difficulty GET /challenge gave with it, and the
     // network that asked, which the arrival counts against (pow.mjs). Either missing is auth.mjs's
     // bug: thrown, so the login fails as the relay's own error, never with a proof unchecked.
     // admitted: a closed relay admitted the identity by its operator's attestation (closed.mjs),
     // which stands for the work: recorded as a proof, no hash, no arrival counted.
+    // → null (go on), a refusal, or { wait, done } when the proof needs its evaluation (pow.mjs: ~0.5 s
+    // in a worker): auth.mjs awaits `wait` (a refusal or null) and calls done(it) before anything else
+    // of the login, which decides again, since other logins ran meanwhile.
     pow({ pow: c, host: h, account, original, nonce, isNew, now, bits, network, admitted = false }) {
       if (typeof original !== 'string') throw new Error('policy.pow: auth.mjs passes no original DID');
       if (!Number.isInteger(bits) || typeof network !== 'string') throw new Error('policy.pow: auth.mjs passes no bits or network from the nonce');
@@ -550,14 +553,27 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       // Before the hash: whatever the proof, a network past its count of new identities brings no
       // more today (pow.mjs: proof of work alone does not bound what a native solver mints).
       if (pow.capped(now, network)) return `the network this login's challenge came from brought ${pow.perDay} new identities here in the last 24 hours, the most one network may: try again tomorrow`;
-      const why = pow.check({ pow: c, host: h, original, nonce, bits });
-      if (why) return why;
-      s.prove.run(account, dayOf(now));
-      // An arrival is counted at a good proof, not at every login of an unknown identity: raising
-      // the difficulty for every newcomer must cost whoever raises it the work too.
-      pow.arrived(now, network);
-      return null;
+      return {
+        wait: pow.check({ pow: c, host: h, original, nonce, bits }),
+        done: (why) => {
+          if (why) return why;
+          // Meanwhile another login of this identity may have proven work (nothing more to count),
+          // or other proofs from its network brought it to its cap (refused as above: the count holds).
+          if (s.proven.get(account)) return null;
+          if (pow.capped(now, network)) return `the network this login's challenge came from brought ${pow.perDay} new identities here in the last 24 hours, the most one network may: try again tomorrow`;
+          s.prove.run(account, dayOf(now));
+          // An arrival is counted at a good proof, not at every login of an unknown identity: raising
+          // the difficulty for every newcomer must cost whoever raises it the work too.
+          pow.arrived(now, network);
+          return null;
+        },
+      };
     },
+    // GET /challenge's `pow` beside pow_bits: the function and its cost (pow.mjs).
+    powParams: pow.params,
+    // Proofs waiting for their evaluation at their most (pow.mjs busy): a login with one is refused
+    // `rate` before its nonce is spent.
+    powBusy: () => pow.busy(),
 
     // Every login, after the proof (pow, above): whether a new identity's account and chain are
     // stored (auth.mjs). Only once it has proven work: logins cost none, so rows for every fresh DID
@@ -718,14 +734,17 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
 //   RELAY_VENDOR_DID      the vendor's genesis DID licences must chain to (default: licence.ts's
 //                         vendorDid(), i.e. SIGELO_VENDOR_DID or the D1 placeholder)
 //   RELAY_PRO_STORAGE_MB  the most storage any pool gets (default 1024: a placeholder)
-//   RELAY_POW_BITS        proof of work for a new identity (default 22; + 2 and + 4 from a network
-//                         at 8 and 64 new identities in a day, challenges it holds unredeemed
-//                         counted: pow.mjs NETWORK_STEPS; 64 good proofs close it, below)
+//   RELAY_POW_BITS        proof of work for a new identity, in Argon2id evaluations (2^bits on
+//                         average; default 6; + 2 and + 4 from a network at 8 and 64 new identities
+//                         in a day, challenges it holds unredeemed counted: pow.mjs NETWORK_STEPS;
+//                         64 good proofs close it, below)
 //   RELAY_POW_LOAD_BITS   …while more new identities than RELAY_POW_LOAD prove work in an hour,
-//                         challenges unredeemed counted (24)
+//                         challenges unredeemed counted (8)
 //   RELAY_POW_LOAD        new identities an hour (default 1000)
 //   RELAY_POW_NETWORK_DAY new identities one /24 or /48 may bring in 24 hours (default 64, pow.mjs
 //                         NETWORK_DAY): past it the next is refused "pow", an operator's agent too
+//   RELAY_POW_CHECKS      proofs evaluated at once, each ~0.5 s of a core and 64 MiB (default 4,
+//                         pow.mjs CHECKS; 4 times as many wait, then `rate`)
 //   RELAY_FREE_QUEUE_MB   queued in all, past which free readers take nothing more (default: half
 //                         the room below relay_full the database's disk has at start, freeQueueOf;
 //                         set it on a disk whose other files keep growing)
@@ -742,7 +761,7 @@ export function relayPolicyFromEnv(env, die = (why) => { throw new Error(why); }
     vendor,
     tiers: { free: TIERS.free, pro: { ...TIERS.pro, storage: whole('RELAY_PRO_STORAGE_MB', TIERS.pro.storage / MB, 1, 1e7) * MB } },
     pow: { bits: whole('RELAY_POW_BITS', POW_BITS, 0, 64), loadBits: whole('RELAY_POW_LOAD_BITS', POW_LOAD_BITS, 0, 64), loadPerHour: whole('RELAY_POW_LOAD', POW_LOAD, 1, 1e9), steps: NETWORK_STEPS,
-      perDay: whole('RELAY_POW_NETWORK_DAY', NETWORK_DAY, 1, 1e6) },
+      perDay: whole('RELAY_POW_NETWORK_DAY', NETWORK_DAY, 1, 1e6), checks: whole('RELAY_POW_CHECKS', CHECKS, 1, 64) },
   };
   const freeMb = whole('RELAY_FREE_QUEUE_MB', undefined, 1, 1e9);
   if (freeMb !== undefined) config.freeQueue = freeMb * MB;

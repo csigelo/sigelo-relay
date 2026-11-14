@@ -12,6 +12,7 @@
   "dependencies": {
     "aedes": "^1.2.0",
     "aedes-persistence": "^11.0.0",
+    "hash-wasm": "4.12.0",
     "sigelo": "^0.1.9",
     "ws": "^8.22.0"
   },

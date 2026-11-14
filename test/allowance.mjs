@@ -43,7 +43,8 @@ import { OPERATOR_CTX } from '../auth.mjs';
 import { KB, MB, MESSAGE_FLOOR, MESSAGE_ROW, TIERS as DEFAULT_TIERS, chargeOf, freeQueueOf, relayPolicy, relayPolicyFromEnv, windowWeeks } from '../allowance.mjs';
 import { checkRelayLicence, LICENCE_CTX, LICENCE_KEEP, RELAY_ROTATIONS_MAX, operators } from '../operator.mjs';
 import { UNKNOWN as GIFT_UNKNOWN, addMonths, giftBrake } from '../gifts.mjs';
-import { CLOSED_BITS, DAY as POW_DAY, NETWORK_DAY, NETWORK_STEPS, leadingZeroBits, powCheck, powDigest, solve } from '../pow.mjs';
+import { argon2Sync } from 'node:crypto';
+import { ARGON, CHECKS, CLOSED_BITS, DAY as POW_DAY, NETWORK_DAY, NETWORK_STEPS, POW_PREFIX, WAITING_PER, leadingZeroBits, powCheck, powDigest, powSalt, solve } from '../pow.mjs';
 import { CREATED, bundleOf, clientId, identity, password, rotated, seed } from './fixtures.mjs';
 
 let n = 0, failed = 0;
@@ -67,7 +68,13 @@ const vendor = identity('vendor');
 let pol;   // the policy object of the main relay, for tierOf
 // The free tier's ceiling is set, so the run does not depend on how full this machine's disk is;
 // the default, measured from the disk, is checked on a relay of its own below.
-const config = { vendor: vendor.original, tiers: TIERS, pow: { bits: 8, loadBits: 12, loadPerHour: 1000 }, licenceRate: 1000, freeQueue: 64 * 1024 * 1024 };
+// The relays here evaluate Argon2id at 8 KiB and 1 pass (T, ~1 ms) and ask 4 bits (16 on average),
+// so the suite stays quick. Two checks below run at the real cost (ARGON).
+const T = Object.freeze({ m: 8, t: 1, p: 1 });
+const digest = (host, original, nonce, c) => powDigest(host, original, nonce, c, T);
+// policy.pow as auth.mjs runs it: a proof that needs its evaluation ({ wait, done }) awaited, then done.
+const policyPow = async (pl, args) => { const r = pl.pow(args); return r !== null && typeof r === 'object' ? r.done(await r.wait) : r; };
+const config = { vendor: vendor.original, tiers: TIERS, pow: { bits: 4, loadBits: 8, loadPerHour: 1000, cost: T }, licenceRate: 1000, freeQueue: 64 * 1024 * 1024 };
 const cfg = { host: HOST, db: join(dir, 'relay.db'), tcpPort: 0, httpPort: 0, loginRate: 100000, verifyBudget: 1e9, clock: () => now, diskUsed: () => 0.1, log: () => {},
   policy: (ctx) => (pol = relayPolicy(ctx, config)) };
 const relay = await startRelay(cfg);
@@ -99,7 +106,7 @@ const proved = new Set();   // relay port + original DID of each login with a pr
 async function login(id, opts = {}, r = relay) {
   const { challenge, pow_bits } = await getChallenge(id.did, r, opts.ip);
   const first = !proved.has(`${r.ports.tcp} ${id.original}`);
-  const pow = opts.pow === true || (opts.pow === undefined && first) ? solve(HOST, id.original, challenge.nonce, pow_bits) : opts.pow || undefined;
+  const pow = opts.pow === true || (opts.pow === undefined && first) ? await solve(HOST, id.original, challenge.nonce, pow_bits, T) : opts.pow || undefined;
   const pw = password(id, challenge, { bundle: opts.bundle ?? true, extra: pow === undefined ? {} : { pow } });
   const creds = { username: id.did, clientId: clientId(id), password: pw, ...(opts.will && { will: opts.will }) };
   const out = { ...(await mqttConnect(creds, r, opts.local)), creds, challenge, pow_bits };
@@ -151,7 +158,7 @@ const tierOf = (id) => pol.tierOf(accountOf(id.original), now);
 async function loginBadPow(id, r = relay) {
   const { challenge, pow_bits } = await getChallenge(id.did, r);
   let c = 0;
-  while (leadingZeroBits(powDigest(HOST, id.original, challenge.nonce, String(c))) >= pow_bits) c++;
+  while (leadingZeroBits(await digest(HOST, id.original, challenge.nonce, String(c))) >= pow_bits) c++;
   const creds = { username: id.did, clientId: clientId(id), password: password(id, challenge, { extra: { pow: String(c) } }) };
   return { ...(await mqttConnect(creds, r)), creds };
 }
@@ -176,96 +183,114 @@ const withVouch = (agent, op, att) => bundleOf(agent, { attestations: [att], iss
 {
   ok(leadingZeroBits(Buffer.from([0, 0, 0x3f, 0xff])) === 18 && leadingZeroBits(Buffer.from([0x80, 0])) === 0 && leadingZeroBits(Buffer.alloc(32)) === 256, 'leading zero bits: 18, 0, and 256 for a zero digest');
   const did = identity('pow').original, nonceA = 'A'.repeat(43), nonceB = 'B'.repeat(43);
-  const p = powCheck({ bits: 12, loadBits: 16 });
-  const c = solve(HOST, did, nonceA, 12);
-  ok(leadingZeroBits(powDigest(HOST, did, nonceA, c)) >= 12 && p.check({ pow: c, host: HOST, original: did, nonce: nonceA, bits: 12 }) === null, `a proof of 12 bits over (host, original DID, nonce, c = ${c}) is accepted: one hash`);
-  // An independent vector (computed with sha256sum over the plan's bytes), so a change of the
-  // layout fails here even though solve() and the check would still agree with each other.
-  ok(c === '5505' && powDigest(HOST, did, nonceA, c).toString('hex') === '0002fd76159103431219d720d7ecd8e87289abbc6a856ffa8fb32f654d6a3f5e',
-    'plan §3\'s layout pinned: "sigelo-relay-pow/0\\n" ‖ relay.test ‖ the "pow" fixture DID ‖ "A" × 43 ‖ c: c = 5505 at 12 bits, digest 0002fd76…');
-  ok(/does not meet 12 bits/.test(p.check({ pow: c, host: HOST, original: did, nonce: nonceB, bits: 12 })) && p.check({ pow: c, host: 'other.relay', original: did, nonce: nonceA, bits: 12 }) !== null
-    && p.check({ pow: c, host: HOST, original: identity('pow 2').original, nonce: nonceA, bits: 12 }) !== null, 'the same c over another nonce, another relay or another DID: refused, "does not meet 12 bits"');
-  ok(['12a', '1'.repeat(17), '', 5].every((x) => /want c as a string/.test(p.check({ pow: x, host: HOST, original: did, nonce: nonceA, bits: 12 }))), 'c that is not 1 to 16 decimal digits (a letter, 17 digits, empty, a number): refused');
+  const p = powCheck({ bits: 4, loadBits: 8, cost: T });
+  ok(JSON.stringify(p.params) === '{"v":1,"alg":"argon2id","m":8,"t":1,"p":1}' && JSON.stringify(powCheck({}).params) === '{"v":1,"alg":"argon2id","m":65536,"t":3,"p":1}',
+    'the function GET /challenge states: Argon2id at the cost a relay checks (by default 64 MiB, 3 passes, 1 lane)');
+  const c = await solve(HOST, did, nonceA, 4, T);
+  ok(leadingZeroBits(await digest(HOST, did, nonceA, c)) >= 4 && await p.check({ pow: c, host: HOST, original: did, nonce: nonceA, bits: 4 }) === null, `a proof of 4 bits over (host, original DID, nonce, c = ${c}) is accepted: one evaluation`);
+  // Independent vectors (computed with OpenSSL's Argon2id, node:crypto argon2Sync, over the plan's
+  // bytes), so a change of the layout, the salt or the cost fails here even though solve() and the
+  // check would still agree with each other.
+  ok(c === '8' && Buffer.from(await digest(HOST, did, nonceA, c)).toString('hex') === '0e562fec121d4473dee607a427140e2e0e181b676fda58d2455568644790d92b',
+    'plan §3\'s layout pinned: Argon2id("sigelo-relay-pow/1\\n" ‖ relay.test ‖ the "pow" fixture DID ‖ "A" × 43 ‖ c, salt SHA-256("A" × 43)[0..16], 8 KiB, 1 pass): c = 8 at 4 bits, output 0e562fec…');
+  // The one check at the real cost (ARGON: 64 MiB, 3 passes, ~0.5 s each): c = 10 meets 2 bits.
+  const real = powCheck({ bits: 2, loadBits: 2 }), t1 = performance.now();
+  const realOut = Buffer.from(await powDigest(HOST, did, nonceA, '10'));
+  const realOk = await real.check({ pow: '10', host: HOST, original: did, nonce: nonceA, bits: 2 }), realNo = await real.check({ pow: '10', host: HOST, original: did, nonce: nonceA, bits: 6 });
+  const sslOut = typeof argon2Sync === 'function' ? argon2Sync('argon2id', { message: Buffer.from(POW_PREFIX + HOST + did + nonceA + '10'), nonce: powSalt(nonceA), parallelism: 1, tagLength: 32, memory: ARGON.m, passes: ARGON.t }).toString('hex') : null;
+  ok(realOut.toString('hex') === '1f215854ef6858d5aabb23d357956ef60d2bc4a38358189370207d0b5b1f35b0' && (sslOut === null || sslOut === realOut.toString('hex')) && realOk === null && /does not meet 6 bits/.test(realNo ?? ''),
+    `at the real cost (64 MiB, 3 passes, 1 lane): c = 10's output pinned (1f215854…, ${sslOut === null ? 'OpenSSL not in this Node' : 'and OpenSSL\'s the same'}), taken at 2 bits in a worker, refused at 6 (3 evaluations, ${Math.round(performance.now() - t1)} ms)`);
+  ok(/does not meet 4 bits/.test(await p.check({ pow: c, host: HOST, original: did, nonce: nonceB, bits: 4 }) ?? '') && await p.check({ pow: c, host: 'other.relay', original: did, nonce: nonceA, bits: 4 }) !== null
+    && await p.check({ pow: c, host: HOST, original: identity('pow 2').original, nonce: nonceA, bits: 4 }) !== null, 'the same c over another nonce, another relay or another DID: refused, "does not meet 4 bits"');
+  ok((await Promise.all(['12a', '1'.repeat(17), '', 5].map((x) => p.check({ pow: x, host: HOST, original: did, nonce: nonceA, bits: 4 })))).every((x) => /want c as a string/.test(x)), 'c that is not 1 to 16 decimal digits (a letter, 17 digits, empty, a number): refused');
   // The check takes the bits the nonce states, never below the base: a stated 0 is a bug, not a pass.
-  let weak = 0, none = 0;   // a c of 12 to 15 bits; one of fewer than 12
-  for (let i = 0; ; i++) { const z = leadingZeroBits(powDigest(HOST, did, nonceA, String(i))); if (z >= 12 && z < 16) { weak = String(i); break; } }
-  for (let i = 0; ; i++) { if (leadingZeroBits(powDigest(HOST, did, nonceA, String(i))) < 12) { none = String(i); break; } }
+  let weak = 0, none = 0;   // a c of 4 to 7 bits; one of fewer than 4
+  for (let i = 0; ; i++) { const z = leadingZeroBits(await digest(HOST, did, nonceA, String(i))); if (z >= 4 && z < 8) { weak = String(i); break; } }
+  for (let i = 0; ; i++) { if (leadingZeroBits(await digest(HOST, did, nonceA, String(i))) < 4) { none = String(i); break; } }
   const stated = (b, pc = p, x = weak) => pc.check({ pow: x, host: HOST, original: did, nonce: nonceA, bits: b });
-  ok(stated(12) === null && /does not meet 16 bits/.test(stated(16)) && /does not meet 12 bits/.test(stated(0, p, none)),
-    'a proof is checked against the bits its nonce states (12 taken, 16 refused for a 12-to-15-bit c), and never below the base (stated 0: 12 still needed)');
-  // The load raise: more than 2 new identities in an hour → 16 bits, for that hour and the next.
-  const l = powCheck({ bits: 12, loadBits: 16, loadPerHour: 2 });
+  ok(await stated(4) === null && /does not meet 8 bits/.test(await stated(8)) && /does not meet 4 bits/.test(await stated(0, p, none)),
+    'a proof is checked against the bits its nonce states (4 taken, 8 refused for a 4-to-7-bit c), and never below the base (stated 0: 4 still needed)');
+  // The load raise: more than 2 new identities in an hour → 8 bits, for that hour and the next.
+  const l = powCheck({ bits: 4, loadBits: 8, loadPerHour: 2, cost: T });
   const hour = Math.floor(now / 3600) * 3600;
   for (let i = 0; i < 3; i++) l.arrived(hour + 10);
-  ok(l.required(hour + 20) === 16 && stated(12, l) === null && /does not meet 16 bits/.test(stated(16, l)),
-    'under load (3 new identities, 2 an hour configured): 16 bits for a challenge issued now; one issued at 12 before the raise is still taken at 12 (its nonce says so)');
-  ok(l.required(hour + 3600 + 5) === 16 && l.required(hour + 7200 + 5) === 12, 'the raise holds through the next hour and ends the hour after');
+  ok(l.required(hour + 20) === 8 && await stated(4, l) === null && /does not meet 8 bits/.test(await stated(8, l)),
+    'under load (3 new identities, 2 an hour configured): 8 bits for a challenge issued now; one issued at 4 before the raise is still taken at 4 (its nonce says so)');
+  ok(l.required(hour + 3600 + 5) === 8 && l.required(hour + 7200 + 5) === 4, 'the raise holds through the next hour and ends the hour after');
   // Per network (pow.mjs NETWORK_STEPS): the base below 8 new identities from it in 24 hours, + 2
   // from 8, + 4 from 64; a network is counted alone, and only for 24 hours.
-  ok(JSON.stringify(NETWORK_STEPS) === '[{"from":8,"add":2},{"from":64,"add":4}]', 'the default curve: + 2 bits from 8 new identities a day from one network, + 4 from 64 (22, 24, 26)');
-  const w = powCheck({ bits: 22, loadBits: 24, loadPerHour: 1000 }), t = hour + 3 * 3600, A = 'net a', B = 'net b';
+  ok(JSON.stringify(NETWORK_STEPS) === '[{"from":8,"add":2},{"from":64,"add":4}]', 'the default curve: + 2 bits from 8 new identities a day from one network, + 4 from 64 (6, 8, 10)');
+  const w = powCheck({ bits: 6, loadBits: 8, loadPerHour: 1000 }), t = hour + 3 * 3600, A = 'net a', B = 'net b';
   const curve = [];
   for (let i = 0; i < 64; i++) {
     if ([0, 7, 8, 63].includes(i)) curve.push(`${i}:${w.required(t, A)}`);
     w.arrived(t + i, A);
   }
   curve.push(`64:${w.required(t + 64, A)}`);
-  ok(curve.join() === '0:22,7:22,8:24,63:24,64:26' && w.required(t + 64, B) === 22 && w.required(t + 64) === 22,
-    `a network's difficulty at the edges (arrivals:bits): ${curve.join(' ')}; another network, and none, still 22`);
+  ok(curve.join() === '0:6,7:6,8:8,63:8,64:10' && w.required(t + 64, B) === 6 && w.required(t + 64) === 6,
+    `a network's difficulty at the edges (arrivals:bits): ${curve.join(' ')}; another network, and none, still 6`);
   // Arrival i came at t + i: at t + DAY + k, those after t + k are inside the day, 63 - k of them.
-  ok(w.required(t + POW_DAY - 1, A) === 26 && w.required(t + POW_DAY, A) === 24 && w.required(t + POW_DAY + 55, A) === 24 && w.required(t + POW_DAY + 56, A) === 22,
-    '24 hours on, the arrivals leave one by one: 26 while all 64 are inside the day, 24 from the first one out, 22 once 7 are left');
-  const both = powCheck({ bits: 12, loadBits: 16, loadPerHour: 2 });
+  ok(w.required(t + POW_DAY - 1, A) === 10 && w.required(t + POW_DAY, A) === 8 && w.required(t + POW_DAY + 55, A) === 8 && w.required(t + POW_DAY + 56, A) === 6,
+    '24 hours on, the arrivals leave one by one: 10 while all 64 are inside the day, 8 from the first one out, 6 once 7 are left');
+  const both = powCheck({ bits: 4, loadBits: 8, loadPerHour: 2 });
   for (let i = 0; i < 8; i++) both.arrived(hour + 10, A);
-  ok(both.required(hour + 20, A) === 16 && both.required(hour + 20, B) === 16 && both.required(hour + 3 * 3600, A) === 14,
-    'the load raise and a network\'s step together: the higher of the two (16), and the network\'s 14 once the load is gone');
+  ok(both.required(hour + 20, A) === 8 && both.required(hour + 20, B) === 8 && both.required(hour + 3 * 3600, A) === 6,
+    'the load raise and a network\'s step together: the higher of the two (8), and the network\'s 6 once the load is gone');
   // Challenges waiting (issued, neither spent nor expired) count with the arrivals: each one's
   // difficulty is frozen in its nonce, so counting good proofs alone let one network fetch as many
   // challenges as it liked at the base before redeeming any (review finding: the prefetch race).
-  const pf = powCheck({ bits: 22, loadBits: 24, loadPerHour: 1000 }), tp = hour + 5 * 3600;
+  const pf = powCheck({ bits: 6, loadBits: 8, loadPerHour: 1000 }), tp = hour + 5 * 3600;
   const tally = (xs) => [...new Set(xs)].map((x) => `${x}x${xs.filter((y) => y === x).length}`).join(' ');
   const ahead = Array.from({ length: 70 }, () => pf.issue(tp, A, tp + 300));
-  ok(tally(ahead) === '22x8 24x56 26x6' && pf.required(tp, B) === 22,
-    `70 challenges fetched by one network before any login state ${tally(ahead)}, the curve for 70 new identities; another network still 22`);
+  ok(tally(ahead) === '6x8 8x56 10x6' && pf.required(tp, B) === 6,
+    `70 challenges fetched by one network before any login state ${tally(ahead)}, the curve for 70 new identities; another network still 6`);
   for (let i = 0; i < 70; i++) pf.spent(tp + 1, A, tp + 300);
-  ok(pf.required(tp + 1, A) === 22, 'spent by logins without a good proof (a known identity, a bad proof), they wait no more: 22 again');
+  ok(pf.required(tp + 1, A) === 6, 'spent by logins without a good proof (a known identity, a bad proof), they wait no more: 6 again');
   for (let i = 0; i < 8; i++) { pf.issue(tp + 2, A, tp + 302); pf.spent(tp + 3, A, tp + 302); pf.arrived(tp + 3, A); }
-  ok(pf.required(tp + 3, A) === 24, 'spent with a good proof, a challenge moves from waiting to arrived: 8 of them, 24 for the next');
+  ok(pf.required(tp + 3, A) === 8, 'spent with a good proof, a challenge moves from waiting to arrived: 8 of them, 8 bits for the next');
   for (let i = 0; i < 60; i++) pf.issue(tp + 4, B, tp + 304);
-  ok(pf.required(tp + 303, B) === 24 && pf.required(tp + 304, B) === 22, 'challenges never redeemed wait until they expire (300 s), then count no more');
-  const pl = powCheck({ bits: 12, loadBits: 16, loadPerHour: 2 });
+  ok(pf.required(tp + 303, B) === 8 && pf.required(tp + 304, B) === 6, 'challenges never redeemed wait until they expire (300 s), then count no more');
+  const pl = powCheck({ bits: 4, loadBits: 8, loadPerHour: 2 });
   const relayWide = [0, 1, 2, 3].map((i) => pl.issue(tp, `net ${i}`, tp + 300));
   [0, 1, 2, 3].forEach((i) => pl.spent(tp + 1, `net ${i}`, tp + 300));
-  ok(relayWide.join() === '12,12,12,16' && pl.required(tp + 1) === 12,
-    `the load raise counts waiting challenges too (2 an hour configured, one each from 4 networks): ${relayWide.join()}; 12 once they are spent`);
-  // A count, not a difficulty, bounds what one network mints (audit: a native solver does 2^26 in
-  // ~3 s): past perDay good proofs in 24 hours the network is capped, and its challenges state
+  ok(relayWide.join() === '4,4,4,8' && pl.required(tp + 1) === 4,
+    `the load raise counts waiting challenges too (2 an hour configured, one each from 4 networks): ${relayWide.join()}; 4 once they are spent`);
+  // A count, not a difficulty, bounds what one network mints (audit: a native SHA-256 solver did
+  // 2^26 in ~3 s; Argon2id slows it to ~13 evaluations a second, still not a bound): past perDay good proofs in 24 hours the network is capped, and its challenges state
   // CLOSED_BITS. Challenges held unredeemed close nothing; another network is not touched.
   ok(NETWORK_DAY === 64 && CLOSED_BITS === 64, 'the default cap: 64 new identities a day from one network; a closed network is told 64 bits');
-  const cap = powCheck({ bits: 12, loadBits: 16, perDay: 3 }), tc = hour + 7 * 3600;
+  const cap = powCheck({ bits: 4, loadBits: 8, perDay: 3 }), tc = hour + 7 * 3600;
   for (let i = 0; i < 5; i++) cap.issue(tc, A, tc + 300);
   const opened = !cap.capped(tc, A);
   for (let i = 0; i < 3; i++) cap.arrived(tc + i, A);
-  ok(opened && cap.capped(tc + 3, A) && cap.issue(tc + 3, A, tc + 303) === CLOSED_BITS && !cap.capped(tc + 3, B) && cap.issue(tc + 3, B, tc + 303) === 12,
-    'perDay 3: 5 challenges held close nothing; after 3 good proofs the network is capped and its next challenge states 64; another network 12');
+  ok(opened && cap.capped(tc + 3, A) && cap.issue(tc + 3, A, tc + 303) === CLOSED_BITS && !cap.capped(tc + 3, B) && cap.issue(tc + 3, B, tc + 303) === 4,
+    'perDay 3: 5 challenges held close nothing; after 3 good proofs the network is capped and its next challenge states 64; another network 4');
   ok(cap.capped(tc + POW_DAY - 1, A) && !cap.capped(tc + POW_DAY, A), 'the cap holds for 24 hours from the oldest of those proofs, then the network opens');
   const thrown = (o) => { try { powCheck(o); return ''; } catch (e) { return e.message; } };
   ok(/perDay/.test(thrown({ bits: 8, perDay: 0 })), 'powCheck refuses a cap below 1');
   ok(/at most 60/.test(thrown({ bits: 61, loadBits: 61 })) && /rising/.test(thrown({ bits: 8, steps: [{ from: 8, add: 2 }, { from: 8, add: 4 }] })) && /rising/.test(thrown({ bits: 8, steps: [{ from: 8, add: 2 }, { from: 64, add: 2 }] })),
     'powCheck refuses a base whose highest step passes 64 bits, and steps that do not rise');
-  const bad = powCheck({ bits: 22 });
+  ok(/cost/.test(thrown({ cost: { m: 4, t: 1, p: 1 } })) && /cost/.test(thrown({ cost: { m: 8, t: 1, p: 2 } })) && /checks/.test(thrown({ checks: 0 })),
+    'powCheck refuses a cost below 8 KiB or of more than 1 lane, and fewer than 1 check at once');
+  const bad = powCheck({ bits: 22, loadBits: 22, cost: T });
   const t0 = process.hrtime.bigint();
-  let passed = 0;
-  for (let i = 0; i < 10000; i++) if (bad.check({ pow: String(i), host: HOST, original: did, nonce: nonceB, bits: 22 }) === null) passed++;
+  const verdicts = await Promise.all(Array.from({ length: 200 }, (_, i) => bad.check({ pow: String(i), host: HOST, original: did, nonce: nonceB, bits: 22 })));
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  ok(passed === 0 && ms < 2000 && bad.required(now) === 22, `10,000 bad proofs at 22 bits: all refused in ${ms.toFixed(0)} ms, one hash each, no arrival counted`);
+  ok(verdicts.every((v) => /does not meet 22 bits/.test(v)) && bad.required(now) === 22, `200 bad proofs at 22 bits, all at once: all refused (${ms.toFixed(0)} ms), one evaluation each, no arrival counted`);
+  // At most CHECKS evaluations at once, WAITING_PER times as many waiting in order; past that busy(),
+  // which auth.mjs answers with "rate" before spending the nonce (relay below).
+  ok(CHECKS === 4 && WAITING_PER === 4, 'by default 4 evaluations at once, 16 waiting');
+  const q = powCheck({ bits: 4, cost: { m: 1024, t: 1, p: 1 }, checks: 2 }), job = (i) => q.check({ pow: String(i), host: HOST, original: did, nonce: nonceA, bits: 4 });
+  const nine = Array.from({ length: 9 }, (_, i) => job(i)), busy9 = q.busy(), tenth = job(9), busy10 = q.busy();
+  await Promise.all([...nine, tenth]);
+  ok(!busy9 && busy10 && !q.busy(), `2 at once: 2 running and 7 waiting is not busy, 2 and 8 is (${busy9}, ${busy10}); free again once they are done`);
 }
 
 // ================================================================ proof of work on the relay
 const erin = identity('erin');
 {
   const ch = await getChallenge(erin.did);
-  ok(ch.pow_bits === 8, `GET /challenge gives pow_bits, the configured difficulty (${ch.pow_bits})`);
+  ok(ch.pow_bits === 4 && JSON.stringify(ch.pow) === '{"v":1,"alg":"argon2id","m":8,"t":1,"p":1}', `GET /challenge gives pow_bits and pow, the configured difficulty and function (${ch.pow_bits}, ${JSON.stringify(ch.pow)})`);
   const l0 = await login(erin, { pow: false });
   ok(l0.client?.connected === true, 'a new identity logs in without a proof: the work is due at its first claim');
   ok(await subscribe(l0.client, topic()) === 128 && await noticed(l0.client, 'pow'), 'its first claim: refused, $sigelo/notice "pow"');
@@ -277,7 +302,7 @@ const erin = identity('erin');
   let stale;
   for (let i = 0; ; i++) {
     const c = String(i);
-    if (leadingZeroBits(powDigest(HOST, erin.original, first.challenge.nonce, c)) >= 8 && leadingZeroBits(powDigest(HOST, erin.original, second.challenge.nonce, c)) < 8) { stale = c; break; }
+    if (leadingZeroBits(await digest(HOST, erin.original, first.challenge.nonce, c)) >= 4 && leadingZeroBits(await digest(HOST, erin.original, second.challenge.nonce, c)) < 4) { stale = c; break; }
   }
   const staleCreds = { username: erin.did, clientId: clientId(erin), password: password(erin, second.challenge, { extra: { pow: stale } }) };
   const replayed = await mqttConnect(staleCreds);
@@ -293,21 +318,21 @@ const erin = identity('erin');
   ok(l3.client?.connected === true && !l4.client && (await checkOf(l4.creds)).check === 'pow', 'a proven identity\'s pow is not hashed again ("0" passes) but is still shape-checked ("x": pow)');
   l3.client?.end(true);
   // Bad proofs leave nothing behind: no proof kept, no account, no arrival (plan §5 "Proof-of-work
-  // DoS"). Five logins of a new identity, then 10,000 checks through the relay's own policy.
+  // DoS"). Five logins of a new identity, then 200 checks through the relay's own policy.
   const nell = identity('nell'), nellAccount = accountOf(nell.original), nonceB = 'B'.repeat(43);
   const proofs = () => relay.db.raw.prepare('SELECT count(*) AS n FROM pow_proofs').get().n, before = proofs();
   let named = 0;
   for (let i = 0; i < 5; i++) { const b = await loginBadPow(nell); if (!b.client && (await checkOf(b.creds)).check === 'pow') named++; }
   const bad = [];
-  for (let i = 0; bad.length < 10000; i++) if (leadingZeroBits(powDigest(HOST, nell.original, nonceB, String(i))) < 8) bad.push(String(i));
+  for (let i = 0; bad.length < 200; i++) if (leadingZeroBits(await digest(HOST, nell.original, nonceB, String(i))) < 4) bad.push(String(i));
   const t0 = process.hrtime.bigint();
-  const refused = bad.filter((c) => pol.pow({ pow: c, host: HOST, account: nellAccount, original: nell.original, nonce: nonceB, isNew: false, now, bits: 8, network: 'test' }) !== null).length;
+  const refused = (await Promise.all(bad.map((c) => policyPow(pol, { pow: c, host: HOST, account: nellAccount, original: nell.original, nonce: nonceB, isNew: false, now, bits: 4, network: 'test' })))).filter((x) => x !== null).length;
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  ok(named === 5 && refused === 10000 && ms < 5000 && proofs() === before && relay.db.account(nellAccount) === undefined && (await getChallenge(erin.did)).pow_bits === 8,
-    `5 logins and 10,000 policy checks with bad proofs: refused "pow" (${ms.toFixed(0)} ms), no proof kept, no account made, pow_bits still 8`);
+  ok(named === 5 && refused === 200 && proofs() === before && relay.db.account(nellAccount) === undefined && (await getChallenge(erin.did)).pow_bits === 4,
+    `5 logins and 200 policy checks with bad proofs: refused "pow" (${ms.toFixed(0)} ms), no proof kept, no account made, pow_bits still 4`);
   // The load raise on a relay of its own, configured for 3 new identities an hour: only good proofs
   // count, so logins without a proof, or with bad ones, cannot raise the work for everyone else.
-  const loaded = await startRelay({ ...cfg, db: join(dir, 'load.db'), policy: (ctx) => relayPolicy(ctx, { ...config, pow: { bits: 8, loadBits: 12, loadPerHour: 3 } }) });
+  const loaded = await startRelay({ ...cfg, db: join(dir, 'load.db'), policy: (ctx) => relayPolicy(ctx, { ...config, pow: { bits: 4, loadBits: 8, loadPerHour: 3, cost: T } }) });
   for (let i = 0; i < 6; i++) (await login(identity(`idle ${i}`), { pow: false }, loaded)).client?.end(true);
   for (let i = 0; i < 4; i++) (await loginBadPow(identity('liar'), loaded)).client?.end(true);
   const unloaded = (await getChallenge(erin.did, loaded)).pow_bits;
@@ -315,38 +340,38 @@ const erin = identity('erin');
   const raised = (await getChallenge(erin.did, loaded)).pow_bits;
   now += 2 * 3600;
   const calm = (await getChallenge(erin.did, loaded)).pow_bits;
-  ok(unloaded === 8 && raised === 12 && calm === 8,
+  ok(unloaded === 4 && raised === 8 && calm === 4,
     `6 new identities without a proof and one failing 4 times raise nothing (pow_bits ${unloaded}); 4 good proofs in an hour: ${raised}; two hours later ${calm}`);
   await loaded.close();
-  // Per network, on a relay of its own (base 8): new identities whose challenges came from one /24
+  // Per network, on a relay of its own (base 4): new identities whose challenges came from one /24
   // (nginx's X-Real-IP; every CONNECT here comes from 127.0.0.1) raise that network's pow_bits at 8
-  // good proofs a day. Other networks stay at 8, the CONNECTs' own 127.0.0.0/24 included: else
+  // good proofs a day. Other networks stay at 4, the CONNECTs' own 127.0.0.0/24 included: else
   // challenges asked from one network and logins made from another kept the first at the base.
   const N = await startRelay({ ...cfg, db: join(dir, 'netpow.db'), policy: (ctx) => relayPolicy(ctx, config) });
   const NET = '198.51.100.7', NEAR = '198.51.100.200', OTHER = '203.0.113.7', saved = now;
   const late = identity('net late'), later = identity('net later');
-  const early = await getChallenge(late.did, N, NET);   // issued at 8 bits, used after the raise
+  const early = await getChallenge(late.did, N, NET);   // issued at 4 bits, used after the raise
   const joined = [];
   for (let i = 0; i < 8; i++) { const l = await login(identity(`net ${i}`), { pow: true, ip: NET }, N); joined.push(l.client?.connected === true); l.client?.end(true); }
   const bitsOf = async (ip) => (await getChallenge(erin.did, N, ip)).pow_bits;
   const seen = [await bitsOf(NET), await bitsOf(NEAR), await bitsOf(OTHER), await bitsOf(undefined)];
-  ok(early.pow_bits === 8 && joined.every(Boolean) && seen.join() === '10,10,8,8',
-    `8 new identities whose challenges came from ${NET}: pow_bits there and in the rest of its /24 ${seen[0]}, ${seen[1]} (8 + 2); another /24 ${seen[2]}; the CONNECTs' 127.0.0.0/24 ${seen[3]}`);
+  ok(early.pow_bits === 4 && joined.every(Boolean) && seen.join() === '6,6,4,4',
+    `8 new identities whose challenges came from ${NET}: pow_bits there and in the rest of its /24 ${seen[0]}, ${seen[1]} (4 + 2); another /24 ${seen[2]}; the CONNECTs' 127.0.0.0/24 ${seen[3]}`);
   // A proof is checked against the bits its nonce states: the raise refuses no client mid-search.
-  const weakFor = (id, nonce) => { for (let i = 0; ; i++) { const z = leadingZeroBits(powDigest(HOST, id.original, nonce, String(i))); if (z >= 8 && z < 10) return String(i); } };
-  const connectWith = async (id, ch) => { const creds = { username: id.did, clientId: clientId(id), password: password(id, ch, { extra: { pow: weakFor(id, ch.nonce) } }) }; return { ...(await mqttConnect(creds, N)), creds }; };
-  const e = await connectWith(late, early.challenge), fresh10 = await getChallenge(later.did, N, NET), f = await connectWith(later, fresh10.challenge);
-  ok(e.client?.connected === true && fresh10.pow_bits === 10 && !f.client && (await checkOf(f.creds, N)).check === 'pow',
-    'an 8-or-9-bit proof on the challenge issued at 8 before the raise logs in after it (its nonce states 8); on one issued after (10): refused "pow"');
+  const weakFor = async (id, nonce) => { for (let i = 0; ; i++) { const z = leadingZeroBits(await digest(HOST, id.original, nonce, String(i))); if (z >= 4 && z < 6) return String(i); } };
+  const connectWith = async (id, ch) => { const creds = { username: id.did, clientId: clientId(id), password: password(id, ch, { extra: { pow: await weakFor(id, ch.nonce) } }) }; return { ...(await mqttConnect(creds, N)), creds }; };
+  const e = await connectWith(late, early.challenge), fresh6 = await getChallenge(later.did, N, NET), f = await connectWith(later, fresh6.challenge);
+  ok(e.client?.connected === true && fresh6.pow_bits === 6 && !f.client && (await checkOf(f.creds, N)).check === 'pow',
+    'a 4-or-5-bit proof on the challenge issued at 4 before the raise logs in after it (its nonce states 4); on one issued after (6): refused "pow"');
   e.client?.end(true);
   now += DAY;
   const dayOn = await bitsOf(NET);
-  ok(dayOn === 8, `a day after those proofs, ${NET} is back at the base (${dayOn})`);
+  ok(dayOn === 4, `a day after those proofs, ${NET} is back at the base (${dayOn})`);
   now = saved;
   await N.close();
   // The prefetch race (review finding), on a relay of its own: one /24 fetches challenges for 9
   // fresh DIDs before any login. They wait, and count as new identities to come, so the 9th states
-  // 8 + 2; all 9 are redeemed at what they state and log in. Before, all 9 stated 8, and so did
+  // 4 + 2; all 9 are redeemed at what they state and log in. Before, all 9 stated 4, and so did
   // every challenge a network could fetch within 5 minutes.
   const P = await startRelay({ ...cfg, db: join(dir, 'prefetch.db'), policy: (ctx) => relayPolicy(ctx, config) });
   const PNET = '192.0.2.7', KNET = '2001:db8:1::7', UNET = '2001:db8:2::7';   // three networks: a /24 and two /48s
@@ -354,13 +379,13 @@ const erin = identity('erin');
   for (let i = 0; i < 9; i++) { const id = identity(`ahead ${i}`); fetched.push({ id, ...(await getChallenge(id.did, P, PNET)) }); }
   let redeemed = 0;
   for (const { id, challenge, pow_bits } of fetched) {
-    const r = await mqttConnect({ username: id.did, clientId: clientId(id), password: password(id, challenge, { extra: { pow: solve(HOST, id.original, challenge.nonce, pow_bits) } }) }, P);
+    const r = await mqttConnect({ username: id.did, clientId: clientId(id), password: password(id, challenge, { extra: { pow: await solve(HOST, id.original, challenge.nonce, pow_bits, T) } }) }, P);
     if (r.client?.connected) redeemed++;
     r.client?.end(true);
   }
   const statedAhead = fetched.map((x) => x.pow_bits).join();
-  ok(statedAhead === '8,8,8,8,8,8,8,8,10' && redeemed === 9 && (await getChallenge(erin.did, P, PNET)).pow_bits === 10,
-    `9 challenges fetched by one /24 before any login state ${statedAhead}; all 9 log in at what they state; that /24 then states 10`);
+  ok(statedAhead === '4,4,4,4,4,4,4,4,6' && redeemed === 9 && (await getChallenge(erin.did, P, PNET)).pow_bits === 6,
+    `9 challenges fetched by one /24 before any login state ${statedAhead}; all 9 log in at what they state; that /24 then states 6`);
   // A known identity's logins spend their challenges at once (auth.mjs powSpent): 20 logins from
   // one /24 leave nothing waiting there. Challenges nobody redeems wait 300 s, then count no more.
   const known = identity('known k');
@@ -370,7 +395,7 @@ const erin = identity('erin');
   const held = (await getChallenge(erin.did, P, UNET)).pow_bits;
   now += 300;
   const expired = (await getChallenge(erin.did, P, UNET)).pow_bits;
-  ok(knownBits === 8 && held === 10 && expired === 8,
+  ok(knownBits === 4 && held === 6 && expired === 4,
     `21 logins of one identity from one network leave its pow_bits there at ${knownBits}; 8 challenges unredeemed on another raise it to ${held}, and to ${expired} once expired`);
   now = saved;
   await P.close();
@@ -381,25 +406,25 @@ const erin = identity('erin');
   const CNET = '198.51.100.9', CAWAY = '203.0.113.9';
   const pre = identity('cap before'), ch4 = await getChallenge(pre.did, C, CNET);
   // A licensed operator (logged in from another network) and a challenge its new agent fetches
-  // from CNET before the cap, stated at 8.
+  // from CNET before the cap, stated at 4.
   const opC = identity('cap operator'), agC = identity('cap agent'), chA = await getChallenge(agC.did, C, CNET);
   (await login(opC, { pow: true, ip: CAWAY }, C)).client?.end(true);
   const upC = await upload(licence(opC), C);
   const three = [];
   for (let i = 0; i < 3; i++) { const id = identity(`cap ${i}`), l = await login(id, { pow: true, ip: CNET }, C); three.push(l.client?.connected === true); l.client?.end(true); }
   const closed = (await getChallenge(erin.did, C, CNET)).pow_bits;
-  const c4 = { username: pre.did, clientId: clientId(pre), password: password(pre, ch4.challenge, { extra: { pow: solve(HOST, pre.original, ch4.challenge.nonce, ch4.pow_bits) } }) };
+  const c4 = { username: pre.did, clientId: clientId(pre), password: password(pre, ch4.challenge, { extra: { pow: await solve(HOST, pre.original, ch4.challenge.nonce, ch4.pow_bits, T) } }) };
   const capL = await mqttConnect(c4, C), why4 = await checkOf(c4, C);
-  ok(three.every(Boolean) && closed === CLOSED_BITS && ch4.pow_bits === 8 && !capL.client && why4.check === 'pow' && /brought 3 new identities/.test(why4.detail ?? ''),
+  ok(three.every(Boolean) && closed === CLOSED_BITS && ch4.pow_bits === 4 && !capL.client && why4.check === 'pow' && /brought 3 new identities/.test(why4.detail ?? ''),
     `3 new identities from one /24 log in; then its GET /challenge states ${closed}, and a 4th with a good proof on a challenge issued before is refused "pow" (${why4.detail})`);
   // Review finding, recorded rather than changed (relay/README.md says it): the cap closes the
   // network to a licensed operator's new agents too. GET /challenge states 64 before the relay sees
-  // any bundle, and apps/contact/carrier.mjs searches no more than 26 bits; here the agent holds a
+  // any bundle, and apps/contact/carrier.mjs searches no more than 10 bits; here the agent holds a
   // challenge from before the cap, a good proof and its operator attestation, and is refused all
   // the same. An exemption is the orchestrator's decision (this suite pins what is shipped).
-  const cA = { username: agC.did, clientId: clientId(agC), password: password(agC, chA.challenge, { bundle: withVouch(agC, opC, vouch(opC, agC)), extra: { pow: solve(HOST, agC.original, chA.challenge.nonce, chA.pow_bits) } }) };
+  const cA = { username: agC.did, clientId: clientId(agC), password: password(agC, chA.challenge, { bundle: withVouch(agC, opC, vouch(opC, agC)), extra: { pow: await solve(HOST, agC.original, chA.challenge.nonce, chA.pow_bits, T) } }) };
   const agL = await mqttConnect(cA, C), whyA = await checkOf(cA, C);
-  ok(upC.ok && chA.pow_bits === 8 && !agL.client && whyA.check === 'pow' && /brought 3 new identities/.test(whyA.detail ?? '') && (await getChallenge(agC.did, C, CNET)).pow_bits === CLOSED_BITS,
+  ok(upC.ok && chA.pow_bits === 4 && !agL.client && whyA.check === 'pow' && /brought 3 new identities/.test(whyA.detail ?? '') && (await getChallenge(agC.did, C, CNET)).pow_bits === CLOSED_BITS,
     'a licensed operator\'s new agent on the capped network, with a good proof and its attestation: refused "pow" too, and told 64 bits for a fresh challenge');
   agL.client?.end(true);
   const again = await login(identity('cap 0'), { ip: CNET }, C), away = await login(identity('cap away'), { pow: true, ip: CAWAY }, C);
@@ -791,10 +816,11 @@ let annC, benC, K;
   const died = [];
   const die = (why) => { died.push(why); throw new Error(why); };
   const tryEnv = (env) => { try { relayPolicyFromEnv(env, die); return 'ok'; } catch { return died.at(-1); } };
-  ok(tryEnv({}) === 'ok' && tryEnv({ RELAY_POW_BITS: '20', RELAY_PRO_STORAGE_MB: '2048', RELAY_VENDOR_DID: vendor.original }) === 'ok', 'relayPolicyFromEnv: the defaults, and set values, are taken');
+  ok(tryEnv({}) === 'ok' && tryEnv({ RELAY_POW_BITS: '7', RELAY_PRO_STORAGE_MB: '2048', RELAY_VENDOR_DID: vendor.original }) === 'ok', 'relayPolicyFromEnv: the defaults, and set values, are taken');
   ok(/^RELAY_POW_BITS/.test(tryEnv({ RELAY_POW_BITS: 'x' })) && /^RELAY_PRO_STORAGE_MB/.test(tryEnv({ RELAY_PRO_STORAGE_MB: '0' })) && /^RELAY_VENDOR_DID/.test(tryEnv({ RELAY_VENDOR_DID: 'vendor' }))
     && /loadBits/.test(tryEnv({ RELAY_POW_BITS: '26', RELAY_POW_LOAD_BITS: '22' })) && /^RELAY_FREE_QUEUE_MB/.test(tryEnv({ RELAY_FREE_QUEUE_MB: '0' }))
-    && /tiers\.pro\.storage: want at least tiers\.free\.storage/.test(tryEnv({ RELAY_PRO_STORAGE_MB: '10' })) && /at most 60/.test(tryEnv({ RELAY_POW_BITS: '61', RELAY_POW_LOAD_BITS: '61' })),
+    && /tiers\.pro\.storage: want at least tiers\.free\.storage/.test(tryEnv({ RELAY_PRO_STORAGE_MB: '10' })) && /at most 60/.test(tryEnv({ RELAY_POW_BITS: '61', RELAY_POW_LOAD_BITS: '61' }))
+    && /^RELAY_POW_CHECKS/.test(tryEnv({ RELAY_POW_CHECKS: '0' })) && /^RELAY_POW_CHECKS/.test(tryEnv({ RELAY_POW_CHECKS: '65' })) && tryEnv({ RELAY_POW_CHECKS: '2' }) === 'ok',
     'relayPolicyFromEnv: a bad value is refused naming its variable (or the tier it breaks: pro below free; a base whose network steps pass 64 bits)');
 }
 
@@ -1381,28 +1407,48 @@ const fresh = (name, extra = {}) => {
   await R.close();
 }
 
+// ================================================================ proofs past the queue
+{
+  // At most CHECKS evaluations at once and WAITING_PER times as many waiting (pow.mjs): past that a
+  // login with a proof is refused "rate" before its nonce is spent, so the same CONNECT, proof and
+  // all, logs in once the queue has room. Real cost here, 1 at once: 5 evaluations fill it.
+  const Q = fresh('pow busy', { pow: { ...config.pow, bits: 1, loadBits: 1, cost: ARGON, checks: 1 } }), R = await Q.start();
+  const id = identity('busy newcomer');
+  const { challenge, pow_bits, pow: params } = await getChallenge(id.did, R);
+  const c = await solve(HOST, id.original, challenge.nonce, pow_bits, params);
+  const creds = { username: id.did, clientId: clientId(id), password: password(id, challenge, { extra: { pow: c } }) };
+  const fill = Array.from({ length: 1 + WAITING_PER }, (_, i) => policyPow(Q.pol, { pow: String(i), host: HOST, account: accountOf(`did:sigelo:zBusy${i}`), original: `did:sigelo:zBusy${i}`, nonce: 'B'.repeat(43), isNew: true, now, bits: 1, network: 'busy net' }));
+  const refused = await checkOf(creds, R);
+  await Promise.all(fill);
+  const later = await mqttConnect(creds, R);
+  ok(JSON.stringify(params) === '{"v":1,"alg":"argon2id","m":65536,"t":3,"p":1}' && refused.check === 'rate' && /same login again/.test(refused.detail ?? '') && later.client?.connected === true && await subscribe(later.client, topic()) === 1,
+    `1 evaluation running and 4 waiting: a new identity's login with its proof is refused "rate" (${refused.detail}); the same CONNECT logs in once they are done, and claims`);
+  later.client?.end(true);
+  await R.close();
+}
+
 // ================================================================ the per-network curve at its default edge, through the policy
 {
   // Review finding: NETWORK_DAY is the top step's 64, so what GET /challenge states (policy.powBits:
   // pow.mjs issue(), the cap applied) runs base, base + 2, then closed; base + 4 only while a
   // challenge waiting brings the count to 64 before the 64th good proof. The earlier edge test read
-  // required(), which ignores the cap. Default steps and cap here, base 8: 8, 10, 12, 64.
-  const E = fresh('pow edge'), R = await E.start(), EN = 'edge net', te = now, exp = te + 300;
-  const proveAs = (i, bits) => {
+  // required(), which ignores the cap. Default steps and cap here, base 2: 2, 4, 6, 64.
+  const E = fresh('pow edge', { pow: { ...config.pow, bits: 2, loadBits: 2 } }), R = await E.start(), EN = 'edge net', te = now, exp = te + 300;
+  const proveAs = async (i, bits) => {
     const original = `did:sigelo:zEdge${i}`, nonce = String(i).padStart(43, 'E');
     E.pol.powSpent({ network: EN, exp, now: te });
-    return E.pol.pow({ pow: solve(HOST, original, nonce, bits), host: HOST, account: accountOf(original), original, nonce, isNew: true, now: te, bits, network: EN });
+    return policyPow(E.pol, { pow: await solve(HOST, original, nonce, bits, T), host: HOST, account: accountOf(original), original, nonce, isNew: true, now: te, bits, network: EN });
   };
   const seen = [];
   for (let i = 0; i < 64; i++) {
     const bits = E.pol.powBits({ network: EN, exp, now: te });
     if ([0, 7, 8, 63].includes(i)) seen.push(`${i}:${bits}`);
     if (i === 63) { seen.push(`63 + 1 waiting:${E.pol.powBits({ network: EN, exp, now: te })}`); E.pol.powSpent({ network: EN, exp, now: te }); }
-    if (proveAs(i, bits) !== null) seen.push(`refused ${i}`);
+    if (await proveAs(i, bits) !== null) seen.push(`refused ${i}`);
   }
   seen.push(`64:${E.pol.powBits({ network: EN, exp, now: te })}`);
-  const past = proveAs(64, 10);
-  ok(seen.join() === '0:8,7:8,8:10,63:10,63 + 1 waiting:12,64:64' && /brought 64 new identities/.test(past ?? ''),
+  const past = await proveAs(64, 4);
+  ok(seen.join() === '0:2,7:2,8:4,63:4,63 + 1 waiting:6,64:64' && /brought 64 new identities/.test(past ?? ''),
     `the default curve as stated (good proofs:bits): ${seen.join(' ')}; the 65th new identity refused "pow" whatever its proof`);
   await R.close();
 }
@@ -1430,13 +1476,13 @@ const fresh = (name, extra = {}) => {
     // A closed network states 64 bits, which no search here could meet: recorded, not searched.
     const { challenge, pow_bits } = await getChallenge(nx.did, R, RNET);
     if (pow_bits === CLOSED_BITS) { tries.push('closed'); continue; }
-    const creds = { username: nx.did, clientId: clientId(nx), password: password(nx, challenge, { extra: { pow: solve(HOST, nx.original, challenge.nonce, pow_bits) } }) };
+    const creds = { username: nx.did, clientId: clientId(nx), password: password(nx, challenge, { extra: { pow: await solve(HOST, nx.original, challenge.nonce, pow_bits, T) } }) };
     const l = await mqttConnect(creds, R);
     tries.push(l.client ? 'connected' : (await checkOf(creds, R)).check);
     l.client?.end(true);
   }
   const there = (await getChallenge(erin.did, R, RNET)).pow_bits;
-  ok(tries.join() === 'relay_full,relay_full,relay_full' && there === 8 && R.db.account(NX) === undefined,
+  ok(tries.join() === 'relay_full,relay_full,relay_full' && there === 4 && R.db.account(NX) === undefined,
     `a new free identity tries 3 times with a good proof while the free tier is full: ${tries.join()}; one arrival counted (its network, 2 a day, still states ${there})`);
   const hb = (await login(holder, {}, R)).client;
   await unsubscribe(hb, HT); await end(hb);   // room for an account now
@@ -1788,7 +1834,7 @@ const fresh = (name, extra = {}) => {
   // POST /gift as `id`, after a login to G that stored it (pow), unless opts.fresh.
   async function redeem(id, hash, opts = {}) {
     const { challenge, pow_bits } = await getChallenge(id.did, G, opts.ip);
-    const pow = opts.pow ? { pow: solve(HOST, id.original, challenge.nonce, pow_bits) } : {};
+    const pow = opts.pow ? { pow: await solve(HOST, id.original, challenge.nonce, pow_bits, T) } : {};
     const pw = password(id, challenge, { bundle: opts.bundle ?? true, extra: pow });
     const res = await fetch(`${base(G)}/gift`, { method: 'POST', headers: opts.ip ? { 'x-real-ip': opts.ip } : {}, body: JSON.stringify({ username: id.did, client_id: clientId(id), password: pw, code_hash: hash }) });
     return { status: res.status, after: res.headers.get('retry-after'), json: await res.json() };

@@ -4,7 +4,8 @@
 //   GET  /challenge?did=<current DID>   → { challenge: {v:"sigelo-relay/0", typ:"relay-login", did,
 //                 relay: the relay host, nonce}, pow_bits: what a new identity proves with this
 //                 nonce (policy.powBits, M4: pow.mjs, which counts it as waiting until a login
-//                 spends it, policy.powSpent; 0 without it) }
+//                 spends it, policy.powSpent; 0 without it), pow: {v: 1, alg: "argon2id", m, t,
+//                 p}, the function it is proved with (policy.powParams; absent without it) }
 //   MQTT CONNECT  username = current DID, client id = "s" + 24 hex of SHA-256(original DID),
 //                 clean session off, password = JCS of {v:"sigelo-relay/0", nonce, sig, bundle?, pow?},
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
@@ -169,14 +170,18 @@ function issuersNamed(issuers, attestations) {
 // first mailbox claim. policy.pow, when M4 supplies it, decides the value and its shape, given the
 // bits the nonce states and the network it was issued to (newNonce); without it absence is
 // accepted and a present value is only shape-checked, so a client that already sends one is not
-// refused.
+// refused. → undefined, or what policy.pow answers when the proof needs its evaluation, { wait,
+// done } (allowance.mjs): login() goes on after it.
 function checkPow(pow, ctx, policy) {
   if (!policy.pow) {
     if (pow !== undefined && (typeof pow !== 'string' || pow.length < 1 || pow.length > 128)) fail('pow', 'want a string of 1 to 128 characters');
-    return;
+    return undefined;
   }
-  const refusal = policy.pow({ pow, ...ctx });
-  if (refusal) fail('pow', refusal);
+  const r = policy.pow({ pow, ...ctx });
+  if (typeof r === 'string') fail('pow', r);
+  if (r === null || r === undefined) return undefined;
+  if (!(r.wait instanceof Promise) || typeof r.done !== 'function') throw new Error('policy.pow: want null, a refusal, or {wait, done}');
+  return r;
 }
 
 // db: relay/db.mjs. host: the relay's public name, the login body's `relay` (no replay at another relay).
@@ -198,6 +203,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   const liveIds = new Map();        // client id → the Aedes client whose session it is
   const unproven = new Map();       // Aedes client of an identity with no proof of work → { prefix, timer }, oldest first
   const ending = new WeakMap();     // Aedes client admitted to a closed relay until a time → the timer that closes it then
+  const left = new WeakSet();       // Aedes client whose socket closed (detach)
   let total = 0;
   // The cache of plan §3: current DID → account, account → { current, original, key }, for logins
   // without a bundle. Memory only. The rotations themselves are in the database (db.chainOf), so a
@@ -364,7 +370,9 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   }
 
   // The whole login. prefix: the client's address cut to /24 or /48. charged: the login rate was
-  // already charged (POST /check charges it before reading the body).
+  // already charged (POST /check charges it before reading the body). → the session, or { wait,
+  // finish } when a proof of work needs its evaluation (checkPow): finish(what wait gave) → the
+  // session, the rest of the login run then (attempt). Nothing else waits.
   function login({ username, clientId, clean, password, prefix, charged = false }) {
     const now = clock();
     if (!charged) chargeLogin(prefix, now);
@@ -384,6 +392,9 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const issued = nonceOf(p.nonce, username), t = nonceTime(now);
     if (issued === null || spent.has(p.nonce)) fail('challenge_unknown', 'not issued here to this DID, or already used: GET /challenge again');
     if (issued.exp <= t) fail('challenge_expired', `expired (${TTL} s): GET /challenge again`);
+    // Proofs of work waiting for their evaluation at their most (pow.mjs): refused before the nonce
+    // is spent, so the same CONNECT, proof and all, is good again while the nonce lives.
+    if (p.pow !== undefined && !closed && policy.powBusy?.()) fail('rate', 'this relay is checking as many proofs of work as it holds: send the same login again in a few seconds (its nonce and proof stay good)');
     spend(p.nonce, issued.exp, t);
     // Spent once, here, whatever follows: the proof of work counts it as waiting no more (pow.mjs).
     // Told on every login, a known identity's too, or its challenges kept its network's new DIDs
@@ -423,8 +434,15 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       if (typeof a !== 'number') fail('closed', a.why);
       admitted = a;
     }
+    const pending = checkPow(p.pow, { host, account, original, nonce: p.nonce, isNew: db.account(account) === undefined, now, bits: issued.bits, network: issued.network, admitted: admitted !== undefined }, policy);
+    const rest = () => finishLogin({ now, username, prefix, original, key, chain, result, taken, account, want, admitted });
+    if (!pending) return rest();
+    return { wait: pending.wait, finish: (why) => { const r = pending.done(why); if (r) fail('pow', r); return rest(); } };
+  }
+  // The rest of a login, after the proof of work (login): from here on in one go, whatever waited
+  // before (isNew read again: another login of this identity may have stored it meanwhile).
+  function finishLogin({ now, username, prefix, original, key, chain, result, taken, account, want, admitted }) {
     const isNew = db.account(account) === undefined;
-    checkPow(p.pow, { host, account, original, nonce: p.nonce, isNew, now, bits: issued.bits, network: issued.network, admitted: admitted !== undefined }, policy);
     if (isNew && diskFull()) fail('relay_full', 'this relay takes no new identities until disk use falls below 70 %');
     // Nothing durable for a new identity until policy.keep says so (M4: once it has proven work):
     // a login costs no work, so rows written for every fresh DID would let free identities alone
@@ -479,14 +497,23 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   // relay failing (a full disk, a bug): "internal", logged without its message (it may quote the
   // request). What a login writes (a new account, a proof, a changed chain or pool row) is settled:
   // no commit of it stays in the WAL in front of what this identity sends next (db.mjs's header).
-  function attempt(fields) {
-    let outcome;
-    try { outcome = { ok: true, session: db.settle(() => login(fields)) }; } catch (e) {
-      if (!(e instanceof LoginError)) { log(`login bug ${e.name} ${String(e.stack).split('\n')[1]?.trim()}`); outcome = { ok: false, check: 'internal', detail: 'the relay failed: try again later' }; }
-      else outcome = { ok: false, check: e.check, detail: e.detail };
-    }
-    record(outcomeKey(fields.username, fields.clientId, fields.password), { ok: outcome.ok, check: outcome.check, detail: outcome.detail });
-    return outcome;
+  // A login whose proof of work waits for its evaluation (login's { wait, finish }) answers a promise
+  // of it; every other answers at once. use(outcome), when given, runs in the same turn as the
+  // login's end, so nothing else runs between its seat check and what use does with the seat.
+  function attempt(fields, use = (o) => o) {
+    const end = (f) => {
+      let outcome;
+      try { outcome = { ok: true, session: db.settle(f) }; } catch (e) {
+        if (!(e instanceof LoginError)) { log(`login bug ${e.name} ${String(e.stack).split('\n')[1]?.trim()}`); outcome = { ok: false, check: 'internal', detail: 'the relay failed: try again later' }; }
+        else outcome = { ok: false, check: e.check, detail: e.detail };
+      }
+      record(outcomeKey(fields.username, fields.clientId, fields.password), { ok: outcome.ok, check: outcome.check, detail: outcome.detail });
+      return use(outcome);
+    };
+    let r;
+    try { r = db.settle(() => login(fields)); } catch (e) { return end(() => { throw e; }); }
+    if (!r.wait) return end(() => r);
+    return r.wait.then((why) => end(() => r.finish(why)), (e) => end(() => { throw e; }));
   }
 
   // ---- MQTT ----
@@ -495,6 +522,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   // The socket of `client` closed (server.mjs), or its seat was given to another (authenticate):
   // its session, if it had one, no longer counts.
   function detach(client) {
+    left.add(client);
     const u = unproven.get(client);
     if (u) { clearTimeout(u.timer); unproven.delete(client); }
     clearTimeout(ending.get(client)); ending.delete(client);
@@ -508,7 +536,12 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   }
   function authenticate(client, username, password, cb) {
     const prefix = prefixOfClient(client);
-    const o = attempt({ username, clientId: client.id, clean: client.clean, password, prefix });
+    void attempt({ username, clientId: client.id, clean: client.clean, password, prefix }, (o) => admit(client, prefix, o, cb));
+  }
+  // A login's outcome o for client (authenticate). A client whose socket closed while its proof of
+  // work waited (detach ran) takes no seat: counted now, it would never be uncounted.
+  function admit(client, prefix, o, cb) {
+    if (o.ok && left.has(client)) return cb(Object.assign(new Error('closed'), { returnCode: 3, login: true }), false);
     if (!o.ok) {
       log(`refused ${prefix} ${o.check}`);
       stats?.count('login_refused', o.check);
@@ -551,17 +584,19 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     // policy answering anything else is the relay's fault: 500.
     const network = networkOf(prefix), exp = nonceTime(now) + TTL, bits = closed ? 0 : policy.powBits?.({ network, exp, now }) ?? 0;
     if (!Number.isInteger(bits) || bits < 0 || bits > 64) throw new Error('policy.powBits: not a whole number of bits, 0 to 64');
-    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits };
+    // pow: the function the proof is computed with and its cost (pow.mjs), so a client refuses one it
+    // does not know rather than search in vain.
+    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }) };
   }
   // prefix: the login rate is already charged to it (before the body was read).
-  function check(body, prefix) {
+  async function check(body, prefix) {
     const keys = Object.keys(body);
     if (typeof body.username !== 'string' || typeof body.client_id !== 'string' || typeof body.password !== 'string'
       || (body.clean !== undefined && typeof body.clean !== 'boolean') || keys.some((k) => !['username', 'client_id', 'password', 'clean'].includes(k)))
       throw httpFail(400, 'want {username, client_id, password, clean?}: the CONNECT fields, password as the string sent');
     const password = Buffer.from(body.password, 'utf8');
     const seen = outcomes.get(outcomeKey(body.username, body.client_id, password));
-    const o = seen && seen.exp > clock() ? seen : attempt({ username: body.username, clientId: body.client_id, clean: body.clean ?? false, password, prefix, charged: true });
+    const o = seen && seen.exp > clock() ? seen : await attempt({ username: body.username, clientId: body.client_id, clean: body.clean ?? false, password, prefix, charged: true });
     if (o.check === 'internal') throw httpFail(503, o.detail);
     return o.ok ? { ok: true } : { ok: false, check: o.check, detail: o.detail };
   }
@@ -593,7 +628,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         let body;
         try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
         if (!isObject(body)) throw httpFail(400, 'body is not a JSON object');
-        return send(200, check(body, prefix));
+        return send(200, await check(body, prefix));
       }
       // Short invite codes (park.mjs). The park brake first, before the body or the login.
       if (park && route === 'POST /park') {
@@ -606,7 +641,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
           || typeof body.username !== 'string' || typeof body.client_id !== 'string' || typeof body.password !== 'string') {
           throw httpFail(400, `want {${PARK_FIELDS.join(', ')}}: POST /check's login fields, then what to park`);
         }
-        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        const o = await attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
         if (o.check === 'internal') throw httpFail(503, o.detail);
         if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
         // Only an identity that has proven its work (allowance.mjs keep) parks: a fresh DID costs nothing.
@@ -625,7 +660,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!isObject(body) || Object.keys(body).length !== GIFT_FIELDS.length || !GIFT_FIELDS.every((k) => typeof body[k] === 'string')) {
           throw httpFail(400, `want {${GIFT_FIELDS.join(', ')}}: POST /check's login fields, then the code's hash`);
         }
-        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        const o = await attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
         if (o.check === 'internal') throw httpFail(503, o.detail);
         if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
         // An identity with no proof of work has no account here to be an operator's.
@@ -661,7 +696,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!isObject(body) || Object.keys(body).length !== CANCEL_FIELDS.length || !CANCEL_FIELDS.every((k) => typeof body[k] === 'string')) {
           throw httpFail(400, `want {${CANCEL_FIELDS.join(', ')}}: POST /check's login fields, the hash in the path`);
         }
-        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        const o = await attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
         if (o.check === 'internal') throw httpFail(503, o.detail);
         if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
         if (park.cancel(url.pathname.slice('/park/'.length), o.session.account, clock())) return send(200, { ok: true });
@@ -678,7 +713,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         if (!isObject(body) || !SET_FIELDS.every((k) => typeof body[k] === 'string') || !keys.every((k) => SET_FIELDS.includes(k) || SET_OPTIONAL.includes(k)) || keys.length === SET_FIELDS.length) {
           throw httpFail(400, `want {${SET_FIELDS.join(', ')}, paused?, cap?}: POST /check's login fields, then at least one setting`);
         }
-        const o = attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
+        const o = await attempt({ username: body.username, clientId: body.client_id, clean: false, password: Buffer.from(body.password, 'utf8'), prefix });
         if (o.check === 'internal') throw httpFail(503, o.detail);
         if (!o.ok) return send(200, { ok: false, check: o.check, detail: o.detail });
         let r;
