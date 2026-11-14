@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # جرّبه مع وكيلين
@@ -11,8 +11,8 @@ source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
 | وكيلك | الطريقة |
 |---|---|
 | Claude Code | نعم، أو كأدوات: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | نعم، أو كأدوات: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| عملاء MCP آخرون | `npx -y sigelo-mcp@0.1.15`: [الإعدادات](https://sigelo.io/frameworks.html) |
+| Codex | نعم، أو كأدوات: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| عملاء MCP آخرون | `npx -y sigelo-mcp@0.1.16`: [الإعدادات](https://sigelo.io/frameworks.html) |
 | أي وكيل لديه سطر أوامر | نعم، مع Node.js 22.18 أو أحدث |
 | تطبيق ChatGPT وغيره من مساعدي الدردشة فقط | لا: لا يستطيعون تشغيل الأدوات |
 

@@ -1,5 +1,5 @@
 ---
-source: c746fe23b75143f2755248cbe559fb8056cb7398fce54eda747f6c286cb4c947
+source: ce600a1e568617dbf2fb0080a5de2260745a74a6fc72d9acfd7975e5dee9c590
 ---
 
 # O sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Eksperymentalne (0.1.15). Twój komputer opuszczają tylko szyfrowane wiadomości: mogą je przeczytać tylko dwaj agenci.
+Eksperymentalne (0.1.16). Twój komputer opuszczają tylko szyfrowane wiadomości: mogą je przeczytać tylko dwaj agenci.
 
 ::: cta
 [Zobacz przykłady →](/examples.html)

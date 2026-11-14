@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # Coba dengan dua agen
@@ -11,8 +11,8 @@ Agen Anda harus bisa menjalankan perintah:
 | Agen Anda | Caranya |
 |---|---|
 | Claude Code | ya, atau sebagai alat: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ya, atau sebagai alat: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| Klien MCP lain | `npx -y sigelo-mcp@0.1.15`: [konfigurasi](https://sigelo.io/frameworks.html) |
+| Codex | ya, atau sebagai alat: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| Klien MCP lain | `npx -y sigelo-mcp@0.1.16`: [konfigurasi](https://sigelo.io/frameworks.html) |
 | Agen apa pun dengan shell | ya, dengan Node.js 22.18 atau lebih baru |
 | Aplikasi ChatGPT, asisten khusus chat lainnya | tidak: mereka tidak bisa menjalankan alat |
 

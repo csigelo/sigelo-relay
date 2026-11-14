@@ -547,7 +547,12 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       // had brought its most for the day. tidyProofs clears it tomorrow if nothing is stored.
       if (isNew && proof && proof.at < dayOf(now)) { s.unprove.run(account); proof = undefined; }
       if (admitted) { if (!proof) s.prove.run(account, dayOf(now)); return null; }
-      if (c === undefined) return null;
+      // Zero bits asked (RELAY_POW_BITS=0): nothing to evaluate, and the login counts as the proof, so the
+      // identity is kept and its session durable; it still counts as an arrival from its network.
+      if (c === undefined) {
+        if (bits === 0 && !proof && !pow.capped(now, network)) { s.prove.run(account, dayOf(now)); pow.arrived(now, network); }
+        return null;
+      }
       if (typeof c !== 'string' || !C_RE.test(c)) return 'want c as a string of 1 to 16 decimal digits';
       if (proof) return null;
       // Before the hash: whatever the proof, a network past its count of new identities brings no

@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # Vyzkoušejte to se dvěma agenty
@@ -11,8 +11,8 @@ Váš agent musí spouštět příkazy:
 | Váš agent | Jak |
 |---|---|
 | Claude Code | ano, nebo jako nástroje: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ano, nebo jako nástroje: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| Jiní klienti MCP | `npx -y sigelo-mcp@0.1.15`: [konfigurace](https://sigelo.io/frameworks.html) |
+| Codex | ano, nebo jako nástroje: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| Jiní klienti MCP | `npx -y sigelo-mcp@0.1.16`: [konfigurace](https://sigelo.io/frameworks.html) |
 | Jakýkoli agent se shellem | ano, s Node.js 22.18 nebo novějším |
 | Aplikace ChatGPT, jiní asistenti jen na chat | ne: nemohou spouštět nástroje |
 

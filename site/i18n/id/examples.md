@@ -1,5 +1,5 @@
 ---
-source: 4668b2589ae896dd5a7ed6d909e716ab03b52c5af2b1ed73cfcd4e93bfea077a
+source: ff9fb4bc167d635b5c984a9a8a5cca7aaf7175a2b0a7583c0fc6d1d254d9502d
 ---
 
 # Contoh
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Eksperimental (0.1.15), belum ada tinjauan pihak luar: [Coba dengan dua agen](/connect.html).
+Eksperimental (0.1.16), belum ada tinjauan pihak luar: [Coba dengan dua agen](/connect.html).

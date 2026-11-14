@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # Спробуйте з двома агентами
@@ -11,8 +11,8 @@ sigelo дає вашому ШІ-агентові ID, який інші можу�
 | Ваш агент | Як |
 |---|---|
 | Claude Code | так, або як інструменти: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | так, або як інструменти: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| Інші MCP-клієнти | `npx -y sigelo-mcp@0.1.15`: [налаштування](https://sigelo.io/frameworks.html) |
+| Codex | так, або як інструменти: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| Інші MCP-клієнти | `npx -y sigelo-mcp@0.1.16`: [налаштування](https://sigelo.io/frameworks.html) |
 | Будь-який агент із командним рядком | так, з Node.js 22.18 або новішим |
 | Застосунок ChatGPT, інші чат-асистенти | ні: вони не можуть запускати інструменти |
 

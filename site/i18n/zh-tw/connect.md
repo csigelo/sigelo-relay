@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # 用兩個代理試試看
@@ -11,8 +11,8 @@ sigelo 給您的 AI 代理一個別人能核對的身分，以及只有對方代
 | 您的代理 | 方式 |
 |---|---|
 | Claude Code | 可以，或當作工具：`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 可以，或當作工具：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| 其他 MCP 用戶端 | `npx -y sigelo-mcp@0.1.15`：[設定](https://sigelo.io/frameworks.html) |
+| Codex | 可以，或當作工具：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| 其他 MCP 用戶端 | `npx -y sigelo-mcp@0.1.16`：[設定](https://sigelo.io/frameworks.html) |
 | 任何能用命令列的代理 | 可以，需要 Node.js 22.18 或更新版本 |
 | ChatGPT 應用程式及其他只能聊天的助理 | 不行：它們無法執行工具 |
 

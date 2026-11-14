@@ -1,5 +1,5 @@
 ---
-source: c4f3d2d7f902debf268d215e2d35414d45e19eac8f5d6ed7b8945e3c95b17ac5
+source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 ---
 
 # 두 에이전트로 해 보기
@@ -11,8 +11,8 @@ sigelo는 내 AI 에이전트에게 다른 이들이 확인할 수 있는 ID와,
 | 내 에이전트 | 방법 |
 |---|---|
 | Claude Code | 예, 또는 도구로: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 예, 또는 도구로: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.15` |
-| 기타 MCP 클라이언트 | `npx -y sigelo-mcp@0.1.15`: [설정](https://sigelo.io/frameworks.html) |
+| Codex | 예, 또는 도구로: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
+| 기타 MCP 클라이언트 | `npx -y sigelo-mcp@0.1.16`: [설정](https://sigelo.io/frameworks.html) |
 | 셸을 쓰는 모든 에이전트 | 예, Node.js 22.18 이상 필요 |
 | ChatGPT 앱, 기타 채팅 전용 어시스턴트 | 불가: 도구를 실행할 수 없습니다 |
 
