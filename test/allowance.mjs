@@ -35,7 +35,8 @@ import { connect as netConnect } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { connect, MqttClient } from 'mqtt';
-import { attest, canonicalize, keygen, rotate } from 'sigelo';
+import { attest, canonicalize, keygen, multibase, rotate } from 'sigelo';
+import { ENROL_GRACE, inviteAnswerTopic } from '../park.mjs';
 import { FULL, startRelay } from '../server.mjs';
 import { ACCOUNT_ROW, CLAIM_ROW, DELETE_BATCH, accountOf, openDb } from '../db.mjs';
 import { RESTORE_MAX } from '../mailbox.mjs';
@@ -44,7 +45,7 @@ import { KB, MB, MESSAGE_FLOOR, MESSAGE_ROW, TIERS as DEFAULT_TIERS, chargeOf, f
 import { checkRelayLicence, LICENCE_CTX, LICENCE_KEEP, RELAY_ROTATIONS_MAX, operators } from '../operator.mjs';
 import { UNKNOWN as GIFT_UNKNOWN, addMonths, giftBrake } from '../gifts.mjs';
 import { argon2Sync } from 'node:crypto';
-import { ARGON, CHECKS, CLOSED_BITS, DAY as POW_DAY, NETWORK_DAY, NETWORK_STEPS, POW_PREFIX, WAITING_PER, leadingZeroBits, powCheck, powDigest, powSalt, solve } from '../pow.mjs';
+import { ARGON, CHECKS, CLOSED_BITS, DAY as POW_DAY, NETWORK_DAY, NETWORK_STEPS, POW_PREFIX, WAITING_PER, leadingZeroBits, oldProof, powCheck, powDigest, powSalt, solve } from '../pow.mjs';
 import { CREATED, bundleOf, clientId, identity, password, rotated, seed } from './fixtures.mjs';
 
 let n = 0, failed = 0;
@@ -163,6 +164,19 @@ async function loginBadPow(id, r = relay) {
   return { ...(await mqttConnect(creds, r)), creds };
 }
 const isoOf = (t) => new Date(t * 1000).toISOString().replace('.000Z', 'Z');
+// A long code (apps/contact/invite.mjs, as relay/test/run.mjs spells it out) with a chosen secret, and an
+// enrolment code parked under hash h (POST /park with enrol: true) by a proven identity.
+const H256 = (b) => createHash('sha256').update(b).digest();
+function longCode(id, secret = randomBytes(32), exp = now + DAY) {
+  const host = Buffer.from(HOST), e = Buffer.alloc(4);
+  e.writeUInt32BE(exp);
+  const body = Buffer.concat([Buffer.from([1]), H256(canonicalize(id.genesis)), secret, e, Buffer.from([host.length]), host]);
+  return 'sgl1' + multibase(Buffer.concat([body, H256(body).subarray(0, 4)])).slice(1);
+}
+async function parkEnrol(id, h, invite, r = relay, exp = now + 3600) {
+  const { challenge } = await getChallenge(id.did, r, '198.18.200.1');
+  return (await postJson('/park', { username: id.did, client_id: clientId(id), password: password(id, challenge), code_hash: h, invite, exp, enrol: true }, r)).json;
+}
 
 // ---- licences and operator attestations, as the offline issuer and an operator write them ----
 const relayClaims = { tier: 'pro', storage_mb: 1, msgs_day: 5, retention_days: 20, groups: 0 };
@@ -307,6 +321,27 @@ const erin = identity('erin');
   const staleCreds = { username: erin.did, clientId: clientId(erin), password: password(erin, second.challenge, { extra: { pow: stale } }) };
   const replayed = await mqttConnect(staleCreds);
   ok(!replayed.client && (await checkOf(staleCreds)).check === 'pow', 'a proof made over another login\'s nonce: refused, POST /check names pow');
+  // the agent-setup feedback, point 1: a client of before 2026-11-13 computes the dropped SHA-256 proof. Refused by
+  // its own name, client_old, with the one line to act on; never a formula, never let in by chance.
+  {
+    const oldOne = identity('old client');
+    let { challenge: oc, pow_bits: ob } = await getChallenge(oldOne.did), c = 0;
+    const sha = (x) => leadingZeroBits(createHash('sha256').update(`sigelo-relay-pow/0\n${HOST}${oldOne.original}${oc.nonce}${x}`, 'utf8').digest());
+    // The old solver's answer: the first c meeting the bits as SHA-256 (it searched from 0); another challenge
+    // in the 1 in 2^bits case where that c meets Argon2id too.
+    for (; ; ({ challenge: oc, pow_bits: ob } = await getChallenge(oldOne.did))) {
+      for (c = 0; sha(String(c)) < ob; c++);
+      if (leadingZeroBits(await digest(HOST, oldOne.original, oc.nonce, String(c))) < ob) break;
+    }
+    let later = c + 1;
+    while (sha(String(later)) < ob) later++;
+    ok(oldProof(HOST, oldOne.original, oc.nonce, String(c), ob) && !oldProof(HOST, oldOne.original, oc.nonce, String(later), ob) && !oldProof(HOST, oldOne.original, oc.nonce, `0${c}`, ob),
+      `oldProof: the first counter meeting the bits as SHA-256 (${c}) is the old solver's; a later one that meets them (${later}), or a padded one, is not (a current client's bad proof: pow)`);
+    const oldCreds = { username: oldOne.did, clientId: clientId(oldOne), password: password(oldOne, oc, { extra: { pow: String(c) } }) };
+    const tried = await mqttConnect(oldCreds), said = await checkOf(oldCreds);
+    ok(!tried.client && tried.error?.code === 5 && said.check === 'client_old' && said.detail === 'client too old: npm i -g sigelo-agent@latest',
+      `an old client's SHA-256 proof: refused client_old (CONNACK 5), its detail one line (${said.check}: ${said.detail})`);
+  }
   const l1 = await login(erin, { pow: true });
   ok(l1.client?.connected === true && await subscribe(l1.client, topic()) === 1, 'with a proof over this login\'s nonce: logged in, and the first claim is granted');
   await end(l1.client);
@@ -338,6 +373,20 @@ const erin = identity('erin');
   const unloaded = (await getChallenge(erin.did, loaded)).pow_bits;
   for (let i = 0; i < 4; i++) (await login(identity(`crowd ${i}`), { pow: true }, loaded)).client?.end(true);
   const raised = (await getChallenge(erin.did, loaded)).pow_bits;
+  // the agent-setup feedback, point 10: under that load a new identity naming a live enrolment code is asked the
+  // base, ENROL_GRACE times per code; a hash parked as an invite, or none, gets the load's bits.
+  {
+    const op = identity('crowd 0'), eh = H256('sigelo-park/0ENR0LL3D').toString('hex'), ih = H256('sigelo-park/0PLA1NC0D').toString('hex');
+    const pe = await parkEnrol(op, eh, longCode(op), loaded);
+    const { challenge: pc } = await getChallenge(op.did, loaded, '198.18.200.2');
+    await postJson('/park', { username: op.did, client_id: clientId(op), password: password(op, pc), code_hash: ih, invite: longCode(op), exp: now + 600 }, loaded);
+    const at = async (h) => (await (await fetch(`${base(loaded)}/challenge?did=${encodeURIComponent(erin.did)}&enrol=${h}`)).json()).pow_bits;
+    const graced = [];
+    for (let i = 0; i < ENROL_GRACE + 1; i++) graced.push(await at(eh));
+    const plain = await at(ih), none = await at('0'.repeat(64));
+    ok(pe.ok === true && pe.enrol === true && graced.slice(0, ENROL_GRACE).every((b) => b === 4) && graced[ENROL_GRACE] === 8 && plain === 8 && none === 8,
+      `under load (8 bits) a challenge naming a live enrolment code states the base 4, ${ENROL_GRACE} times per code; an invite's hash or none: 8 (${graced.join()}; ${plain}, ${none})`);
+  }
   now += 2 * 3600;
   const calm = (await getChallenge(erin.did, loaded)).pow_bits;
   ok(unloaded === 4 && raised === 8 && calm === 4,
@@ -539,8 +588,18 @@ let F;
   const T2 = topic(), T3 = topic(), T4 = topic();
   ok(await subscribe(fm, T2) === 1 && await subscribe(fm, T3) === 1, 'quota_mailboxes edge: the 2nd and 3rd claims (free: 3) are granted');
   ok(await subscribe(fm, T4) === 128 && await noticed(fm, 'quota_mailboxes'), 'quota_mailboxes edge: the 4th is refused, $sigelo/notice "quota_mailboxes"');
+  ok(/sigelo-agent forget <did>/.test(notices(fm).at(-1)?.detail ?? ''), `quota_mailboxes names the verb that frees one (${notices(fm).at(-1)?.detail})`);
   await unsubscribe(fm, T3);
   ok(await subscribe(fm, T4) === 1, 'after giving one up (UNSUBSCRIBE), the 4th is granted');
+  // the agent-setup feedback, point 11: an enrolment code's answer topic, while its code waits at the relay, counts
+  // for nothing. frank gives T4 up, claims the topic of a code he then parks as an enrolment: 3 held, 2 counted.
+  await unsubscribe(fm, T4);
+  const secret = randomBytes(32), A = inviteAnswerTopic(secret), eh = H256('sigelo-park/0FRANKENR').toString('hex');
+  const claimedA = await subscribe(fm, A), pk = await parkEnrol(frank, eh, longCode(frank, secret));
+  const T5 = topic(), T6 = topic();
+  ok(claimedA === 1 && pk.ok === true && await subscribe(fm, T5) === 1 && await subscribe(fm, T6) === 128,
+    `a waiting enrolment code's answer topic is not counted: with it, F and T2, one more claim is granted, the next refused (${JSON.stringify(pk)})`);
+  await unsubscribe(fm, T5);
   for (const c of [fm, gi, iv]) await end(c);
 }
 
@@ -1165,6 +1224,8 @@ const fresh = (name, extra = {}) => {
   ok(back.client?.connected === true && await until(() => !squat[0].connected) && squat[1].connected && squat[2].connected,
     'the identity that proved work logs in all the same: the oldest unproven session gives up its seat');
   ok(await until(() => !squat[1].connected && !squat[2].connected, 4000) && back.client.connected, 'and the others are closed after their second; the proven session stays');
+  ok(notices(squat[0]).some((x) => x.code === 'session_seat' && /took this session's seat/.test(x.detail)), `the session that gave up its seat was told why first: session_seat (${notices(squat[0]).map((x) => x.code)})`);
+  ok(notices(squat[1]).some((x) => x.code === 'session_unproven' && /proven no work stays 1 s/.test(x.detail)), `an unproven session cut at its time is told why first: session_unproven (${notices(squat[1]).map((x) => x.code)})`);
   ok(await until(() => U.auth.sessions() === 1), 'one session left');
   for (const c of [...squat, back.client]) c?.end(true);
   await U.close();

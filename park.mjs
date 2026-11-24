@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/park.mjs — short invite codes (contract sigelo-park/0: apps/contact/short.mjs; ROADMAP §8 item 1).
+// relay/park.mjs — short invite codes (contract sigelo-park/0: apps/contact/short.mjs).
 //
 //   POST /park           {username, client_id, password, code_hash, invite, exp}: the login fields of
 //                        POST /check (auth.mjs: a fresh GET /challenge nonce, signed, spent here),
 //                        then what to park → {ok: true, exp} | {ok: false, check, detail}
-//   GET  /park/<hash>    → 200 {ok: true, invite}, replaced at once by a tombstone (one use)
+//   GET  /park/<hash>    → 200 {ok: true, invite, enrol?}, replaced at once by a tombstone (one use;
+//                        an enrolment code: enrol true, kept until the grant, below)
 //                        | 404 {ok: false, check: "park_unknown", detail} | 429 {ok: false, check: "rate", detail}
 //   DELETE /park/<hash>  {username, client_id, password}: the same login fields (a fresh nonce, spent
 //                        here), and only the identity that parked the entry → 200 {ok: true}, the entry
@@ -78,6 +79,28 @@
 // day's cap reached (public_cap), one answer per account per code per UTC day (public_once). The
 // day's count is kept in memory and written by the sweep each minute.
 import { createHash, hkdfSync } from 'node:crypto';
+
+// Enrolment codes (apps/contact/enrol.mjs issue, the agent-setup feedback points 2, 10, 12): a short code parked
+// with `enrol: true` by the operator who will place a worker through it. Three rules differ from an
+// invite's, nothing else:
+//   - a fetch hands it out WITHOUT spending it, at most ENROL_FETCHES times: a machine whose first try
+//     failed (a refused proof of work, a crash, a model that called the wrong verb) fetches it again.
+//     It is spent when the operator's grant has gone (the parker's DELETE /park/<hash>, carrier.mjs
+//     unparkHash after the worker's identity was sent), or at its exp. Whoever holds the code could
+//     fetch it before; that is unchanged: the operator answers only the DID that paired through it
+//     first (enrol.mjs "The marker"), and a second answer to a taken invite pairs nobody.
+//   - its life is up to ENROL_TTL (a day: a local model on a busy CPU took 45 minutes to run the
+//     command), so one code is guessed with odds of at most 600 / 2^40 per 10 minutes it lives:
+//     7.9 × 10^-8 for a day, under the lookup brakes as ever.
+//   - GET /challenge?did=…&enrol=<hash> of a live one states the BASE proof of work to a new identity
+//     (enrolGrace, at most ENROL_GRACE challenges per code), not the load or the network's step, and
+//     the code's answer topic does not count against its parker's mailboxes while it waits
+//     (enrolTopics, allowance.mjs claim). The challenge is charged as a lookup, since it answers
+//     whether a hash is parked: no free oracle.
+export const ENROL_TTL = 86400, ENROL_FETCHES = 8, ENROL_GRACE = 4;
+const INVITE_ANSWER_LABEL = 'sigelo-invite/0 answer topic';
+/** An invite's answer topic from its 32-byte secret (apps/contact/invite.mjs inviteKeys): i/ + hex HKDF-SHA256(secret, no salt, label, 16). */
+export const inviteAnswerTopic = (secret) => 'i/' + Buffer.from(hkdfSync('sha256', secret, Buffer.alloc(0), INVITE_ANSWER_LABEL, 16)).toString('hex');
 
 // PARK_TTL: the longest a code is kept (the inviter's exp, invite --ttl 60 s to an hour; 600 before).
 export const PARK_TTL = 3600, PARK_MAX = 50000;
@@ -179,7 +202,7 @@ const didDigest = (d) => (typeof d === 'string' && /^did:sigelo:z[1-9A-HJ-NP-Za-
  * host: this relay's name; clock: Unix seconds; ttl: PARK_TTL (tests: an older relay's 600).
  * db: relay/db.mjs, for public codes (none: POST /park refuses them); pro(account, now): whether the
  * account draws on a Pro licence (allowance.mjs pool); claimOf(topic): db.mjs claim.
- * → { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics }.
+ * → { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics, enrolGrace, enrolTopics, isEnrol }.
  */
 export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks = PARKS, lookupsAll = LOOKUPS_ALL, ttl = PARK_TTL,
   db = null, pro = () => false, publicFetches = PUBLIC_FETCHES, publicFetchesAll = PUBLIC_FETCHES_ALL, perAccount = PUBLIC_PER_ACCOUNT }) {
@@ -290,7 +313,9 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (typeof code_hash !== 'string' || !HASH_RE.test(code_hash)) fail('park', 'code_hash: 64 lowercase hex digits, SHA-256("sigelo-park/0" ‖ the normalised short code)');
     if (typeof invite === 'string' && invite.startsWith('sgl2')) return parkPublic(body, did, now, owner, claimOf);
     if (Object.hasOwn(body, 'cap')) fail('park', 'cap: only with a public code (sgl2…)');
-    if (!Number.isSafeInteger(exp) || exp <= now || exp > now + ttl + PARK_SKEW) fail('park', `exp: Unix seconds, within ${ttl} s from now (the code's life: 60 s to ${ttl === PARK_TTL ? 'an hour' : `${ttl} s`})`);
+    if (Object.hasOwn(body, 'enrol') && body.enrol !== true) fail('park', 'enrol: true, or absent');
+    const enrol = body.enrol === true, life = enrol ? Math.max(ttl, ENROL_TTL) : ttl;
+    if (!Number.isSafeInteger(exp) || exp <= now || exp > now + life + PARK_SKEW) fail('park', `exp: Unix seconds, within ${life} s from now (the code's life: 60 s to ${life === PARK_TTL ? 'an hour' : life === ENROL_TTL ? 'a day for an enrolment code' : `${life} s`})`);
     const code = readInvite(invite), mine = didDigest(did);
     if (code.relay !== host) fail('park', `invite: names ${JSON.stringify(code.relay)}, not this relay`);
     if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
@@ -299,9 +324,9 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if ((was && was.exp > now) || pub.get(code_hash)?.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
     if (held.size >= max && sweep(now) === 0 && !was) fail('park_full', `${max} short codes are parked on this relay, its most: try again in a few minutes, or use the long code (invite --long)`);
     // Kept PARK_TTL at most by this relay's clock, whatever the inviter's says.
-    const until = Math.min(exp, now + ttl);
-    held.set(code_hash, { invite, exp: until, owner });
-    return { exp: until };
+    const until = Math.min(exp, now + life);
+    held.set(code_hash, { invite, exp: until, owner, ...(enrol && { enrol: true, fetches: 0, grace: 0, topic: inviteAnswerTopic(code.secret) }) });
+    return { exp: until, ...(enrol && { enrol: true }) };
   }
 
   // → the long code, gone from here at once (a tombstone holds the hash until its exp); or null
@@ -313,8 +338,34 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (e === undefined) return null;
     if (e.exp <= now) { held.delete(k); return null; }
     if (e.invite === null) return null;
+    // An enrolment code: handed out again until the grant (the parker's cancel), ENROL_FETCHES at most.
+    if (e.enrol && ++e.fetches < ENROL_FETCHES) return e.invite;
     held.set(k, { invite: null, exp: e.exp, owner: e.owner });
     return e.invite;
+  }
+
+  // Whether a live enrolment code waits under `hash`: GET /park/<hash> says so (enrol: true), so the
+  // machine refuses a pairing code given to init --enrol (the agent-setup feedback, the enrolment boundary).
+  function isEnrol(hash, now = clock()) {
+    const e = typeof hash === 'string' && HASH_RE.test(hash) ? held.get(hash) : undefined;
+    return e?.enrol === true && e.invite !== null && e.exp > now;
+  }
+
+  // GET /challenge?enrol=<hash> (auth.mjs): whether a live enrolment code waits under it, counting one of
+  // its ENROL_GRACE challenges at the base. → true or false (auth.mjs then states the usual bits).
+  function enrolGrace(hash, now = clock()) {
+    const e = typeof hash === 'string' && HASH_RE.test(hash) ? held.get(hash) : undefined;
+    if (!e?.enrol || e.invite === null || e.exp <= now || e.grace >= ENROL_GRACE) return false;
+    e.grace++;
+    return true;
+  }
+
+  // allowance.mjs claim: how many of `account`'s claims are answer topics of its enrolment codes still
+  // waiting (claimOf(topic).account the account: the parker claims the topic before it parks).
+  function enrolTopics(account, now = clock(), claimOf = () => undefined) {
+    let n = 0;
+    for (const e of held.values()) if (e.enrol && e.owner === account && e.invite !== null && e.exp > now && claimOf(e.topic)?.account === account) n++;
+    return n;
   }
 
   // owner: the account the login proved. → true: a tombstone now (or already one); false: unknown,
@@ -334,6 +385,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (e.invite !== null) held.set(k, { invite: null, exp: e.exp, owner });
     return true;
   }
+
 
   // A public code under this hash: null (none: a short code's hash, or nothing), { gone: true }
   // (revoked or expired), or { invite, paused, exp, cap }. Read before any brake (auth.mjs): the
@@ -385,5 +437,5 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // size: the codes parked, not yet fetched (tombstones count against max, not here). publics: the public codes held, live or not.
   const size = () => { let n = 0; for (const e of held.values()) if (e.invite !== null) n++; return n; };
   const publics = () => pub.size;
-  return { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics };
+  return { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics, enrolGrace, enrolTopics, isEnrol };
 }

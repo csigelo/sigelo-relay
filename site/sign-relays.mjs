@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/site/sign-relays.mjs — signs the relay registry (ROADMAP §9 item 4): relays.src.json →
+// relay/site/sign-relays.mjs — signs the relay registry: relays.src.json →
 // relays.json, a bundle of the RELEASE identity (registry.mjs), as release/sign-release.sh signs
 // release.json. The maintainer runs it after registry-add.mjs, then commits both files.
 //

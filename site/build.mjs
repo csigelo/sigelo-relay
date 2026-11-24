@@ -141,7 +141,7 @@ export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ..
 export const NOBODY = 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.';
 export const MOTTO = 'By AI, for AI.';
 export const DISCLOSURE = 'Built by a team of AI agents under a human owner.';
-// The site's description (JSON-LD WebSite). In a language (2026-10-25, Owner: the motto is the
+// The site's description (JSON-LD WebSite). In a language (since 2026-10-25 the motto is the
 // project's, in every language): lang.json `motto` and `disclosure`, glossed as the rest; readLanguages
 // joins them into `site` as here. English is the fallback only where a language is stale.
 export const SITE_DESCRIPTION = `${MOTTO} ${DISCLOSURE}`;
@@ -224,7 +224,7 @@ const headOf = (p, pending) => ({ title: p.title, description: p.description, ..
 export const titleOf = (p, pending = false) => (p.slug === 'index' ? p.title : `${headOf(p, pending).title} — sigelo relay`);
 export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).description, p.slug);
 
-// Dark pages (ROADMAP §15 R1): pages written ahead of the Owner's go, in relay/site/dark/<slug>.md, each
+// Dark pages: pages written ahead of the maintainer's go, in relay/site/dark/<slug>.md, each
 // beginning with front matter `---`, `title: …`, `description: …`, `---`, then its H1. While DISCLOSED is
 // false they are built OUTSIDE the site, into <out>-dark/ (relay/site/dist-dark/ for dist/), as noindex
 // pages to read locally: never into dist/, so a deploy cannot carry them, and in no nav, sitemap,
@@ -236,7 +236,7 @@ export const descriptionOf = (p, pending = false) => fill(headOf(p, pending).des
 export const DISCLOSED = false;
 export const DARK = 'dark';
 const DARK_FRONT_RE = /^---\ntitle: ([^\n]+)\ndescription: ([^\n]+)\n---\n\n?/;
-// `<words>` outside code that is not an autolink: a value the Owner fills on disclosure day (price, seller).
+// `<words>` outside code that is not an autolink: a value the maintainer fills on disclosure day (price, seller).
 export const DARK_PLACEHOLDER_RE = /<(?!https?:\/\/)[^<>\n]+>/g;
 export const darkPlaceholders = (md) => [...new Set(md.replace(/^( *)```[\s\S]*?^\1```$/gm, '').replace(/`[^`\n]*`/g, '').match(DARK_PLACEHOLDER_RE) ?? [])];
 // → [{ slug, nav: null, dark: true, title, description, md }] from site/dark/, by file name; [] without it.
@@ -1472,7 +1472,7 @@ Policy: https://sigelo.io/security.html
 Policy: https://sigelo.io/security.html#official-channels
 Preferred-Languages: en
 `);
-  // relays.json (ROADMAP §9.4): the registry as sign-relays.mjs signed it, served when it verifies
+  // relays.json: the registry as sign-relays.mjs signed it, served when it verifies
   // against the release identity and lists exactly relays.src.json's; else not served, and said.
   const registry = registryStatus(site);
   if (registry.ok) put('relays.json', registry.text);

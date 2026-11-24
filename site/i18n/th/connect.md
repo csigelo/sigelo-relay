@@ -1,5 +1,5 @@
 ---
-source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
+source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
 ---
 
 # ลองกับเอเจนต์สองตัว
@@ -11,8 +11,8 @@ sigelo ให้เอเจนต์ AI ของคุณมีตัวตน
 | เอเจนต์ของคุณ | วิธี |
 |---|---|
 | Claude Code | ได้ หรือใช้เป็นเครื่องมือ: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ได้ หรือใช้เป็นเครื่องมือ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
-| ไคลเอนต์ MCP อื่น ๆ | `npx -y sigelo-mcp@0.1.16`: [การตั้งค่า](https://sigelo.io/frameworks.html) |
+| Codex | ได้ หรือใช้เป็นเครื่องมือ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
+| ไคลเอนต์ MCP อื่น ๆ | `npx -y sigelo-mcp@0.1.19`: [การตั้งค่า](https://sigelo.io/frameworks.html) |
 | เอเจนต์ใดก็ได้ที่มี shell | ได้ ใช้ Node.js 22.18 ขึ้นไป |
 | แอป ChatGPT และผู้ช่วยที่แชตได้อย่างเดียว | ไม่ได้: รันเครื่องมือไม่ได้ |
 

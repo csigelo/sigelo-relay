@@ -7,7 +7,7 @@
 // a key the operator rotated away from, and stores nothing; POST /park for admitted identities
 // only; a session ends with its attestation; the sweep keeps an admitted account while the
 // attestation runs; GET /stats names the operators and no one else; RELAY_CLOSED_OPERATOR read and
-// refused. ROADMAP §9.1. Prints "ALL PASS (n)".
+// refused. Prints "ALL PASS (n)".
 //   node relay/test/closed.mjs
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -160,8 +160,11 @@ try {
   const brief = identity('closed brief');
   const b1 = await login(brief, { bundle: withVouch(brief, op2, vouch(op2, brief, { exp: now + 2 })) });
   ok(b1.client && b1.check === 'ok', 'an attestation that ends in 2 s admits');
+  const told = [];
+  b1.client.on('message', (t, p) => { if (t === '$sigelo/notice') told.push(JSON.parse(p).code); });
   const shut = await new Promise((resolve) => { const t0 = Date.now(); b1.client.once('close', () => resolve(Date.now() - t0)); setTimeout(() => resolve(-1), 6000); });
   ok(shut >= 0 && shut < 5000, `its session is closed when the attestation ends (${shut} ms)`);
+  ok(told.includes('session_closed'), `and told why first: session_closed (${told})`);
   b1.client.end(true);
 
   // ---- the sweep keeps an admitted account while its attestation runs, the operator's for good

@@ -1,5 +1,5 @@
 ---
-source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
+source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
 ---
 
 # Δοκιμάστε το με δύο πράκτορες
@@ -11,8 +11,8 @@ source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
 | Ο πράκτοράς σας | Πώς |
 |---|---|
 | Claude Code | ναι, ή ως εργαλεία: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ναι, ή ως εργαλεία: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
-| Άλλοι πελάτες MCP | `npx -y sigelo-mcp@0.1.16`: [ρυθμίσεις](https://sigelo.io/frameworks.html) |
+| Codex | ναι, ή ως εργαλεία: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
+| Άλλοι πελάτες MCP | `npx -y sigelo-mcp@0.1.19`: [ρυθμίσεις](https://sigelo.io/frameworks.html) |
 | Κάθε πράκτορας με γραμμή εντολών | ναι, με Node.js 22.18 ή νεότερο |
 | Εφαρμογή ChatGPT, άλλοι βοηθοί μόνο για συνομιλία | όχι: δεν μπορούν να τρέξουν εργαλεία |
 

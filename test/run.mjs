@@ -592,8 +592,8 @@ let a, b;
   ok(costly.slice(0, 3).every((x) => x.ok) && costly[3].check === 'rate' && otherNet.ok, `bundles of 64 rotations from one /24: three a minute, the fourth refused rate; another /24 still logs in (${[...costly, otherNet].map((x) => x.check ?? 'ok').join()})`);
   await v.close();
   const named = new Set(lines.filter((l) => l.startsWith('refused ')).map((l) => l.split(' ')[2]));
-  // closed: a closed relay's (test/closed.mjs).
-  ok(CHECKS.filter((c) => c !== 'rate' && c !== 'closed').every((c) => named.has(c)), `every login check was hit and logged by name: ${[...named].sort().join(' ')}`);
+  // closed: a closed relay's (test/closed.mjs); client_old: a relay that checks proofs of work (test/allowance.mjs).
+  ok(CHECKS.filter((c) => c !== 'rate' && c !== 'closed' && c !== 'client_old').every((c) => named.has(c)), `every login check was hit and logged by name: ${[...named].sort().join(' ')}`);
 }
 
 // ================================================================ what M4's hooks see and set
@@ -1662,6 +1662,26 @@ function walStates(r, name, tag = name) {
   const c21 = await cancel6(alice, hC, { ip: '192.0.2.151' }), g21 = await get6(hashOf('CANCEL04'), '192.0.2.152');
   ok(cs.every((x) => x === 400) && c21.status === 429 && c21.json.check === 'rate' && c21.after === String(600 - (now % 600)) && g21.status === 429,
     `DELETE /park/<hash>: 20 per 10 minutes per /24 with the GETs, counted before the body and the login: the 21st rate (429), and a GET from that network too (${cs.slice(0, 3).join()}…; ${c21.status} ${c21.after}; ${g21.status})`);
+  // Enrolment codes (park.mjs "Enrolment codes", the agent-setup feedback points 2 and 12): up to a day, fetched
+  // again until the parker's cancel (the operator's grant), ENROL_FETCHES at most; an invite keeps an hour.
+  {
+    const hN = hashOf('ENR0LL01'), hP = hashOf('ENR0LL02'), hX = hashOf('ENR0LL03');
+    const day = await park6(alice, { code_hash: hN, invite: longCode(alice), exp: now + DAY, enrol: true });
+    const plainDay = await park6(alice, { code_hash: hP, invite: longCode(alice), exp: now + DAY });
+    const notTrue = await park6(alice, { code_hash: hX, invite: longCode(alice), exp: now + 600, enrol: 'yes' });
+    ok(day.json.ok === true && day.json.enrol === true && day.json.exp === now + DAY && plainDay.json.check === 'park' && notTrue.json.check === 'park',
+      `POST /park enrol: true parks for a day; an invite for a day, or enrol other than true: park (${JSON.stringify(day.json)}; ${plainDay.json.detail}; ${notTrue.json.detail})`);
+    const fetches = [];
+    for (let i = 0; i < 3; i++) fetches.push(await get6(hN));
+    ok(fetches.every((x) => x.status === 200 && x.json.enrol === true && x.json.invite === fetches[0].json.invite), 'it says enrol: true, and an enrolment code is handed out again: a first try that failed (a refused proof of work, a crash) fetches it once more');
+    const granted = await cancel6(alice, hN), after = await get6(hN);
+    ok(granted.json.ok === true && after.status === 404 && after.json.check === 'park_unknown', 'the operator\'s cancel after its grant spends it: park_unknown from then on');
+    const hM = hashOf('ENR0LL04');
+    await park6(alice, { code_hash: hM, invite: longCode(alice), exp: now + 600, enrol: true });
+    const many = [];
+    for (let i = 0; i < 9; i++) many.push((await get6(hM)).status);
+    ok(many.slice(0, 8).every((x) => x === 200) && many[8] === 404, `at most 8 fetches of one enrolment code, then park_unknown (${many.join()})`);
+  }
   await pr6.close();
   // The relay-wide lookup ceiling too: a network's share 1 of 8, its second cancel is rate.
   const pr7 = await startRelay({ ...cfg, db: join(dir, 'park-cancel-all.db'), park: { lookupsAll: { n: 8, window: 600 } } });

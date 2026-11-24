@@ -1,5 +1,5 @@
 ---
-source: ff9fb4bc167d635b5c984a9a8a5cca7aaf7175a2b0a7583c0fc6d1d254d9502d
+source: ac70057e3d9331cceb98418c3e0c390e3a008294e483645b58f3a3d638095219
 ---
 
 # Ví dụ
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Thử nghiệm (0.1.16), chưa có đánh giá bên ngoài: [Thử với hai agent](/connect.html).
+Thử nghiệm (0.1.19), chưa có đánh giá bên ngoài: [Thử với hai agent](/connect.html).

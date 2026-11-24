@@ -6,6 +6,8 @@
 //                 nonce (policy.powBits, M4: pow.mjs, which counts it as waiting until a login
 //                 spends it, policy.powSpent; 0 without it), pow: {v: 1, alg: "argon2id", m, t,
 //                 p}, the function it is proved with (policy.powParams; absent without it) }
+//                 &enrol=<code hash>: a live enrolment code under it states the base (park.mjs
+//                 enrolGrace; charged as a lookup). A proof of the dropped SHA-256 kind: client_old.
 //   MQTT CONNECT  username = current DID, client id = "s" + 24 hex of SHA-256(original DID),
 //                 clean session off, password = JCS of {v:"sigelo-relay/0", nonce, sig, bundle?, pow?},
 //                 sig over that login body ("sigelo\n" ‖ JCS, SPEC §3), did = the username
@@ -45,6 +47,9 @@ import { canonicalize, commitmentOf, did as didOf, keygen, parseBytes, verify, v
 import { accountOf, clientIdOf, hashHex } from './db.mjs';
 import { CANCEL_FIELDS, PARK_FIELDS, ParkError, SET_FIELDS, SET_OPTIONAL } from './park.mjs';
 import { GIFT_FIELDS } from './gifts.mjs';
+import { NOTICE } from './mailbox.mjs';
+import { CLIENT_OLD } from './pow.mjs';
+import { PUSH_V } from './push.mjs';
 
 export const V = 'sigelo-relay/0';
 // The body a login signs: a type of its own, never a SPEC §5.2 challenge. An agent's general-purpose
@@ -57,7 +62,7 @@ export const TYP_LOGIN = 'relay-login';
 export const loginBody = (did, relay, nonce) => ({ v: V, typ: TYP_LOGIN, did, relay, nonce });
 export const TTL = 300, MAX_ITEMS = 64, MAX_BODY = 256 * 1024, WINDOW = 60;
 export const DID_RE = /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/;
-export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'retired_recovery', 'client_id', 'closed', 'pow', 'relay_full'];
+export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'retired_recovery', 'client_id', 'closed', 'pow', 'relay_full', 'client_old'];
 // Plan §3 "Operator attestation": the only attestations the relay reads (M4), at most this many.
 export const OPERATOR_CTX = 'sigelo-relay/operator', MAX_OPERATOR = 4;
 // Signature checks bundles may cost per address prefix and minute: one bundle at its largest (64
@@ -78,7 +83,7 @@ export const MAX_SESSIONS = 16000, MAX_PER_PREFIX = 1000;
 // liked, and one network locked every agent of its /24 out, a few networks the whole relay.
 export const UNPROVEN_SECONDS = 60;
 // CONNACK return codes (MQTT 3.1.1 §3.2.2.3), so a client learns something before POST /check.
-const RETURN_CODE = { rate: 3, relay_full: 3, internal: 3, client_id: 2, pow: 5 };
+const RETURN_CODE = { rate: 3, relay_full: 3, internal: 3, client_id: 2, pow: 5, client_old: 5 };
 // The current-DID cache holds this many identities; an evicted one sends its bundle again.
 const CACHE = 100000;
 // Used challenges kept until they expire. Logins cost an Ed25519 check each, so 5 minutes of them
@@ -172,13 +177,15 @@ function issuersNamed(issuers, attestations) {
 // accepted and a present value is only shape-checked, so a client that already sends one is not
 // refused. → undefined, or what policy.pow answers when the proof needs its evaluation, { wait,
 // done } (allowance.mjs): login() goes on after it.
+// The dropped SHA-256 proof of a client of before 2026-11-13 (pow.mjs CLIENT_OLD): its own name, one line.
+const powCheckName = (why) => (why === CLIENT_OLD ? 'client_old' : 'pow');
 function checkPow(pow, ctx, policy) {
   if (!policy.pow) {
     if (pow !== undefined && (typeof pow !== 'string' || pow.length < 1 || pow.length > 128)) fail('pow', 'want a string of 1 to 128 characters');
     return undefined;
   }
   const r = policy.pow({ pow, ...ctx });
-  if (typeof r === 'string') fail('pow', r);
+  if (typeof r === 'string') fail(powCheckName(r), r);
   if (r === null || r === undefined) return undefined;
   if (!(r.wait instanceof Promise) || typeof r.done !== 'function') throw new Error('policy.pow: want null, a refusal, or {wait, done}');
   return r;
@@ -195,7 +202,7 @@ function checkPow(pow, ctx, policy) {
 // asked, all stored).
 // log(line): never a DID or topic. closed: closed.mjs's, on a closed relay (null: open): a login it
 // does not admit is refused `closed`, and no challenge asks proof of work.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null }) {
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null, push = false }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
@@ -235,7 +242,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     if (r.n > limit) throw Object.assign(new LoginError('rate', why), { retryAfter: retryAfter(w, WINDOW, now) });
   }
   const verifyCost = (prefix, now, n) => charge('verify', prefix, now, n, verifyBudget, `bundles from this network cost more than ${verifyBudget} signature checks this minute: wait`);
-  const chargeLogin = (prefix, now) => charge('login', prefix, now, 1, loginRate, `more than ${loginRate} logins a minute from this network: wait`);
+  const chargeLogin = (prefix, now) => charge('login', prefix, now, 1, loginRate, `more than ${loginRate} logins a minute from this network (logins from every device behind this address count, retries included): wait a minute`);
 
   // The challenge nonce carries its own proof (plan §3 "Login"; single use, as world/server.mjs):
   // base64url of head = exp (4 bytes) ‖ pow bits (1) ‖ network (4) ‖ 7 random bytes, then the first
@@ -437,7 +444,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const pending = checkPow(p.pow, { host, account, original, nonce: p.nonce, isNew: db.account(account) === undefined, now, bits: issued.bits, network: issued.network, admitted: admitted !== undefined }, policy);
     const rest = () => finishLogin({ now, username, prefix, original, key, chain, result, taken, account, want, admitted });
     if (!pending) return rest();
-    return { wait: pending.wait, finish: (why) => { const r = pending.done(why); if (r) fail('pow', r); return rest(); } };
+    return { wait: pending.wait, finish: (why) => { const r = pending.done(why); if (r) fail(powCheckName(r), r); return rest(); } };
   }
   // The rest of a login, after the proof of work (login): from here on in one go, whatever waited
   // before (isNew read again: another login of this identity may have stored it meanwhile).
@@ -534,6 +541,16 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     total--;
     if (liveIds.get(client.id) === client) liveIds.delete(client.id);
   }
+  // A session the relay ends itself (unproven past its time, its seat given to a proven identity, a
+  // closed relay's admission run out): a notice {code, detail} first, so the client can say why and
+  // wait instead of logging in again at once (0.1.17: a temporary identity cut after 60 s logged in
+  // 30 times a minute); the close follows the notice's write, or a second at most.
+  function endWith(client, code, detail) {
+    const close = () => { clearTimeout(t); try { client.close(); } catch {} };
+    const t = setTimeout(close, 1000);
+    t.unref?.();
+    try { client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify({ code, detail })), qos: 0, retain: false }, close); } catch { close(); }
+  }
   function authenticate(client, username, password, cb) {
     const prefix = prefixOfClient(client);
     void attempt({ username, clientId: client.id, clean: client.clean, password, prefix }, (o) => admit(client, prefix, o, cb));
@@ -548,20 +565,20 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       return cb(Object.assign(new Error(o.check), { returnCode: RETURN_CODE[o.check] ?? 4, login: true }), false);   // login: logged once, above
     }
     // The seat this login takes (seat): that session stops counting now and is closed.
-    if (o.session.evict) { const victim = o.session.evict; detach(victim); setImmediate(() => victim.close()); }
+    if (o.session.evict) { const victim = o.session.evict; detach(victim); setImmediate(() => endWith(victim, 'session_seat', 'this relay is full and an identity that has proven work took this session\'s seat: prove work (a new identity\'s first login does) or try again later')); }
     // A will is published after the session ends, outside any login: the relay keeps none.
     client._will = null;
     sessions.set(client, { account: o.session.account, clientId: o.session.clientId, prefix });
     counted.set(client, prefix); live.set(prefix, (live.get(prefix) ?? 0) + 1); total++; liveIds.set(client.id, client);
     if (!o.session.durable) {
-      const timer = setTimeout(() => client.close(), unprovenSeconds * 1000);
+      const timer = setTimeout(() => endWith(client, 'session_unproven', `an identity that has proven no work stays ${unprovenSeconds} s: log in with a proof of work to stay`), unprovenSeconds * 1000);
       timer.unref();
       unproven.set(client, { prefix, timer });
     }
     // A closed relay's session ends with the attestation it was admitted by (a timer holds at most
     // 2^31 - 1 ms, ~24.8 days: closed then, the client logs in again and is checked again).
     if (Number.isSafeInteger(o.session.admitted)) {
-      const timer = setTimeout(() => client.close(), Math.min(Math.max(0, o.session.admitted - clock()) * 1000, 2 ** 31 - 1));
+      const timer = setTimeout(() => endWith(client, 'session_closed', 'this closed relay admitted the session until its operator attestation\'s end: log in again to be checked again'), Math.min(Math.max(0, o.session.admitted - clock()) * 1000, 2 ** 31 - 1));
       timer.unref();
       ending.set(client, timer);
     }
@@ -579,16 +596,24 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     const now = clock();
     // Twice the login rate: a waiting client fetches a challenge per login, and every device behind one
     // address shares the count. Logged like a refused login (stats too), so a 429 shows in the journal.
-    try { charge('challenge', prefix, now, 1, loginRate * 2, `more than ${loginRate * 2} challenges a minute from this network (every device behind this address counts, retries included): wait`); } catch (e) { log(`refused ${prefix} challenge_rate`); stats?.count('login_refused', 'challenge_rate'); throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
+    try { charge('challenge', prefix, now, 1, loginRate * 2, `more than ${loginRate * 2} challenges a minute from this network (challenges from every device behind this address count, retries included): wait a minute`); } catch (e) { log(`refused ${prefix} challenge_rate`); stats?.count('login_refused', 'challenge_rate'); throw Object.assign(httpFail(429, e.message), { retryAfter: e.retryAfter }); }
     // pow_bits: the difficulty a new identity must meet with this nonce (M4: by the network asking
     // and what it holds unredeemed, pow.mjs, which counts this one from now on); 0 = none asked (a
     // closed relay asks none: closed.mjs). A
     // policy answering anything else is the relay's fault: 500.
-    const network = networkOf(prefix), exp = nonceTime(now) + TTL, bits = closed ? 0 : policy.powBits?.({ network, exp, now }) ?? 0;
+    // ?enrol=<hash>: a new identity holding a live enrolment code (park.mjs enrolGrace) is asked the base.
+    // Whether a hash is parked is what it answers, so it is charged as a lookup first (no free oracle).
+    const eh = url.searchParams.get('enrol');
+    let enrol = false;
+    if (eh !== null && park && !closed) {
+      try { park.charge('lookup', prefix, now); } catch (e) { throw Object.assign(httpFail(429, e.detail ?? e.message), { retryAfter: e.retryAfter }); }
+      enrol = park.enrolGrace(eh, now);
+    }
+    const network = networkOf(prefix), exp = nonceTime(now) + TTL, bits = closed ? 0 : policy.powBits?.({ network, exp, now, ...(enrol && { enrol: true }) }) ?? 0;
     if (!Number.isInteger(bits) || bits < 0 || bits > 64) throw new Error('policy.powBits: not a whole number of bits, 0 to 64');
     // pow: the function the proof is computed with and its cost (pow.mjs), so a client refuses one it
     // does not know rather than search in vain.
-    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }) };
+    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }), ...(push && { push: PUSH_V }) };
   }
   // prefix: the login rate is already charged to it (before the body was read).
   async function check(body, prefix) {
@@ -639,7 +664,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         let body;
         try { body = parseBytes(await readBody(req)); } catch (e) { if (e.status) throw e; throw httpFail(400, `body is not strict JSON: ${e.message}`); }
         // cap: a public code's (park.mjs), optional.
-        if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length + (Object.hasOwn(body, 'cap') ? 1 : 0) || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
+        if (!isObject(body) || Object.keys(body).length !== PARK_FIELDS.length + (Object.hasOwn(body, 'cap') ? 1 : 0) + (Object.hasOwn(body, 'enrol') ? 1 : 0) || !PARK_FIELDS.every((k) => Object.hasOwn(body, k))
           || typeof body.username !== 'string' || typeof body.client_id !== 'string' || typeof body.password !== 'string') {
           throw httpFail(400, `want {${PARK_FIELDS.join(', ')}}: POST /check's login fields, then what to park`);
         }
@@ -684,9 +709,9 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
           return send(200, { ok: true, invite: pub.invite, public: true, exp: pub.exp });
         }
         try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
-        const invite = park.fetch(url.pathname.slice('/park/'.length), clock());
-        if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour)' });
-        return send(200, { ok: true, invite });
+        const asked = url.pathname.slice('/park/'.length), enrol = park.isEnrol(asked, clock()), invite = park.fetch(asked, clock());
+        if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour; an enrolment code up to a day)' });
+        return send(200, { ok: true, invite, ...(enrol && { enrol: true }) });
       }
       // Cancel a parked code (park.mjs): reaching the hash is a lookup, charged before the body or the
       // login; then the parker's login; a miss and another's entry answer the same 404.

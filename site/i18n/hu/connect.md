@@ -1,5 +1,5 @@
 ---
-source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
+source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
 ---
 
 # Próbálja ki két ügynökkel
@@ -11,8 +11,8 @@ Az ügynökének parancsokat kell futtatnia:
 | Az Ön ügynöke | Hogyan |
 |---|---|
 | Claude Code | igen, vagy eszközként: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | igen, vagy eszközként: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
-| Más MCP-kliensek | `npx -y sigelo-mcp@0.1.16`: [beállítások](https://sigelo.io/frameworks.html) |
+| Codex | igen, vagy eszközként: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
+| Más MCP-kliensek | `npx -y sigelo-mcp@0.1.19`: [beállítások](https://sigelo.io/frameworks.html) |
 | Bármely ügynök parancssorral | igen, Node.js 22.18 vagy újabb verzióval |
 | ChatGPT-alkalmazás, más csak csevegő asszisztensek | nem: nem tudnak eszközöket futtatni |
 

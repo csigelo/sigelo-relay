@@ -31,6 +31,8 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A minter with native Argon2id on 8 phone cores does 13 evaluations a second (the day's 64 then take ~19 minutes), so this count, not the bits, bounds what one network mints |
 | `RELAY_POW_CHECKS` | 4 | proofs the relay evaluates at once, each in a worker thread, ~0.5 s of a core and 64 MiB (256 MiB at most by default); 4 times as many wait their turn, and a login with a proof past those is refused `rate` before its nonce is spent, so the same CONNECT is good again while the nonce lives |
 | `RELAY_FREE_QUEUE_MB` | half the room below 70 % on the database's disk at start | the free tier's ceiling: every queued message and every identity row (accounts with their chains, claims, chain DIDs) counted; past it free readers take nothing more, free identities no new mailbox, and no new free identity, nor a longer chain of one, is stored (one recovery edge still is, so an owner takes a stolen key back). Set it on a disk whose other files keep growing |
+| `RELAY_PUSH` | on | `off`: no UnifiedPush wakes, and GET /challenge does not offer them (`push.mjs`, design/push.md) |
+| `RELAY_PUSH_KEY` | `push.key` beside `RELAY_DB` | the wakes' key file: the seal of the registrations at rest and the VAPID key; made at the first start, 0600; lost or replaced, the registrations kept no longer open and each phone registers again at its next login |
 | `RELAY_CLOSED_OPERATOR` | unset (open) | a closed relay: the original DIDs of its operators, comma-separated, at most 8 (Closed relay) |
 
 ## Closed relay
@@ -134,6 +136,11 @@ proxied), 80/tcp (certbot, and the redirect to https) and 3478/udp (STUN, below)
 key could have left in `/var/lib/sigelo`. The dependencies are installed where `deploy.sh` runs and
 go up with the stage; nothing on the host fetches. A host that reports another code or deps sha256
 than the ones staged gets the release rolled back.
+
+## Push (ntfy)
+
+The relay POSTs UnifiedPush wakes itself (push.mjs: https out to public addresses). For phones without a push server of
+their own, ntfy runs beside it as push.sigelo.ai: `deploy/ntfy/README.md` (installed by hand, once; not by `deploy.sh`).
 
 ## STUN (coturn)
 
@@ -345,6 +352,11 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    hour (`PARK_TTL` 3600; default 10 minutes); the odds that guesses find one: `park.mjs`.
 
 ## What the relay keeps
+
+Push registrations (`push.mjs`, `sigelo-push/0`): one per account, its endpoint URL and RFC 8291 keys sealed under
+`RELAY_PUSH_KEY`, the day of its last registration; gone 90 days after it, with the account, at a 404 or 410 from
+the push service, or when the phone removes it. In memory only: which accounts were woken since their last login.
+
 
 The database holds no DID in the clear: accounts are SHA-256 of the original DID; claims and
 queued envelopes carry the reader's account and client id. Those are plain hashes of public

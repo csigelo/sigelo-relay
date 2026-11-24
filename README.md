@@ -55,12 +55,12 @@ messages, 64 KB, 7 days. Presence: one 512-byte `p/` marker per reader.
 
 Short codes: 40 bits, 60 s to an hour (default 10 minutes), fetched once or cancelled
 (`DELETE /park/<hash>`). With 50,000 parked, one network's guesses (20 per 10 minutes) hit one
-at most 1 in 183,000 an hour; all networks' (600), 1 in 6,100. A given code's odds grow with its
-life: 3.3 × 10⁻⁹ for an hour. A wrong pairing shows other four words.
+at most 1 in 183,000 an hour; all networks' (600), 1 in 6,100; one code 3.3 × 10⁻⁹ an hour. Enrolment codes: up
+to a day, fetched until the grant (8 at most), base proof of work, uncounted.
 
 Proof of work: 2^`pow_bits` Argon2id tries of 64 MiB (0.5 s each on a phone), one to check. Per
 /24 or /48: 8 from 8 new identities a day, unredeemed challenges counted, 10 from 64. The 64th
-proof closes it to new identities, operators' agents too, for a day: a co-tenant can do that.
+proof closes it for a day, operators' agents too. A SHA-256 proof: `client_old`.
 Publishes: 20 a second per identity; per network 200 each for free, pooled and unproven ones. At 70 % disk: no new identity, mailbox
 or message. Refusals reach the client by name on `$sigelo/notice`.
 

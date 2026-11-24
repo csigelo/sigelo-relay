@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/site/registry-add.mjs — lists a relay in the registry (ROADMAP §9 item 4). A maintainer tool:
+// relay/site/registry-add.mjs — lists a relay in the registry. A maintainer tool:
 // it fetches https://<host>/.well-known/sigelo-relay.json (the relay's own statement, registry.mjs:
 // signed by its relay identity, naming exactly this host), checks it, computes the host's tag and
 // appends {host, did, tier?, note?, added} to relays.src.json. First host for a tag keeps it: a

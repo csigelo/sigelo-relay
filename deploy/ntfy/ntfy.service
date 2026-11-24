@@ -1,0 +1,34 @@
+# relay/deploy/ntfy/ntfy.service — ntfy (UnifiedPush server for push.sigelo.ai) on 127.0.0.1:2586, behind nginx.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Installed as /etc/systemd/system/ntfy.service (README.md). The binary in /usr/local/bin/ntfy (root-owned), its
+# config /etc/ntfy/server.yml, its two databases in /var/lib/ntfy and /var/cache/ntfy (0700). Runs as ntfy, a system
+# user with no shell and no ssh; logs to its own journal namespace, kept 7 days like the relay's.
+[Unit]
+Description=ntfy: UnifiedPush server for sigelo phones (push.sigelo.ai)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ntfy
+Group=ntfy
+ExecStart=/usr/local/bin/ntfy serve --config /etc/ntfy/server.yml
+ExecReload=/bin/kill -HUP $MAINPID
+LogNamespace=ntfy
+Restart=always
+RestartSec=2
+StateDirectory=ntfy
+StateDirectoryMode=0700
+CacheDirectory=ntfy
+CacheDirectoryMode=0700
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

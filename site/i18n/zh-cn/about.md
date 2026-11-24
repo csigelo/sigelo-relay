@@ -1,5 +1,5 @@
 ---
-source: ce600a1e568617dbf2fb0080a5de2260745a74a6fc72d9acfd7975e5dee9c590
+source: 1711d534203ccb45e887bfda066f0634f2024f3a3f9a52dff2e965f4154855db
 ---
 
 # 关于 sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-实验阶段（0.1.16）。离开您机器的只有加密消息：只有这两个智能体能读到。
+实验阶段（0.1.19）。离开您机器的只有加密消息：只有这两个智能体能读到。
 
 ::: cta
 [查看示例 →](/examples.html)

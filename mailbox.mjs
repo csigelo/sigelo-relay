@@ -13,6 +13,9 @@
 //               relay cannot read the code's).
 //   p/<32 hex>  a presence topic (presence.mjs): its writer's one marker, replaced, sent at once to a
 //               subscriber as a retained message; nothing of it is in the database.
+//   $sigelo/push  the session's UnifiedPush registration (push.mjs, sigelo-push/0), or an empty
+//               payload that removes it; never delivered. A message stored for a reader not
+//               connected then wakes its phone (store).
 //   $sigelo/notice  refusals after login, as {code, detail}, written to that client alone; a publish
 //               to a topic nobody holds now gets "no_reader". Every refusal is named. A refused
 //               PUBLISH's notice also carries its packet id (`id`). The notice is written before the
@@ -41,6 +44,7 @@
 import { Readable } from 'node:stream';
 import { DAY } from './db.mjs';
 import { PRESENCE } from './presence.mjs';
+import { PUSH_TOPIC } from './push.mjs';
 
 export const MAILBOX = /^m\/[0-9a-f]{32}$/, INVITE = /^i\/[0-9a-f]{32}$/, NOTICE = '$sigelo/notice';
 export const MAX_MESSAGE = 256 * 1024, INVITE_MESSAGES = 4, INVITE_BYTES = 64 * 1024, INVITE_TTL = 7 * DAY;
@@ -81,7 +85,7 @@ const live = (c, now) => c !== undefined && !c.dead && (c.expires === null || c.
 // presence: presence.mjs's, for p/ topics (none: they are refused as any other topic). guard:
 // park.mjs's, for the mailboxes of public codes: check(topic, writer, now) refuses (paused, cap,
 // revoked, one a day), count(topic, writer, now) once a publish is stored.
-export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null, guard = null }) {
+export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null, guard = null, push = null }) {
   // The row each queued message is stored in, by its payload Buffer. Aedes wraps a publish in new
   // packet objects on its way to the reader but always passes the payload Buffer along by
   // reference, and the payload is all the relay knows a message by; a weak key frees with it.
@@ -173,15 +177,19 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
       rowOf.set(packet.payload, id);
       return null;
     });
-    if (r === null) { db.countSent(session.account, now, senderPool); guard?.count(topic, session.account, now); stats?.count('stored'); }
+    if (r === null) {
+      db.countSent(session.account, now, senderPool); guard?.count(topic, session.account, now); stats?.count('stored');
+      // Its reader not connected: a wake to its phone, if it registered one (push.mjs).
+      if (push !== null && !online(c.client_id)) push.wake(c.account);
+    }
     return r;
   }
 
   function authorizePublish(client, packet, cb) {
     const session = client && sessionOf(client);
     if (!session) return cb(refusal('no session'));
-    const marker = presence !== null && PRESENCE.test(packet.topic);
-    if (!marker && !MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
+    const marker = presence !== null && PRESENCE.test(packet.topic), pushing = push !== null && packet.topic === PUSH_TOPIC;
+    if (!marker && !pushing && !MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
     if (packet.qos !== 1) return cb(refusal('qos'));   // store-and-forward is QoS 1 (0 is not stored, 2 not offered)
     packet.retain = false;                              // nothing is retained by Aedes: a presence marker is held by presence.mjs
     let r, rated;
@@ -189,11 +197,13 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     // fails (disk full, a bug) closes this connection instead; the client retransmits later.
     try {
       rated = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'publish', now: clock(), prefix: session.prefix }) ?? null;
-      r = rated || (marker ? presence.store(client, session, packet) : store(session, packet));
+      r = rated || (pushing ? push.register(session.account, packet.payload) : marker ? presence.store(client, session, packet) : store(session, packet));
       // Every refused publish is a strike (allowance.mjs RATE): a no_reader or a quota costs the
       // writer nothing else, and drew on its network's bucket without end.
       if (r && !rated) policy.strike?.({ account: session.account, clientId: session.clientId, now: clock() });
     } catch { return cb(Object.assign(new Error('store failed'), { check: 'store' })); }
+    // A registration is the relay's own: never delivered to anyone (a subscriber of $sigelo/push gets nothing).
+    if (!r && pushing) { packet.topic = SINK; packet.payload = Buffer.alloc(0); }
     if (!r) return cb(null);
     packet.topic = SINK;
     packet.payload = Buffer.alloc(0);
@@ -422,7 +432,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
   const sweep = (now = clock()) => {
     const r = db.sweep(now, {
       minIdle: RETENTION + IDLE_GRACE, idleAfter: (account) => (policy.retention?.(account) ?? RETENTION) + IDLE_GRACE, accountAfter: ACCOUNT_KEEP, online,
-      tidy: (t) => { stats?.flush(t); policy.tidy?.(t); members?.tidy(t); }, kept: (account, t) => members?.kept(account, t) || (policy.accountKept?.(account, t) ?? false),
+      tidy: (t) => { stats?.flush(t); policy.tidy?.(t); members?.tidy(t); push?.tidy(t); }, kept: (account, t) => members?.kept(account, t) || (policy.accountKept?.(account, t) ?? false),
     });
     reapSoon();
     if (presence !== null) r.presence = presence.sweep(now);

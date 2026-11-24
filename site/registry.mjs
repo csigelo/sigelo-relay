@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/site/registry.mjs — the relay registry sigelo.ai serves as /relays.json (ROADMAP §9 item 4).
+// relay/site/registry.mjs — the relay registry sigelo.ai serves as /relays.json.
 //
 // A relay tag is the first 20 bits of SHA-256(UTF-8 "sigelo-relay-tag/0" ‖ UTF-8 host[:port]) in
 // Crockford's base32 (apps/contact/short.mjs relayTag, copied: relay/ is published alone; test.mjs

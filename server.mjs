@@ -24,6 +24,8 @@
 //     RELAY_VENDOR_DID, RELAY_PRO_STORAGE_MB, RELAY_POW_BITS, RELAY_POW_LOAD_BITS, RELAY_POW_LOAD,
 //     RELAY_POW_NETWORK_DAY, RELAY_POW_CHECKS, RELAY_FREE_QUEUE_MB   allowances, proof of work and licences:
 //                       allowance.mjs relayPolicyFromEnv
+//     RELAY_PUSH        off: no UnifiedPush wakes (push.mjs); else on
+//     RELAY_PUSH_KEY    the wakes' key file (default push.key beside RELAY_DB; made at the first start, 0600)
 //     RELAY_CLOSED_OPERATOR  a closed relay: the original DIDs of its operators, comma-separated
 //                       (at most 8). It admits them and the identities they attest for it, and
 //                       nobody else (closed.mjs); unset = open
@@ -34,7 +36,7 @@ import { Aedes } from 'aedes';
 import { createServer as tcpServer } from 'node:net';
 import { createServer as tlsServer } from 'node:tls';
 import { readFileSync, realpathSync, statfsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Duplex } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, createWebSocketStream } from 'ws';
@@ -46,6 +48,7 @@ import { relayStats } from './stats.mjs';
 import { parking } from './park.mjs';
 import { closedOperators, closedRelay } from './closed.mjs';
 import { PRESENCE_WILL, presence as presenceMarkers } from './presence.mjs';
+import { pushWakes } from './push.mjs';
 
 export { WS_PATH, prefixOf };
 
@@ -277,13 +280,17 @@ export async function startRelay(cfg) {
   // Short invite codes, in memory only, and public codes, in the database (park.mjs); cfg.park:
   // its limits, for tests. Pro: an account that draws on a licence (allowance.mjs pool).
   const park = parking({ host: cfg.host, clock, db, pro: (account, now) => (policy.pool?.(account, now) ?? null) !== null, ...cfg.park });
-  a = auth({ db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
+  // An enrolment code's answer topic waiting counts against no mailbox (park.mjs enrolTopics).
+  policy.setEnrolHeld?.((account, now) => park.enrolTopics(account, now, (t) => db.claim(t)));
+  // UnifiedPush wakes (push.mjs): cfg.push false = off; else its options (tests: anyAddress, ca, send). GET /challenge says so.
+  const push = cfg.push === false ? null : pushWakes({ db, host: cfg.host, clock, log, keyFile: cfg.pushKey ?? join(dirname(cfg.db), 'push.key'), ...(cfg.push ?? {}) });
+  a = auth({ push: push !== null, db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
     unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park, closed });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
   // Presence markers (presence.mjs): the relay's offline goes to the readers through the broker.
   const presence = presenceMarkers({ clock, publish: (packet) => broker.publish(packet, () => {}), policy });
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence, guard: park.guard });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence, guard: park.guard, push });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -308,6 +315,7 @@ export async function startRelay(cfg) {
       a.authenticate(client, username, password, (err, ok) => {
         if (ok && client.conn) client.conn.loggedIn = true;
         if (ok && will) presence.watch(client, a.sessionOf(client)?.account);
+        if (ok) push?.connected(a.sessionOf(client)?.account);
         cb(err, ok);
       });
     },
@@ -393,6 +401,7 @@ export async function startRelay(cfg) {
   const closeServer = (s) => new Promise((resolve) => (s ? s.close(() => resolve()) : resolve()));
   async function close() {
     clearInterval(timer);
+    push?.close();
     const stopped = Promise.all([closeServer(tcp), closeServer(tls)]);
     await new Promise((resolve) => broker.close(resolve));
     for (const ws of wss.clients) ws.terminate();
@@ -402,7 +411,7 @@ export async function startRelay(cfg) {
     park.sweep(clock());   // the public codes' counts of the day to the file (park.mjs)
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, presence, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, presence, push, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {
@@ -423,7 +432,9 @@ function fromEnv(env) {
     loginRate: Number(env.RELAY_LOGIN_RATE ?? 30),
     maxSessions: Number(env.RELAY_MAX_SESSIONS ?? MAX_SESSIONS), maxPerPrefix: Number(env.RELAY_MAX_PER_PREFIX ?? MAX_PER_PREFIX),
     policy: relayPolicyFromEnv(env, die),   // M4: RELAY_VENDOR_DID, RELAY_PRO_STORAGE_MB, RELAY_POW_* (allowance.mjs)
+    ...(env.RELAY_PUSH === 'off' && { push: false }), ...(env.RELAY_PUSH_KEY && { pushKey: env.RELAY_PUSH_KEY }),
   };
+  if (env.RELAY_PUSH !== undefined && env.RELAY_PUSH !== 'on' && env.RELAY_PUSH !== 'off') die('RELAY_PUSH: on or off');
   if (!Number.isInteger(cfg.loginRate) || cfg.loginRate < 1) die('RELAY_LOGIN_RATE: want a whole number of logins per minute, at least 1');
   for (const [k, name] of [['maxSessions', 'RELAY_MAX_SESSIONS'], ['maxPerPrefix', 'RELAY_MAX_PER_PREFIX']]) {
     if (!Number.isSafeInteger(cfg[k]) || cfg[k] < 1) die(`${name}: want a whole number of sessions, at least 1`);

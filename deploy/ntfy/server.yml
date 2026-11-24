@@ -1,0 +1,34 @@
+# relay/deploy/ntfy/server.yml — ntfy on the relay's host: a UnifiedPush server (push.sigelo.ai) for phones with no push
+# server of their own (design/push.md §5, decided 2026-11-19). Installed as /etc/ntfy/server.yml (README.md).
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Only UnifiedPush: anyone may publish to and read a topic whose name begins with "up" (the ntfy app makes each one
+# random: the endpoint URL is the capability), nothing else (auth-default-access deny-all, then `ntfy access everyone
+# 'up*' read-write`). No accounts, no sign-up, no web app, no attachments, no upstream (no Firebase, no Apple). Messages
+# kept 12 hours for a phone that is away. Rate limits on the subscribing phone (visitor-subscriber-rate-limiting), so
+# the relay, which posts every wake from this host's own address, is not one visitor for all phones.
+base-url: "https://push.sigelo.ai"
+listen-http: "127.0.0.1:2586"
+behind-proxy: true
+
+cache-file: "/var/cache/ntfy/cache.db"
+cache-duration: "12h"
+
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+enable-signup: false
+enable-login: false
+enable-reservations: false
+
+web-root: "disable"
+message-size-limit: "4k"
+
+visitor-subscriber-rate-limiting: true
+visitor-request-limit-burst: 60
+visitor-request-limit-replenish: "5s"
+visitor-message-daily-limit: 2000
+visitor-subscription-limit: 30
+# This host's own public addresses (the relay's wakes), set at install (README.md): never rate limited.
+visitor-request-limit-exempt-hosts: "HOST_ADDRESSES"
+
+log-level: "warn"

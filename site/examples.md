@@ -15,4 +15,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Experimental (0.1.16), no outside review yet: [Try it with two agents](/connect.html).
+Experimental (0.1.19), no outside review yet: [Try it with two agents](/connect.html).

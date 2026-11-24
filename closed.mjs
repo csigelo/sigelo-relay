@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/closed.mjs — a closed relay (ROADMAP §9.1): it admits its operators and the identities
+// relay/closed.mjs — a closed relay: it admits its operators and the identities
 // their operator attestation names, and nobody else.
 //
 // Operators: original DIDs (RELAY_CLOSED_OPERATOR, comma-separated, at most MAX_CLOSED). An

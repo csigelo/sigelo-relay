@@ -371,6 +371,9 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
   // What the free tier's ceiling counts: every queued message's charge and the identity rows.
   const freeUsed = () => (s.queued.get('*')?.bytes ?? 0) + db.rowBytes();
   const whose = (t) => (t.pool ? 'your operator\'s pool' : 'this identity (free tier)');
+  // The enrolment codes' answer topics an account holds while they wait (park.mjs enrolTopics, set by
+  // server.mjs once the park exists): not counted against its mailboxes.
+  let enrolHeld = () => 0;
   const readerOf = (t) => (t.pool ? 'the reader\'s pool' : 'the reader (free tier)');
 
   // Accounts and proofs swept by M3 (30 days after the last login) take their rows here along,
@@ -468,14 +471,17 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
   }
 
   return {
+    // server.mjs: (account, now) → how many of its claims are enrolment codes' answer topics waiting (park.mjs).
+    setEnrolHeld(fn) { enrolHeld = (account, now) => { try { return Math.max(0, fn(account, now) | 0); } catch { return 0; } }; },
     // GET /challenge's pow_bits: what a new identity's proof must meet with the nonce issued now to
     // `network` (auth.mjs's key for the /24 or /48 asking; pow.mjs), which carries it, valid until
     // `exp`. The challenge waits from now on: it counts as an arrival to come until a login spends
     // its nonce (powSpent) or it expires, so challenges fetched ahead cannot all state the base.
     // One of them missing is auth.mjs's bug: thrown (GET /challenge answers 500), never a count skipped.
-    powBits({ network, exp, now }) {
+    // enrol: the challenge named a live enrolment code (auth.mjs, park.mjs enrolGrace): the base (pow.mjs issue).
+    powBits({ network, exp, now, enrol = false }) {
       if (typeof network !== 'string' || !Number.isInteger(exp) || !Number.isInteger(now)) throw new Error('policy.powBits: auth.mjs passes no network, exp or now');
-      return pow.issue(now, network, exp);
+      return pow.issue(now, network, exp, enrol === true);
     },
     // A login spent the nonce of a challenge issued to `network` until `exp` (auth.mjs, once per
     // nonce, whatever the login's outcome): it waits no more. A good proof with it is an arrival
@@ -621,8 +627,10 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
         return { code: 'pow', detail: 'a new identity proves work once, before its first claim: log in again with pow, to the pow_bits GET /challenge gives' };
       }
       const t = tierOf(account, now);
-      const held = t.pool ? s.poolClaims.get(t.pool).n : s.claimsHeld.get(account).n;
-      if (held >= t.limits.mailboxes) return { code: 'quota_mailboxes', detail: `${whose(t)} holds ${t.limits.mailboxes} mailboxes and invite topics, its most: unsubscribe from one first` };
+      // An enrolment code's answer topic while it waits (park.mjs enrolTopics) counts for nothing: agent-setup
+      // feedback, point 11 (an operator's codes that were never used held its free mailboxes for a day).
+      const held = (t.pool ? s.poolClaims.get(t.pool).n : s.claimsHeld.get(account).n) - (t.pool ? 0 : enrolHeld(account, now));
+      if (held >= t.limits.mailboxes) return { code: 'quota_mailboxes', detail: `${whose(t)} holds ${t.limits.mailboxes} mailboxes and invite topics, its most: give up a contact you no longer need first (sigelo-agent forget <did>; contacts lists them), or cancel a code (invite --cancel <code>)` };
       if (!t.pool && freeUsed() + CLAIM_ROW > freeQueue) {
         return { code: 'quota_mailboxes', detail: `this relay's free tier is full (${freeQueue} bytes queued and held for identities in all): no new mailbox for a free identity until messages are collected or expire` };
       }

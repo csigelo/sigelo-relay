@@ -25,7 +25,7 @@
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   build, deployRefusals, launchRefusals, nginxTree, serversIn, everyDirective, ANON, STATS_ROOT, DEPLOY, ORIGIN, HOST, REPO, ROOT, PAGES, PLACEHOLDERS,
@@ -78,7 +78,7 @@ ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist
 // tools/docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-// 2026-10-25 (Owner): the first screens may explain in place, up to 40 words more: index +40, about +40.
+// 2026-10-25: the first screens may explain in place, up to 40 words more: index +40, about +40.
 // 2026-11-10: index +10, the sub-line's why-trust sentence linking sigelo.io's FAQ (TR1).
 // 2026-11-11: index +5, the link to the relay's FAQ under the cards; faq, the twelfth page (≤ 420 words asked).
 // 2026-11-03: pro +15, the Free/Pro table's Groups row (design/groups.md §4), a table row only: no prose.
@@ -134,7 +134,7 @@ ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('
   'seller: the trade name "sigelo", a business registered in the EU, legal name and address on request (terms: and on invoices), in privacy.md and terms.md; no company form named on any page');
 
 // ---- contact: one address, receive-only, no form, no account wording ---------------------------
-// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.16) is no address.
+// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.19) is no address.
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z][A-Za-z0-9-]*/g;
 for (const p of PAGES) {
   const mails = [...new Set([...(src[p.slug].match(EMAIL) ?? []), ...(html[p.slug].match(EMAIL) ?? [])])];
@@ -166,7 +166,7 @@ for (const p of PAGES) {
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
 // The why (2026-10-24), the first paragraph of both sites' home pages: one scene a newcomer gets.
-// 2026-11-10 (Owner): who built it, and why trust it with its makers unnamed, linking sigelo.io's FAQ.
+// 2026-11-10: who built it, and why trust it with its makers unnamed, linking sigelo.io's FAQ.
 const SUBLINE = 'Built by a team of AI agents under a human owner. Why trust it? For the reason Bitcoin is trusted: the code is public, nobody needs permission, every claim can be checked (FAQ).';
 const WHY = "Your agent books, buys and asks for you. To a shop or another agent it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID anyone can check, even offline: it proves who it is, keeps its good record and gets paid.";
 const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
@@ -364,7 +364,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
 {
   const hero = html.index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '';
   const ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1]));
-  // 2026-10-25 (Owner): the motto's sub-line right under it, saying who answers for the agent.
+  // 2026-10-25: the motto's sub-line right under it, saying who answers for the agent.
   ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === SUBLINE && ps[1] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
     && /<div class="cta">\n<p><a href="\/connect\.html">Try it with two agents →<\/a><\/p>\n<\/div>/.test(hero),
     `index: the hero is the motto (H1), its sub-line (a team of AI agents under a human owner; why trust it, linking the FAQ), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
@@ -657,7 +657,7 @@ for (const l of LANGS) {
   ok(T.contact.includes(`<code>${SIMPLEX}</code>`) && !T.contact.includes(`href="${SIMPLEX}"`) && T.contact.includes(`<code>${PAYMENT_PLACES[0]}</code>`) && T.contact.includes('<code>site/contact.md</code>'),
     `${l.code}/contact: the SimpleX address as text, and where how to pay is published: the English page ${PAYMENT_PLACES[0]} and site/contact.md (a translation is not a third place)`);
 }
-// The motto is the project's, in every language (2026-10-25, Owner): lang.json `motto` and
+// The motto is the project's, in every language (since 2026-10-25): lang.json `motto` and
 // `disclosure`, none still English; the home page's H1 is that motto; the WebSite description joins them.
 {
   const raw = Object.fromEntries(LANGS.map((l) => [l.code, JSON.parse(readFileSync(join(SITE, I18N, l.code, 'lang.json'), 'utf8'))]));
@@ -1296,7 +1296,7 @@ ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === 
 ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
   `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
 ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
-  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
   'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app, Linux phones; no "coming soon")');
 ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
   'connect: the steps render as one numbered list, five items, a code block in each');
@@ -1496,7 +1496,7 @@ ok(PAGES.every((p) => !PAYMENT_LINK_RE.test(src[p.slug])), 'no page carries a pa
 ok(erasure.includes('access requests over SimpleX only: whoever holds one gets the data.'),
   'privacy: an access request goes over SimpleX only, never by e-mail');
 
-// ---- the relay registry (ROADMAP §9.4): relays.json, registry-add.mjs, host-statement.mjs -------
+// ---- the relay registry: relays.json, registry-add.mjs, host-statement.mjs -------
 {
   const reg = await load('./registry.mjs'), { registryStatus } = await load('./build.mjs');
   const { spawn } = await import('node:child_process'), { createServer } = await import('node:http');
@@ -1579,7 +1579,7 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
 }
 
 // ---- the internal runbook's self-test (private tree only) --------------------------------------
-// ---- dark pages (ROADMAP §15 R1): built aside while DISCLOSED is false, pages of the site once true ----
+// ---- dark pages: built aside while DISCLOSED is false, pages of the site once true ----
 // In the relay's public export relay/site/dark/ is left out (release/publish.sh) while DISCLOSED is false,
 // so there these checks see no dark page and only the flag's mechanics are checked (with a fixture).
 {
@@ -1611,7 +1611,7 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
     ok(hits.length === 0 && !/audit|s[t]ripe|credit card|not on sale|invoiced in euros|reverse.charge|excl\.? VAT|net price|\bVAT rate\b/i.test(text),
       `dark: ${d.slug}: no word never written (the relay's list, "audit", the card processor, "not on sale", "Invoiced in euros", reverse charge, net prices)${hits.length ? ` (${hits.join('; ')})` : ''}`);
     ok(text.includes('VAT included. Bank transfer, or Monero at 10 % off. No card.') && [...text.matchAll(/€/g)].length === [...text.matchAll(/<[a-z ]*price> €/g)].length,
-      `dark: ${d.slug}: the payment line, and every price gross as "<… price> €" (one figure, VAT included, the Owner's to fill)`);
+      `dark: ${d.slug}: the payment line, and every price gross as "<… price> €" (one figure, VAT included, the maintainer's to fill)`);
     ok(/sold by (?:<Company legal name>|[^<\n]+), (?:<country>|[^<\n]+) \((?:<VAT no\.>|[^<\n]+)\)\./.test(text) && /\[Contact us for a quote\]\(\/contact\.html\)/.test(text),
       `dark: ${d.slug}: the seller sentence, and "Contact us for a quote" to the contact page`);
   }
@@ -1643,8 +1643,9 @@ ok(erasure.includes('access requests over SimpleX only: whoever holds one gets t
     `dark: DISCLOSED true: every placeholder left is open (${holes.length}; --final refuses), code aside`);
 }
 
-const runbook = join(ROOT, 'commercial', 'relay-pro-runbook.md');
-if (existsSync(runbook)) {
+// An operator runbook with a `// §11` self-test block, when SIGELO_RUNBOOK names one (not part of this tree).
+const runbook = process.env.SIGELO_RUNBOOK ? resolve(process.env.SIGELO_RUNBOOK) : '';
+if (runbook && existsSync(runbook)) {
   const FENCE = '`'.repeat(3);
   const self = [...readFileSync(runbook, 'utf8').matchAll(new RegExp(`^${FENCE}js\\n([\\s\\S]*?)^${FENCE}$`, 'gm'))].map((m) => m[1]).find((b) => b.startsWith('// §11'));
   if (!self) ok(false, 'runbook: its §11 self-test block is found');

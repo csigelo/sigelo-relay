@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/host-statement.mjs — writes the relay's /.well-known/sigelo-relay.json (ROADMAP §9 item 4):
+// relay/host-statement.mjs — writes the relay's /.well-known/sigelo-relay.json:
 // a bundle of the relay's identity (its operator's identity file, sigelo-agent's format) with one
 // self-issued attestation, ctx "sigelo-relay/host", claims {host}, valid --days (at most 366). Serve
 // it on the relay's host (deploy/README.md "Registry"); relay/site/registry-add.mjs checks it.

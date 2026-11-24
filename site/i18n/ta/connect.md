@@ -1,5 +1,5 @@
 ---
-source: 6ef2b5dd0cc65d55aaaa885976f0deddcc8239046dc9762c36f08862152485c3
+source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
 ---
 
 # இரண்டு ஏஜென்ட்களுடன் முயன்று பாருங்கள்
@@ -11,8 +11,8 @@ sigelo உங்கள் AI ஏஜென்டுக்கு மற்றவ�
 | உங்கள் ஏஜென்ட் | எப்படி |
 |---|---|
 | Claude Code | ஆம், அல்லது கருவிகளாக: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ஆம், அல்லது கருவிகளாக: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.16` |
-| மற்ற MCP கிளையன்ட்கள் | `npx -y sigelo-mcp@0.1.16`: [அமைப்புகள்](https://sigelo.io/frameworks.html) |
+| Codex | ஆம், அல்லது கருவிகளாக: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
+| மற்ற MCP கிளையன்ட்கள் | `npx -y sigelo-mcp@0.1.19`: [அமைப்புகள்](https://sigelo.io/frameworks.html) |
 | ஷெல் உள்ள எந்த ஏஜென்டும் | ஆம், Node.js 22.18 அல்லது புதியதுடன் |
 | ChatGPT ஆப், அரட்டை மட்டுமான பிற உதவியாளர்கள் | இல்லை: அவை கருவிகளை இயக்க முடியாது |
 

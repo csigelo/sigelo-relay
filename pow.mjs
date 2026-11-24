@@ -77,6 +77,12 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import hashWasm from 'hash-wasm';
 
 export const POW_V = 1, POW_PREFIX = 'sigelo-relay-pow/1\n';
+// The dropped SHA-256 proof (sigelo-relay-pow/0, 50a2960): a client of before 2026-11-13 (npm 0.1.14 to
+// 0.1.17) still computes it, and passed the Argon2id check by chance at a low pow_bits (1 in 4 at 2 bits),
+// so it failed "at random" with a formula it could not act on (the agent-setup feedback, point 1). No grace: a proof
+// that misses Argon2id but is the old solver's answer (oldProof) is refused client_old, its one line below.
+// Checked only after Argon2id failed, so a current client's good proof never reaches it.
+export const OLD_PREFIX = 'sigelo-relay-pow/0\n', CLIENT_OLD = 'client too old: npm i -g sigelo-agent@latest';
 // The function's cost: memory in KiB, passes, lanes. A relay may be built cheaper for tests
 // (powCheck's cost); GET /challenge states whichever it checks, and a client refuses more than this.
 export const ARGON = Object.freeze({ m: 65536, t: 3, p: 1 });
@@ -102,6 +108,18 @@ export const C_RE = /^[0-9]{1,16}$/;
 const NETWORKS = 100000;
 // A worker with nothing to check for this long ends (its 64 MiB goes with it).
 const IDLE_MS = 30000;
+
+// Whether c is what a client of the dropped SHA-256 proof sends: the FIRST counter (0, 1, 2, …) whose SHA-256 over
+// the same string has `bits` leading zero bits, as its solver searched. A current client's failed Argon2id proof meets
+// the bits by chance 1 time in 2^bits, and is also the first such counter far more rarely still. At most OLD_SCAN hashes.
+const OLD_SCAN = 1 << 20;
+const oldDigest = (prefix, c) => createHash('sha256').update(prefix + c, 'utf8').digest();
+export function oldProof(host, original, nonce, c, bits) {
+  const prefix = OLD_PREFIX + host + original + nonce, n = Number(c);
+  if (!/^(0|[1-9][0-9]*)$/.test(c) || !Number.isSafeInteger(n) || n > OLD_SCAN || leadingZeroBits(oldDigest(prefix, c)) < bits) return false;
+  for (let i = 0; i < n; i++) if (leadingZeroBits(oldDigest(prefix, String(i))) >= bits) return false;
+  return true;
+}
 
 /** GET /challenge's `pow`: the function and its cost, beside pow_bits. */
 export const powParams = (cost = ARGON) => ({ v: POW_V, alg: 'argon2id', m: cost.m, t: cost.t, p: cost.p });
@@ -281,8 +299,11 @@ export function powCheck({ bits = POW_BITS, loadBits = POW_LOAD_BITS, loadPerHou
     // A challenge issued now to `network`, valid until `exp` (auth.mjs's GET /challenge): → its
     // difficulty, from what came before it (CLOSED_BITS to a network at its cap), and from now on it
     // waits (above) until spent or expired.
-    issue(now, network, exp) {
-      const b = capped(now, network) ? CLOSED_BITS : required(now, network);
+    // enrol: the challenge names a live enrolment code (park.mjs enrolGrace): the base, not the load or the
+    // network's step (the agent-setup feedback, point 10: a machine whose own model held its CPU could not solve 8
+    // bits in time, and its code was spent). Still counted as waiting, and still closed at the cap.
+    issue(now, network, exp, enrol = false) {
+      const b = capped(now, network) ? CLOSED_BITS : enrol ? bits : required(now, network);
       waiting.set(exp, (waiting.get(exp) ?? 0) + 1);
       waitingAll++;
       if (network !== undefined) entry(network, now).waiting.push(exp);
@@ -318,6 +339,7 @@ export function powCheck({ bits = POW_BITS, loadBits = POW_LOAD_BITS, loadPerHou
       if (need === 0) return null;   // every output has at least 0 zero bits: nothing to evaluate
       const out = await poolOf(checks).run({ password: POW_PREFIX + host + original + nonce + pow, salt: powSalt(nonce), ...argon });
       if (leadingZeroBits(out) >= need) return null;
+      if (oldProof(host, original, nonce, pow, need)) return CLIENT_OLD;
       return `does not meet ${need} bits: compute it over this login's nonce, the relay host and your original DID, to the pow_bits GET /challenge gave with that nonce`;
     },
   };
