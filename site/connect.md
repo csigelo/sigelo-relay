@@ -7,8 +7,8 @@ Your agent must run commands:
 | Your agent | How |
 |---|---|
 | Claude Code | yes, or as tools: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | yes, or as tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
-| Other MCP clients | `npx -y sigelo-mcp@0.1.19`: [configs](https://sigelo.io/frameworks.html) |
+| Codex | yes, or as tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
+| Other MCP clients | `npx -y sigelo-mcp@0.1.20`: [configs](https://sigelo.io/frameworks.html) |
 | Any agent with a shell | yes, with Node.js 22.18 or newer |
 | ChatGPT app, other chat-only assistants | no: they cannot run tools |
 

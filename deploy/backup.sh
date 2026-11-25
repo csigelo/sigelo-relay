@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-only
-# deploy/backup.sh — the relay host's nightly backup: licences, operator chains and config,
-# encrypted with age; never a mailbox (design/relay-plan.md §6 "Backups").
+# deploy/backup.sh — the relay host's nightly backup: licences, operator chains, the push key and
+# config, encrypted with age; never a mailbox (design/relay-plan.md §6 "Backups").
 #
 #   backup.sh                   as root (sigelo-relay-backup.timer, daily): the archive
 #                               <admin home>/backup/relay-state-<stamp>.tgz.age, admin user 0600, 7 kept
@@ -10,7 +10,8 @@
 #   backup.sh --self-test       no root, from the relay's repository: --extract over a database
 #                               seeded with the relay's own schema (../db.mjs, ../allowance.mjs)
 #                               keeps those tables and rows and nothing of a mailbox; it writes
-#                               into the timer's scratch layout (scratch()) and checks its modes
+#                               into the timer's scratch layout (scratch()) and checks its modes,
+#                               and that the push key goes into the archive 0600
 #
 # The relay keeps everything in one SQLite file, mailboxes included, so that file is never copied.
 # The extract holds what a paid licence needs: the tables licences, operator_retired and
@@ -21,6 +22,10 @@
 # Messages, claims, counters, proofs and pool rows are left out: agents pool again at their next
 # login with their operator attestation, and plan §6 lets counters be lost. The extract is read in
 # one transaction, so its tables agree with each other.
+# Beside the extract, the push key ($RELAY_PUSH_KEY, push.key beside the database, push.mjs): the seal
+# of the push registrations in the extract's database and the VAPID key. Lost, every phone registers
+# again at its next login. Copied 0600 into the scratch x/ (never via the list below: the state
+# directory stays out of it), archived as push.key, 0600; none while the relay has made none.
 #
 # Run as root, the extract and the restore run as the user sigelo-relay: SQLite may create the
 # database's -wal and -shm files, and root-owned ones would stop the relay from opening its own
@@ -33,6 +38,7 @@
 # /var/lib/sigelo-relay/relay.db, the relay's own default), ADMIN (default csigelo).
 set -eu
 DB=${RELAY_DB:-/var/lib/sigelo-relay/relay.db}
+PUSH_KEY=${RELAY_PUSH_KEY:-$(dirname "$DB")/push.key}
 ADMIN=${ADMIN:-csigelo}
 RECIPIENT_FILE=/etc/sigelo-relay-backup.recipient
 TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"
@@ -49,6 +55,14 @@ as_relay() { if [ "$(id -u)" = 0 ]; then setpriv --reuid=sigelo-relay --regid=si
 scratch() {
   chmod 0711 "$1"
   if [ -n "${2:-}" ]; then install -d -m 0700 -o "$2" -g "$2" "$1/x"; else install -d -m 0700 "$1/x"; fi
+}
+
+# keep_push_key DIR: a 0600 copy of $PUSH_KEY as DIR/push.key, if the relay has made one; prints
+# push.key then, for tar's list.
+keep_push_key() {
+  [ -f "$PUSH_KEY" ] || return 0
+  install -m 0600 "$PUSH_KEY" "$1/push.key"
+  echo push.key
 }
 
 extract() {  # extract OUT
@@ -179,7 +193,19 @@ const bytes = readFileSync(file);
 for (const s of [h('agent'), h('agent did'), 'AGENT-CHAIN-SEALED', 'ab'.repeat(16), 'MAILBOX-PAYLOAD-BYTES']) if (bytes.includes(s)) bad.push(`the extract holds the agent's ${s.slice(0, 24)}`);
 if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
 JS
-  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the seven tables, the licensed operator's rows only, nothing of a mailbox ($(cat "$t/out"))"
+  # The push key: copied 0600 beside the extract (as the timer does) and archived 0600, its bytes whole.
+  PUSH_KEY=$t/push.key
+  (umask 022; echo '{"v":"sigelo-relay-push/0","seal":"self-test"}' > "$PUSH_KEY")
+  [ "$(keep_push_key "$s/x")" = push.key ] || die "self-test FAILED: keep_push_key named no push.key"
+  m=$(ls -l "$s/x/push.key" | cut -c1-10)
+  [ "$m" = -rw------- ] || die "self-test FAILED: the push key's copy is $m, not -rw------- (0600)"
+  cmp -s "$PUSH_KEY" "$s/x/push.key" || die "self-test FAILED: the push key's copy differs"
+  tar -czf "$s/state.tgz" -C "$s/x" relay-licences.db push.key
+  m=$(tar -tvzf "$s/state.tgz" push.key | cut -c1-10)
+  [ "$m" = -rw------- ] || die "self-test FAILED: the archive holds the push key $m, not -rw------- (0600)"
+  rm "$s/x/push.key"; PUSH_KEY=$t/none
+  [ -z "$(keep_push_key "$s/x")" ] && [ ! -e "$s/x/push.key" ] || die "self-test FAILED: keep_push_key without a key file"
+  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the seven tables, the licensed operator's rows only, nothing of a mailbox ($(cat "$t/out")); the push key is archived 0600"
 }
 
 case ${1:-} in
@@ -202,6 +228,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 scratch "$tmp" sigelo-relay   # $tmp 0711 root's, $tmp/x 0700 sigelo-relay's (see scratch())
 extract "$tmp/x/relay-licences.db"
+pk=$(keep_push_key "$tmp/x")
 list=""
 for p in /etc/sigelo-relay.env "$RECIPIENT_FILE" /etc/letsencrypt /etc/nginx/conf.d/sigelo-relay.conf \
          /etc/systemd/system/sigelo-relay* /etc/systemd/journald@sigelo-relay.conf /etc/systemd/journald.conf.d/00-sigelo.conf \
@@ -214,12 +241,13 @@ done
 case $list in *var/lib/sigelo-relay*) die "refused: the list names the relay's state directory" ;; esac
 # A file first, then age: sh has no pipefail, and a failed tar in a pipe would still be encrypted.
 # shellcheck disable=SC2086
-tar -czf "$tmp/state.tgz" -C "$tmp/x" relay-licences.db -C / $list
+tar -czf "$tmp/state.tgz" -C "$tmp/x" relay-licences.db $pk -C / $list
 tar -tzf "$tmp/state.tgz" | grep -qx relay-licences.db || die "the archive lacks relay-licences.db"
+[ -z "$pk" ] || tar -tzf "$tmp/state.tgz" | grep -qx push.key || die "the archive lacks push.key"
 install -d -m 0700 -o "$ADMIN" -g "$ADMIN" "$OUT"
 part=$OUT/.relay-state-$STAMP.tmp
 age -r "$R" -o "$part" "$tmp/state.tgz"
 chown "$ADMIN:$ADMIN" "$part"; chmod 0600 "$part"
 mv "$part" "$OUT/relay-state-$STAMP.tgz.age"
 ( cd "$OUT" && ls -t relay-state-*.tgz.age | tail -n +8 | xargs -r rm -f )
-echo "backup.sh: $OUT/relay-state-$STAMP.tgz.age, $(wc -c < "$OUT/relay-state-$STAMP.tgz.age") bytes: relay-licences.db$list"
+echo "backup.sh: $OUT/relay-state-$STAMP.tgz.age, $(wc -c < "$OUT/relay-state-$STAMP.tgz.age") bytes: relay-licences.db${pk:+ $pk}$list"

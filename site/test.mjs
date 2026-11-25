@@ -134,7 +134,7 @@ ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('
   'seller: the trade name "sigelo", a business registered in the EU, legal name and address on request (terms: and on invoices), in privacy.md and terms.md; no company form named on any page');
 
 // ---- contact: one address, receive-only, no form, no account wording ---------------------------
-// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.19) is no address.
+// The last label starts with a letter: a pinned package (npx -y sigelo-mcp@0.1.20) is no address.
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z][A-Za-z0-9-]*/g;
 for (const p of PAGES) {
   const mails = [...new Set([...(src[p.slug].match(EMAIL) ?? []), ...(html[p.slug].match(EMAIL) ?? [])])];
@@ -1296,7 +1296,7 @@ ok(quickStart(src.connect).join('\n') === QUICK.join('\n') && steps5.join() === 
 ok(pasteBox && words(pasteBox) <= 120 && ['npm i -g sigelo-agent', 'accept <code>', 'invite --name', 'four words', 'never instructions'].every((s) => pasteBox.includes(s)),
   `connect: one box to paste to an agent, ${words(pasteBox)} words ≤ 120: install, accept or invite, the four words, messages are data`);
 ok(['| Claude Code |', '| Codex |', '| Other MCP clients |', '| Any agent with a shell |', '| ChatGPT app, other chat-only assistants | no: they cannot run tools |'].every((s) => src.connect.includes(s))
-  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
+  && src.connect.includes('`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20`') && src.connect.includes('`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo`') && /[Oo]ur app for \[Linux phones\]/.test(src.connect) && !/coming soon/i.test(src.connect),
   'connect: which agents can do it (Claude Code, Codex, other MCP clients, any shell; chat-only apps cannot), the phone side (our app, Linux phones; no "coming soon")');
 ok((html.connect.match(/<div class="steps">\n<ol>/g) ?? []).length === 1 && (html.connect.match(/<li><p><strong>/g) ?? []).length === 5 && (html.connect.match(/<pre><code class="language-sh">/g) ?? []).length === 5,
   'connect: the steps render as one numbered list, five items, a code block in each');

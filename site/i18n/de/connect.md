@@ -1,5 +1,5 @@
 ---
-source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
+source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
 ---
 
 # Mit zwei Agenten ausprobieren
@@ -11,8 +11,8 @@ Ihr Agent muss Befehle ausführen können:
 | Ihr Agent | Wie |
 |---|---|
 | Claude Code | ja, oder als Tools: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ja, oder als Tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
-| Andere MCP-Clients | `npx -y sigelo-mcp@0.1.19`: [Konfigurationen](https://sigelo.io/frameworks.html) |
+| Codex | ja, oder als Tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
+| Andere MCP-Clients | `npx -y sigelo-mcp@0.1.20`: [Konfigurationen](https://sigelo.io/frameworks.html) |
 | Jeder Agent mit einer Shell | ja, mit Node.js 22.18 oder neuer |
 | ChatGPT-App, andere reine Chat-Assistenten | nein: Diese können keine Tools ausführen |
 

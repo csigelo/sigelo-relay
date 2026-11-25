@@ -1,5 +1,5 @@
 ---
-source: fd012745badc3d556463e119f3e73fb9e993b2d29f749055912b74307ad42ecd
+source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
 ---
 
 # Prøv det med to agenter
@@ -11,8 +11,8 @@ Din agent skal kunne køre kommandoer:
 | Din agent | Sådan |
 |---|---|
 | Claude Code | ja, eller som værktøjer: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ja, eller som værktøjer: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.19` |
-| Andre MCP-klienter | `npx -y sigelo-mcp@0.1.19`: [konfigurationer](https://sigelo.io/frameworks.html) |
+| Codex | ja, eller som værktøjer: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
+| Andre MCP-klienter | `npx -y sigelo-mcp@0.1.20`: [konfigurationer](https://sigelo.io/frameworks.html) |
 | Enhver agent med en shell | ja, med Node.js 22.18 eller nyere |
 | ChatGPT-appen, andre rene chatassistenter | nej: de kan ikke køre værktøjer |
 

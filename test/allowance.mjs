@@ -155,11 +155,14 @@ async function refusedPublish(c, t, size, code, what, reader) {
   ok(named && queued(t).n === before && (!reader || got(reader, t).length === seen), `${what}: refused ${code} (${notices(c).map((x) => x.code).join() || 'no notice'})`);
 }
 const tierOf = (id) => pol.tierOf(accountOf(id.original), now);
-// A login whose proof of work misses the difficulty (the first such c for this login's nonce).
+// A login whose proof of work misses the difficulty (the first such c for this login's nonce): it fails
+// Argon2id and is not the dropped SHA-256 solver's answer either (pow.mjs oldProof, refused client_old),
+// which a low pow_bits meets by chance (1 in 16 at 4 bits).
 async function loginBadPow(id, r = relay) {
   const { challenge, pow_bits } = await getChallenge(id.did, r);
   let c = 0;
-  while (leadingZeroBits(await digest(HOST, id.original, challenge.nonce, String(c))) >= pow_bits) c++;
+  while (leadingZeroBits(await digest(HOST, id.original, challenge.nonce, String(c))) >= pow_bits
+    || oldProof(HOST, id.original, challenge.nonce, String(c), pow_bits)) c++;
   const creds = { username: id.did, clientId: clientId(id), password: password(id, challenge, { extra: { pow: String(c) } }) };
   return { ...(await mqttConnect(creds, r)), creds };
 }
@@ -311,12 +314,14 @@ const erin = identity('erin');
   await end(l0.client);
   const shape = await login(erin, { pow: '0x1f' });
   ok(!shape.client && (await checkOf(shape.creds)).check === 'pow', 'a pow that is not decimal digits: CONNECT refused, POST /check names pow');
-  // A proof for one login's nonce, sent with another login: refused.
+  // A proof for one login's nonce, sent with another login: refused. Not the dropped SHA-256 solver's answer
+  // over the second nonce either (pow.mjs oldProof, refused client_old).
   const first = await getChallenge(erin.did), second = await getChallenge(erin.did);
   let stale;
   for (let i = 0; ; i++) {
     const c = String(i);
-    if (leadingZeroBits(await digest(HOST, erin.original, first.challenge.nonce, c)) >= 4 && leadingZeroBits(await digest(HOST, erin.original, second.challenge.nonce, c)) < 4) { stale = c; break; }
+    if (leadingZeroBits(await digest(HOST, erin.original, first.challenge.nonce, c)) >= 4 && leadingZeroBits(await digest(HOST, erin.original, second.challenge.nonce, c)) < 4
+      && !oldProof(HOST, erin.original, second.challenge.nonce, c, 4)) { stale = c; break; }
   }
   const staleCreds = { username: erin.did, clientId: clientId(erin), password: password(erin, second.challenge, { extra: { pow: stale } }) };
   const replayed = await mqttConnect(staleCreds);
@@ -407,7 +412,8 @@ const erin = identity('erin');
   ok(early.pow_bits === 4 && joined.every(Boolean) && seen.join() === '6,6,4,4',
     `8 new identities whose challenges came from ${NET}: pow_bits there and in the rest of its /24 ${seen[0]}, ${seen[1]} (4 + 2); another /24 ${seen[2]}; the CONNECTs' 127.0.0.0/24 ${seen[3]}`);
   // A proof is checked against the bits its nonce states: the raise refuses no client mid-search.
-  const weakFor = async (id, nonce) => { for (let i = 0; ; i++) { const z = leadingZeroBits(await digest(HOST, id.original, nonce, String(i))); if (z >= 4 && z < 6) return String(i); } };
+  // Not the dropped SHA-256 solver's answer at 6 bits either (1 in 64 by chance): that one is refused client_old.
+  const weakFor = async (id, nonce) => { for (let i = 0; ; i++) { const z = leadingZeroBits(await digest(HOST, id.original, nonce, String(i))); if (z >= 4 && z < 6 && !oldProof(HOST, id.original, nonce, String(i), 6)) return String(i); } };
   const connectWith = async (id, ch) => { const creds = { username: id.did, clientId: clientId(id), password: password(id, ch, { extra: { pow: await weakFor(id, ch.nonce) } }) }; return { ...(await mqttConnect(creds, N)), creds }; };
   const e = await connectWith(late, early.challenge), fresh6 = await getChallenge(later.did, N, NET), f = await connectWith(later, fresh6.challenge);
   ok(e.client?.connected === true && fresh6.pow_bits === 6 && !f.client && (await checkOf(f.creds, N)).check === 'pow',

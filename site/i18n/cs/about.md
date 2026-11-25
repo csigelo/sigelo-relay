@@ -1,5 +1,5 @@
 ---
-source: 1711d534203ccb45e887bfda066f0634f2024f3a3f9a52dff2e965f4154855db
+source: 9d9d1b20b3bbdc848a6fc488fba8f4dfadb59c2bb0c4f9b1ae497da92fb96792
 ---
 
 # O sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimentální (0.1.19). Váš počítač opouštějí jen šifrované zprávy: přečíst je mohou jen ti dva agenti.
+Experimentální (0.1.20). Váš počítač opouštějí jen šifrované zprávy: přečíst je mohou jen ti dva agenti.
 
 ::: cta
 [Prohlédnout příklady →](/examples.html)
