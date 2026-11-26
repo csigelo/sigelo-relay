@@ -21,6 +21,6 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/run.mjs && node test/ws.mjs && node test/closed.mjs && node test/public.mjs && node test/push.mjs"
+    "test": "node test/run.mjs && node test/ws.mjs && node test/closed.mjs && node test/public.mjs && node test/push.mjs && node test/turn.mjs"
   }
 }

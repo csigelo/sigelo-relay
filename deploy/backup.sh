@@ -29,7 +29,10 @@
 #
 # Run as root, the extract and the restore run as the user sigelo-relay: SQLite may create the
 # database's -wal and -shm files, and root-owned ones would stop the relay from opening its own
-# database. The archive also carries the host's config (below), /etc/letsencrypt included, and is
+# database. The archive also carries the host's config (below), /etc/letsencrypt included, ntfy's
+# (deploy/ntfy: server.yml, push.sigelo.ai's nginx block, its user.db of access rules) and coturn's
+# /etc/turnserver.conf with /etc/sigelo-turn.secret (TURN's shared secret, also the relay's systemd
+# credential turn-secret: README.md "STUN and TURN"), each only if present, and is
 # encrypted to the recipient in /etc/sigelo-relay-backup.recipient (age1…, the public half; the
 # identity is not on this host, so the host cannot read its own backups).
 #
@@ -234,7 +237,8 @@ for p in /etc/sigelo-relay.env "$RECIPIENT_FILE" /etc/letsencrypt /etc/nginx/con
          /etc/systemd/system/sigelo-relay* /etc/systemd/journald@sigelo-relay.conf /etc/systemd/journald.conf.d/00-sigelo.conf \
          /usr/local/sbin/sigelo-relay-* /etc/sudoers.d/sigelo-relay /etc/ssh/sshd_config.d/00-sigelo.conf /etc/nftables.conf \
          /etc/fail2ban/jail.d/sshd.local /etc/fail2ban/jail.d/nginx-limit-req.local /etc/apt/apt.conf.d/20auto-upgrades \
-         /etc/apt/apt.conf.d/52sigelo-relay /etc/apt/sources.list.d/nodesource.sources /etc/apt/preferences.d/nodejs; do
+         /etc/apt/apt.conf.d/52sigelo-relay /etc/apt/sources.list.d/nodesource.sources /etc/apt/preferences.d/nodejs \
+         /etc/nginx/conf.d/sigelo-push.conf /etc/ntfy/server.yml /var/lib/ntfy/user.db /etc/turnserver.conf /etc/sigelo-turn.secret; do
   if [ -e "$p" ]; then list="$list ${p#/}"; fi
 done
 # Never the database or anything else of the relay's state directory: it holds the mailboxes.

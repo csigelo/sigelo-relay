@@ -5,7 +5,8 @@
 //                 relay: the relay host, nonce}, pow_bits: what a new identity proves with this
 //                 nonce (policy.powBits, M4: pow.mjs, which counts it as waiting until a login
 //                 spends it, policy.powSpent; 0 without it), pow: {v: 1, alg: "argon2id", m, t,
-//                 p}, the function it is proved with (policy.powParams; absent without it) }
+//                 p}, the function it is proved with (policy.powParams; absent without it),
+//                 push: "sigelo-push/0" (push.mjs), turn: "sigelo-turn/0" (turn.mjs), each only where taken }
 //                 &enrol=<code hash>: a live enrolment code under it states the base (park.mjs
 //                 enrolGrace; charged as a lookup). A proof of the dropped SHA-256 kind: client_old.
 //   MQTT CONNECT  username = current DID, client id = "s" + 24 hex of SHA-256(original DID),
@@ -50,6 +51,7 @@ import { GIFT_FIELDS } from './gifts.mjs';
 import { NOTICE } from './mailbox.mjs';
 import { CLIENT_OLD } from './pow.mjs';
 import { PUSH_V } from './push.mjs';
+import { TURN_V } from './turn.mjs';
 
 export const V = 'sigelo-relay/0';
 // The body a login signs: a type of its own, never a SPEC §5.2 challenge. An agent's general-purpose
@@ -202,7 +204,7 @@ function checkPow(pow, ctx, policy) {
 // asked, all stored).
 // log(line): never a DID or topic. closed: closed.mjs's, on a closed relay (null: open): a login it
 // does not admit is refused `closed`, and no challenge asks proof of work.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null, push = false }) {
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null, push = false, turn = false }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
@@ -613,7 +615,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     if (!Number.isInteger(bits) || bits < 0 || bits > 64) throw new Error('policy.powBits: not a whole number of bits, 0 to 64');
     // pow: the function the proof is computed with and its cost (pow.mjs), so a client refuses one it
     // does not know rather than search in vain.
-    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }), ...(push && { push: PUSH_V }) };
+    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }), ...(push && { push: PUSH_V }), ...(turn && { turn: TURN_V }) };
   }
   // prefix: the login rate is already charged to it (before the body was read).
   async function check(body, prefix) {

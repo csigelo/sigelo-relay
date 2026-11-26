@@ -33,6 +33,7 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_FREE_QUEUE_MB` | half the room below 70 % on the database's disk at start | the free tier's ceiling: every queued message and every identity row (accounts with their chains, claims, chain DIDs) counted; past it free readers take nothing more, free identities no new mailbox, and no new free identity, nor a longer chain of one, is stored (one recovery edge still is, so an owner takes a stolen key back). Set it on a disk whose other files keep growing |
 | `RELAY_PUSH` | on | `off`: no UnifiedPush wakes, and GET /challenge does not offer them (`push.mjs`, design/push.md) |
 | `RELAY_PUSH_KEY` | `push.key` beside `RELAY_DB` | the wakes' key file: the seal of the registrations at rest and the VAPID key; made at the first start, 0600; lost or replaced, the registrations kept no longer open and each phone registers again at its next login. `backup.sh` archives it as `push.key`, 0600; to restore, with the relay stopped and before `--restore`: `install -m 0600 -o sigelo-relay -g sigelo-relay push.key /var/lib/sigelo-relay/push.key` (over the one the first start made) |
+| `RELAY_TURN_SECRET_FILE` | the systemd credential `turn-secret`, if any | coturn's `static-auth-secret`, one line: logged-in identities get TURN credentials (`turn.mjs`) and GET /challenge says `turn`; none = no TURN ("STUN and TURN" below) |
 | `RELAY_CLOSED_OPERATOR` | unset (open) | a closed relay: the original DIDs of its operators, comma-separated, at most 8 (Closed relay) |
 
 ## Closed relay
@@ -127,7 +128,7 @@ RENEWED_LINEAGE=/etc/letsencrypt/live/relay.sigelo.ai /etc/letsencrypt/renewal-h
 ```
 
 **Firewall.** Open 443/tcp (nginx, MQTT over WebSocket included), 8883/tcp (the broker itself, not
-proxied), 80/tcp (certbot, and the redirect to https) and 3478/udp (STUN, below).
+proxied), 80/tcp (certbot, and the redirect to https), 3478/udp and tcp and 49160-49400/udp (STUN and TURN, below).
 
 **Deploy user.** `deploy/deploy.sh` logs in as `sigelo`, whose keys sshd reads from
 `/etc/ssh/authorized_keys/sigelo`, a file only root writes; the user may not use cron or at.
@@ -142,26 +143,55 @@ than the ones staged gets the release rolled back.
 The relay POSTs UnifiedPush wakes itself (push.mjs: https out to public addresses). For phones without a push server of
 their own, ntfy runs beside it as push.sigelo.ai: `deploy/ntfy/README.md` (installed by hand, once; not by `deploy.sh`).
 
-## STUN (coturn)
-
-A direct file transfer (`sigelo-agent transfer`, design/transfer.md §2) starts with each agent asking
-this host, once, which public address and port its UDP request came from; agents ask their own relay
-host and the contact's, port 3478 (`SIGELO_STUN` overrides). coturn answers that and nothing else:
-`deploy/turnserver.conf` is STUN only (no TURN, no TCP, TLS or DTLS listener, no CLI, no log of who
-asked). No file byte passes this host. Installed by hand, once; not by `deploy.sh`:
+## STUN and TURN (coturn)
 
 ```sh
-# coturn from the host's package manager (the package is named coturn), then:
-install -m 0644 relay/deploy/turnserver.conf /etc/turnserver.conf
-systemctl enable --now coturn   # then open the port: the host's nftables input policy is drop:
-#   udp dport 3478 accept comment "STUN for sigelo transfers"   (in /etc/nftables.conf, then `nft -f /etc/nftables.conf`) && systemctl restart coturn     # reads /etc/turnserver.conf
-# open 3478/udp in the host's firewall
+# once, as root: coturn from the host's package manager (package coturn), then the secret
+umask 077 && openssl rand -hex 32 > /etc/sigelo-turn.secret        # root, 0600; never in the repository
+# the config: the repository's, plus the secret (the file 0640 root:turnserver: coturn runs as turnserver)
+{ cat relay/deploy/turnserver.conf; echo "static-auth-secret=$(cat /etc/sigelo-turn.secret)"; } > /tmp/turnserver.conf
+install -m 0640 -o root -g turnserver /tmp/turnserver.conf /etc/turnserver.conf && rm /tmp/turnserver.conf
+# nftables (input policy drop), in table inet filter's input chain of /etc/nftables.conf, then nft -f /etc/nftables.conf:
+#   udp dport 3478 accept comment "STUN for sigelo transfers"
+#   tcp dport 3478 accept comment "TURN over TCP"
+#   udp dport 49160-49400 accept comment "TURN relayed ports"
+systemctl enable coturn && systemctl restart coturn
+# the relay reads the same secret as a systemd credential (it never reads a root file itself):
+mkdir -p /etc/systemd/system/sigelo-relay.service.d
+printf '[Service]\nLoadCredential=turn-secret:/etc/sigelo-turn.secret\n' > /etc/systemd/system/sigelo-relay.service.d/turn.conf
+systemctl daemon-reload && systemctl restart sigelo-relay
 node relay/deploy/check.mjs                                   # PASS STUN on udp relay.sigelo.ai:3478
 ```
 
-What it costs: one 20-byte request and a 32-byte answer per transfer attempt and side. What it sees:
-the public address of each side seconds before a transfer, beside the relay's logins (THREAT-MODEL
-§3.14). TURN for Pro (relayed, metered) comes later with its own secret; until then nothing relays.
+Not by `deploy.sh`. `backup.sh` archives `/etc/turnserver.conf` and `/etc/sigelo-turn.secret`. A new
+secret: write the file, rebuild `/etc/turnserver.conf` as above, restart both; credentials already
+handed out stop working at once (the apps fetch fresh ones at each call or transfer).
+
+**STUN.** A direct call or transfer starts with each side asking this host, once, which public address
+and port its UDP request came from (its own relay host and the contact's, port 3478; `SIGELO_STUN`
+overrides). Anonymous; nothing logged. One 20-byte request and a 32-byte answer per attempt and side;
+it sees the public address of each side at call or transfer start (THREAT-MODEL §3.14).
+
+**TURN.** When no direct pair of candidates answers, the packets go through this host: ciphertext only
+(DTLS-SRTP, DTLS), the end-to-end keys never here. Only identities logged in to this relay get
+credentials (`turn.mjs`, over their session, `$sigelo/turn`): username `<expiry>:<tag>`, password
+base64(HMAC-SHA1(secret, username)), coturn's `use-auth-secret`; good 1 to 2 hours; at most 60 an
+hour per identity. GET /challenge says `turn: "sigelo-turn/0"` while the relay has the secret.
+
+| Setting | Value | Why |
+|---|---|---|
+| listeners | 3478 udp and tcp | TCP for networks with no UDP out; no TLS or DTLS listener (`turns:` on 443 later) |
+| relayed ports | udp 49160-49400 | 241 allocations at most; the firewall opens the same range |
+| `user-quota` | 8 | allocations at once per identity per hour |
+| `total-quota` | 200 | allocations at once on the host |
+| `max-bps` | 500000 (4 Mbit/s) | per allocation, each direction; a voice call uses about 7 kB/s |
+| `bps-capacity` | 25000000 (200 Mbit/s) | all allocations, each direction |
+| peers | no loopback, private, CGNAT, link-local, documentation, reserved, multicast | the host's own public addresses stay allowed: two sides relayed here meet relay to relay |
+| `stale-nonce` | 600 | |
+| logs | none | |
+
+Cost: a relayed voice hour is about 100 MB through the host; a relayed transfer its size twice (in and
+out). Not metered yet.
 
 ## nginx
 
