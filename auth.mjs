@@ -127,6 +127,9 @@ export function clientAddress(req) {
   const loopback = /^(127\.|::1$|::ffff:127\.)/.test(peer);
   return loopback && typeof real === 'string' ? real : peer;
 }
+// GET /stats's operator view (stats.mjs): a request from loopback that did not come through nginx,
+// which sets X-Real-IP on everything it forwards (deploy/nginx.conf, server level).
+export const operatorView = (req) => /^(127\.|::1$|::ffff:127\.)/.test(req.socket?.remoteAddress ?? '') && req.headers['x-real-ip'] === undefined;
 
 // world/server.mjs's guard: verify() costs one Ed25519 check per rotation, attestation and binding
 // (~5 ms each; a Monero proof more), on the one thread every client shares, so a bundle far larger
@@ -648,7 +651,8 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
       const url = new URL(req.url, 'http://relay');
       const route = `${req.method} ${url.pathname}`;
       if (route === 'GET /challenge') return send(200, challenge(url, httpPrefix(req)));
-      if (route === 'GET /stats' && stats) return send(200, stats.report());   // counts only (stats.mjs)
+      // counts only (stats.mjs); the operator's view only without X-Real-IP, which nginx always sets.
+      if (route === 'GET /stats' && stats) return send(200, stats.report({ operator: operatorView(req) }));
       if (route === 'POST /licence' && policy.licence) { const r = await policy.licence({ prefix: httpPrefix(req), read: async () => parseBytes(await readBody(req)) }); return send(r.status, r.body); }   // M4: operator.mjs
       if (route === 'POST /check') {
         // The login rate first: reading and strictly parsing up to 256 KB is work too (~10 ms).

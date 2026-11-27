@@ -16,6 +16,12 @@
 // minute (mailbox.mjs passes flush as part of its tidy), so a restart loses at most a minute of
 // the day's counts (plan §6 lets counters be lost) and today's row is read back at start. A count
 // tells nothing of who: the rows hold numbers only.
+//
+// The operator's view: report({ operator: true }) adds active_identities_7d and _30d, the accounts
+// whose last_seen (the day of the last login, a column the relay keeps anyway: db.mjs) falls in the
+// last 7 or 30 UTC days, today included. No new column, no new retention. auth.mjs gives that view
+// only to a request on the loopback port with no X-Real-IP (curl on the host); nginx sets X-Real-IP
+// on every request it forwards, so the public https://relay.sigelo.ai/stats never carries them.
 import { DAY, dayOf } from './db.mjs';
 
 export const KEEP_DAYS = 90, HISTORY_DAYS = 30, CACHE_SECONDS = 60;
@@ -50,7 +56,7 @@ function counted(json) {
 // policy: allowance.mjs's (freeQueue, freeUsed, giftTotals), or {} without M4. closed: a closed
 // relay's operators, original DIDs (closed.mjs), or null: the one identifier the report holds,
 // public by the operator's choice (deploy/README.md "Closed relay").
-// → { count(kind, name?), sessions(n), flush(now), report(), close() }.
+// → { count(kind, name?), sessions(n), flush(now), report({ operator }?), close() }.
 export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed = null }) {
   const raw = db.raw;
   raw.exec(SCHEMA);
@@ -87,7 +93,7 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed 
   }
   let cache = null;
 
-  return {
+  const api = {
     // One event: kind is a COUNTERS or BY_NAME key; name the check or code for BY_NAME.
     count(kind, name) {
       roll(clock());
@@ -106,8 +112,14 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed 
       q.put.run(day, JSON.stringify(cur));
       q.old.run(day - KEEP_DAYS * DAY);
     },
-    // GET /stats: computed at most once a CACHE_SECONDS.
-    report() {
+    // GET /stats: computed at most once a CACHE_SECONDS. operator: the loopback view (above).
+    report({ operator = false } = {}) {
+      const body = api.publicReport();
+      if (!operator) return body;
+      const d = dayOf(clock()), since = (n) => one('SELECT count(*) AS n FROM accounts WHERE last_seen >= ?', d - (n - 1) * DAY);
+      return { ...body, active_identities_7d: since(7), active_identities_30d: since(30) };
+    },
+    publicReport() {
       const now = clock();
       if (cache && now - cache.at < CACHE_SECONDS && dayOf(now) === dayOf(cache.at)) return cache.body;
       roll(now);
@@ -142,4 +154,5 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed 
       return body;
     },
   };
+  return api;
 }

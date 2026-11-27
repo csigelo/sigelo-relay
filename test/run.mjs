@@ -1025,7 +1025,9 @@ const statsShape = (s) => {
     || s.days.at(-1).day !== s.day) why.push('days');
   return why;
 };
-const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stats`); return { status: res.status, type: res.headers.get('content-type'), text: await res.text() }; };
+// As nginx forwards it (X-Real-IP set): the public view. Without it, from loopback: the operator's.
+const OPERATOR_KEYS = ['active_identities_7d', 'active_identities_30d'];
+const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stats`, { headers: { 'x-real-ip': '192.0.2.7' } }); return { status: res.status, type: res.headers.get('content-type'), text: await res.text() }; };
 {
   const got = await getStats(), s = JSON.parse(got.text), why = statsShape(s);
   ok(got.status === 200 && got.type === 'application/json' && why.length === 0, `GET /stats: 200, JSON, exactly the counts of stats.mjs, whole numbers${why.length ? ` (wrong: ${why.join(', ')})` : ''}`);
@@ -1075,6 +1077,16 @@ const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stat
     `GET /stats on the next UTC day: today's counts from zero, yesterday kept in days (${JSON.stringify(c.days)})`);
   const kept = S2.db.raw.prepare('SELECT day, counts FROM stats_days ORDER BY day').all();
   ok(kept.length === 2 && kept.every((r) => r.day % DAY === 0 && /^[{}\[\]":,a-z_0-9]*$/.test(r.counts)), 'stats_days: one row a day, keyed by the start of the UTC day, numbers and names of checks only');
+  // The operator's view (stats.mjs): accounts by last_seen in the last 7 and 30 UTC days, on the
+  // loopback request without X-Real-IP only; the public view (through nginx) never has the keys.
+  const opView = async () => (await fetch(`${base(S2)}/stats`)).json();
+  const o1 = await opView();
+  ok(o1.active_identities_7d === 2 && o1.active_identities_30d === 2 && OPERATOR_KEYS.every((k) => !(k in c)) && Object.keys(o1).filter((k) => !OPERATOR_KEYS.includes(k)).sort().join() === STATS_KEYS,
+    `GET /stats from loopback without X-Real-IP: active_identities_7d 2, _30d 2, beside the public keys (${o1.active_identities_7d}, ${o1.active_identities_30d})`);
+  snow += 6 * DAY;
+  const o2 = await opView(), p2 = (await getStats(S2)).text;
+  ok(o2.active_identities_7d === 1 && o2.active_identities_30d === 2, `GET /stats operator view six days on: alice (seen six days ago) in the 7 days, bob (seven) only in the 30 (${o2.active_identities_7d}, ${o2.active_identities_30d})`);
+  ok(!OPERATOR_KEYS.some((k) => p2.includes(k)) && statsShape(JSON.parse(p2)).length === 0, 'GET /stats with X-Real-IP (as nginx forwards every request): no active_identities key, the public shape exactly');
   snow += 95 * DAY;
   S2.sweep(snow);
   ok(S2.db.raw.prepare('SELECT count(*) AS n FROM stats_days').get().n === 1, 'stats_days: rows older than 90 days go at the sweep');

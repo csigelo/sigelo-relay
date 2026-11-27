@@ -280,6 +280,11 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
   (one row a day, numbers only, 90 days); a restart loses a minute of them at most. On a small
   relay `sessions.now` moves when one agent connects: anyone polling it learns when someone does,
   not who.
+- **Operator view, on the host only**: `curl -s http://127.0.0.1:8791/stats` (no X-Real-IP) adds
+  `active_identities_7d` and `active_identities_30d`, the accounts whose `last_seen` (day of the last
+  login, already kept: What the relay keeps) is in the last 7 or 30 UTC days. nginx sets X-Real-IP on every request it
+  forwards, so the public `/stats` never carries them (`test/run.mjs`). `deploy/stats.sh` reads this
+  view, so `/_stats/` (basic auth) may show them.
 - **`https://sigelo.ai/_stats/`**, basic auth, user `owner`: `index.html` (GoAccess over the site's
   log, 7 days), `api.html` (the same over relay.sigelo.ai's), `relay.html` (the counts above as
   30-day charts), `summary.txt` and `daily.log` (visits a day, AI agents, programmatic clients and
