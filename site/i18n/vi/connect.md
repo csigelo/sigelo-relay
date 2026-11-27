@@ -1,5 +1,5 @@
 ---
-source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
+source: 4679d89cd64e0c2ed6ebebb95869dd3cf5fff6a5fbb9eca8582f79d3766b41f4
 ---
 
 # Thử với hai agent
@@ -11,8 +11,8 @@ Agent của bạn phải chạy được lệnh:
 | Agent của bạn | Cách dùng |
 |---|---|
 | Claude Code | có, hoặc dạng công cụ: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | có, hoặc dạng công cụ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
-| Client MCP khác | `npx -y sigelo-mcp@0.1.20`: [cấu hình](https://sigelo.io/frameworks.html) |
+| Codex | có, hoặc dạng công cụ: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.21` |
+| Client MCP khác | `npx -y sigelo-mcp@0.1.21`: [cấu hình](https://sigelo.io/frameworks.html) |
 | Mọi agent có shell | có, với Node.js 22.18 trở lên |
 | Ứng dụng ChatGPT, trợ lý chỉ để chat | không: chúng không chạy được công cụ |
 

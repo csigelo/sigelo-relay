@@ -1,5 +1,5 @@
 ---
-source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
+source: 4679d89cd64e0c2ed6ebebb95869dd3cf5fff6a5fbb9eca8582f79d3766b41f4
 ---
 
 # Probeer het met twee agents
@@ -11,8 +11,8 @@ Je agent moet commando's kunnen uitvoeren:
 | Je agent | Hoe |
 |---|---|
 | Claude Code | ja, of als tools: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | ja, of als tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
-| Andere MCP-clients | `npx -y sigelo-mcp@0.1.20`: [configuraties](https://sigelo.io/frameworks.html) |
+| Codex | ja, of als tools: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.21` |
+| Andere MCP-clients | `npx -y sigelo-mcp@0.1.21`: [configuraties](https://sigelo.io/frameworks.html) |
 | Elke agent met een shell | ja, met Node.js 22.18 of nieuwer |
 | ChatGPT-app, andere assistenten die alleen chatten | nee: ze kunnen geen tools uitvoeren |
 

@@ -109,7 +109,7 @@ from `/var/www/acme`, so issuance and renewals work with nginx up and certbot ne
 by hand (the "nginx" steps below then replace the port-80 config with nginx.conf):
 
 ```sh
-install -d /var/www/acme /etc/letsencrypt/renewal-hooks/deploy && install -d -m 0750 /var/log/nginx/sigelo
+install -d /var/www/acme /etc/letsencrypt/renewal-hooks/deploy && install -d -m 0750 -o root -g www-data /var/log/nginx/sigelo
 printf '%s\n' 'server {' '    listen 80;' '    listen [::]:80;' '    server_name sigelo.ai www.sigelo.ai relay.sigelo.ai;' \
   '    access_log off;' '    error_log /var/log/nginx/sigelo/error.log crit;' \
   '    location ^~ /.well-known/acme-challenge/ {' '        root /var/www/acme;' '    }' \
@@ -155,6 +155,8 @@ install -m 0640 -o root -g turnserver /tmp/turnserver.conf /etc/turnserver.conf 
 #   udp dport 3478 accept comment "STUN for sigelo transfers"
 #   tcp dport 3478 accept comment "TURN over TCP"
 #   udp dport 49160-49400 accept comment "TURN relayed ports"
+# and first in that chain (relayed UDP to this host's own addresses: coturn's ports only, never dhcpcd or another listener):
+#   iif lo udp sport 49160-49400 fib daddr type local udp dport != { 3478, 3479, 49160-49400 } counter drop comment "TURN relayed to a local non-coturn port"
 systemctl enable coturn && systemctl restart coturn
 # the relay reads the same secret as a systemd credential (it never reads a root file itself):
 mkdir -p /etc/systemd/system/sigelo-relay.service.d
@@ -245,13 +247,15 @@ to a CONNECT without credentials) and that a plain GET is refused.
 links to the release's `site/dist`. Debian only, as `sigelo-relay-apply` and `site/deploy/server-setup.sh
 --relay` are: the latter removes the default site (its own `default_server`, and it logs addresses),
 sets nginx's own `error_log` to crit, and rotates `/var/log/nginx/sigelo/` daily, 7 kept. By hand,
-as root, also keeping the main error log 7 days (Debian keeps 14):
+as root, also keeping the main error log 7 days (Debian keeps 14). The log directory is
+root:www-data 0750: nginx's workers must reach it to reopen the logs on USR1 (root:root left them
+writing to the rotated file); logrotate signals by the pid file, systemctl kill as the fallback.
 
 ```sh
-install -d -m 0750 /var/log/nginx/sigelo && rm -f /etc/nginx/sites-enabled/default
+install -d -m 0750 -o root -g www-data /var/log/nginx/sigelo && rm -f /etc/nginx/sites-enabled/default
 sed -i 's|^error_log .*|error_log /var/log/nginx/error.log crit;|' /etc/nginx/nginx.conf
 sed -i 's|^\([[:space:]]*\)rotate .*|\1rotate 7|' /etc/logrotate.d/nginx
-printf '/var/log/nginx/sigelo/*.log {\n  daily\n  rotate 7\n  missingok\n  notifempty\n  postrotate\n    nginx -s reopen\n  endscript\n}\n' > /etc/logrotate.d/sigelo-ai
+printf '/var/log/nginx/sigelo/*.log {\n  daily\n  rotate 7\n  missingok\n  notifempty\n  postrotate\n    { kill -USR1 "$(cat /run/nginx.pid)" || systemctl kill -s USR1 nginx.service || nginx -s reopen; } 2>/dev/null || true\n  endscript\n}\n' > /etc/logrotate.d/sigelo-ai
 install -m 0644 relay/deploy/nginx.conf /etc/nginx/conf.d/sigelo-relay.conf && nginx -t && systemctl reload nginx
 ```
 

@@ -1,5 +1,5 @@
 ---
-source: 9d9d1b20b3bbdc848a6fc488fba8f4dfadb59c2bb0c4f9b1ae497da92fb96792
+source: c4dae1994bc20bd3fc3757c6f3fad866a68cdbd9c2e5dd7b9165fad48ebd973e
 ---
 
 # Sobre o sigelo
@@ -31,7 +31,7 @@ sigelo-agent enrol --name vps --wait 300
 sigelo-agent init --enrol K7F3-Q9ZP
 ```
 
-Experimental (0.1.20). Só saem da sua máquina mensagens cifradas: só os dois agentes as podem ler.
+Experimental (0.1.21). Só saem da sua máquina mensagens cifradas: só os dois agentes as podem ler.
 
 ::: cta
 [Ver exemplos →](/examples.html)

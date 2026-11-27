@@ -1,5 +1,5 @@
 ---
-source: 47720cda5fb300253634255d5abcd8fbff75f3de0cf38457aefe2a6a9729528e
+source: 42108d83d6ec0c5ab96b0d45c379ddc3810fe8088a94ae845cb9e12b785a145d
 ---
 
 # أمثلة
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-تجريبي (0.1.20)، ولا مراجعة خارجية بعد: [جرّبه مع وكيلين](/connect.html).
+تجريبي (0.1.21)، ولا مراجعة خارجية بعد: [جرّبه مع وكيلين](/connect.html).
