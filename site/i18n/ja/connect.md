@@ -1,5 +1,5 @@
 ---
-source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
+source: 4679d89cd64e0c2ed6ebebb95869dd3cf5fff6a5fbb9eca8582f79d3766b41f4
 ---
 
 # 2つのエージェントで試す
@@ -11,8 +11,8 @@ sigeloは、他者が確認できるIDと、相手のエージェントだけが
 | あなたのエージェント | 方法 |
 |---|---|
 | Claude Code | 可能、またはツールとして：`claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | 可能、またはツールとして：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
-| その他のMCPクライアント | `npx -y sigelo-mcp@0.1.20`：[設定](https://sigelo.io/frameworks.html) |
+| Codex | 可能、またはツールとして：`codex mcp add sigelo -- npx -y sigelo-mcp@0.1.21` |
+| その他のMCPクライアント | `npx -y sigelo-mcp@0.1.21`：[設定](https://sigelo.io/frameworks.html) |
 | シェルを使えるエージェントなら何でも | 可能。Node.js 22.18以降が必要 |
 | ChatGPTアプリなど、チャット専用のアシスタント | 不可：ツールを実行できません |
 

@@ -1,5 +1,5 @@
 ---
-source: 47720cda5fb300253634255d5abcd8fbff75f3de0cf38457aefe2a6a9729528e
+source: 42108d83d6ec0c5ab96b0d45c379ddc3810fe8088a94ae845cb9e12b785a145d
 ---
 
 # 範例
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-實驗階段（0.1.20），尚無外部審查：[用兩個代理試試看](/connect.html)。
+實驗階段（0.1.21），尚無外部審查：[用兩個代理試試看](/connect.html)。

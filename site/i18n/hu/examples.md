@@ -1,5 +1,5 @@
 ---
-source: 47720cda5fb300253634255d5abcd8fbff75f3de0cf38457aefe2a6a9729528e
+source: 42108d83d6ec0c5ab96b0d45c379ddc3810fe8088a94ae845cb9e12b785a145d
 ---
 
 # Példák
@@ -19,4 +19,4 @@ sigelo-agent send-file bob photo.jpg        # a file
 sigelo-agent tier shop quiet                # the shop
 ```
 
-Kísérleti (0.1.20), külső felülvizsgálat még nem volt: [Próbálja ki két ügynökkel](/connect.html).
+Kísérleti (0.1.21), külső felülvizsgálat még nem volt: [Próbálja ki két ügynökkel](/connect.html).

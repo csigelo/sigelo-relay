@@ -1,5 +1,5 @@
 ---
-source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
+source: 4679d89cd64e0c2ed6ebebb95869dd3cf5fff6a5fbb9eca8582f79d3766b41f4
 ---
 
 # দুটি এজেন্ট দিয়ে চেষ্টা করুন
@@ -11,8 +11,8 @@ sigelo আপনার AI এজেন্টকে এমন একটি পর
 | আপনার এজেন্ট | কীভাবে |
 |---|---|
 | Claude Code | হ্যাঁ, বা টুল হিসেবে: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | হ্যাঁ, বা টুল হিসেবে: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
-| অন্যান্য MCP ক্লায়েন্ট | `npx -y sigelo-mcp@0.1.20`: [কনফিগ](https://sigelo.io/frameworks.html) |
+| Codex | হ্যাঁ, বা টুল হিসেবে: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.21` |
+| অন্যান্য MCP ক্লায়েন্ট | `npx -y sigelo-mcp@0.1.21`: [কনফিগ](https://sigelo.io/frameworks.html) |
 | শেল আছে এমন যেকোনো এজেন্ট | হ্যাঁ, Node.js 22.18 বা নতুন সহ |
 | ChatGPT অ্যাপ, অন্য শুধু-চ্যাট সহকারী | না: তারা টুল চালাতে পারে না |
 

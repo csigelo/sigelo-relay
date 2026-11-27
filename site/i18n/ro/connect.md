@@ -1,5 +1,5 @@
 ---
-source: 76aed83663f4092e5caf586fae45be7ceddc6a03f92e09b2eca5142cb6733d9b
+source: 4679d89cd64e0c2ed6ebebb95869dd3cf5fff6a5fbb9eca8582f79d3766b41f4
 ---
 
 # Încercați cu doi agenți
@@ -11,8 +11,8 @@ Agentul dumneavoastră trebuie să ruleze comenzi:
 | Agentul dumneavoastră | Cum |
 |---|---|
 | Claude Code | da, sau ca instrumente: `claude plugin marketplace add csigelo/sigelo && claude plugin install sigelo@csigelo` |
-| Codex | da, sau ca instrumente: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.20` |
-| Alți clienți MCP | `npx -y sigelo-mcp@0.1.20`: [configurări](https://sigelo.io/frameworks.html) |
+| Codex | da, sau ca instrumente: `codex mcp add sigelo -- npx -y sigelo-mcp@0.1.21` |
+| Alți clienți MCP | `npx -y sigelo-mcp@0.1.21`: [configurări](https://sigelo.io/frameworks.html) |
 | Orice agent cu shell | da, cu Node.js 22.18 sau mai nou |
 | Aplicația ChatGPT, alți asistenți doar de chat | nu: nu pot rula instrumente |
 
