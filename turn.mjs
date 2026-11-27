@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/turn.mjs — TURN credentials for logged-in identities, sigelo-turn/0 (design/calls.md §3,
-// design/transfer.md §5): coturn on the relay host relays a call's or a transfer's packets when no
+// relay/turn.mjs — TURN credentials for logged-in identities, sigelo-turn/0 (relay/deploy/README.md
+// "STUN and TURN (coturn)"): coturn on the relay host relays a call's or a transfer's packets when no
 // direct pair of candidates answers. The media stays end to end (DTLS-SRTP, DTLS): coturn moves
 // ciphertext.
 //

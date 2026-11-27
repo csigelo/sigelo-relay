@@ -15,7 +15,7 @@
 #   api.html      GoAccess over relay.sigelo.ai's relay-access.log* (the relay's HTTP calls)
 #   relay.html    the relay's counts, 30 days, as charts (stats-chart.mjs over GET /stats)
 #   summary.txt   visits a day, agents and bots against browsers, top pages, the relay's counts
-#                 today: plain text, phone-sized
+#                 today: plain text, small-screen sized
 #   daily.log     summary.txt's block for each finished UTC day, appended once (the last 3,000
 #                 lines kept): for reading over ssh, `cat /var/www/sigelo.ai/stats/daily.log`
 # The logs are nginx.conf's log_format sigelo_anon: the address already cut to /24 or /48, no query

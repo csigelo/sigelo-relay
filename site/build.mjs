@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/site/build.mjs — renders sigelo.ai (design/relay-plan.md §7 M5, §11) to relay/site/dist/.
+// relay/site/build.mjs — renders sigelo.ai to relay/site/dist/.
 //
 //   node relay/site/build.mjs           build, and list what is still open before a deploy
 //   node relay/site/build.mjs --final   refuse while anything is open or wrong (the deploy gate)
@@ -12,7 +12,7 @@
 // Twelve pages, each twice, /<page>.html and /<page>.md (the twin ends with the footer as Markdown),
 // plus what agents and crawlers read: robots.txt (and relay-robots.txt, which nginx serves as
 // relay.sigelo.ai's), sitemap.xml, llms.txt, llms-full.txt, index.json, relay.json (the relay info
-// document of plan §11) and .well-known/security.txt. nginx (relay/deploy/nginx.conf) serves
+// document) and .well-known/security.txt. nginx (relay/deploy/nginx.conf) serves
 // index.json, relay.json and llms.txt with Access-Control-Allow-Origin: *, so a browser-based agent
 // can read them. Static files only: no script but JSON-LD data, no form, no cookie, nothing from
 // another origin.
@@ -55,7 +55,7 @@ export const ORIGIN = 'https://sigelo.ai';
 export const HOST = 'relay.sigelo.ai';
 export const REPO = 'https://github.com/csigelo/sigelo-relay';
 // The brand: relay/site/brand/, a byte-identical copy of the files of assets/brand/ this site uses
-// (design/logo/make.py writes both; relay/ is published alone, so it carries its own). Served under
+// (one generator writes both; relay/ is published alone, so it carries its own). Served under
 // /brand/, the favicon and the PNG icons also at the root. The header's seal is seal.svg inline, its
 // fill left to the stylesheet (--seal: wax; seal-dark's #c8423f on a dark scheme), hidden from
 // assistive technology (the link says "sigelo").
@@ -75,8 +75,8 @@ const PKG = JSON.parse(readFileSync(join(RELAY, 'package.json'), 'utf8'));
 // Who sells Pro and operates the relay, as the pages name it (footer, JSON-LD provider, index.json):
 // the trade name. The pages give no legal name; privacy.md and terms.md say
 // "a business registered in the European Union; legal name and registered address on request".
-// --final refuses null, and a name privacy.md and terms.md do not begin their seller line with
-// (see the runbook).
+// --final refuses null, and a name privacy.md and terms.md do not begin their seller
+// line with.
 export const SELLER = 'sigelo';
 
 // Pro is not on sale until the vendor identity exists: it is minted at a terminal
@@ -134,21 +134,21 @@ export const DOMAINS = [
 export const HOSTS = [{ name: HOST, what: 'relay broker' }];
 export const REPOSITORIES = ['https://github.com/csigelo/sigelo', REPO];
 export const CONTENT_HOSTS = [...DOMAINS.filter((d) => d.role === 'content'), ...HOSTS].map((d) => d.name);
-// SECURITY.md's line, which the contact page carries verbatim (SEO spec §4.10). A payment address is made
+// SECURITY.md's line, which the contact page carries verbatim. A payment address is made
 // per invoice, so it is sent: only in answer to the buyer's own request, in the SimpleX conversation
 // the buyer opened from sigelo.io's contact page (a conversation a phisher cannot write into).
 // index.json's official.payment_address_only_with and invoice_only_via say so, as sigelo.io's do.
 export const NOBODY = 'Nobody from the project will ever ask for a seed, an identity or wallet private key, or a token. A payment address comes only with an invoice you asked for, in the SimpleX conversation you opened with the address on `https://sigelo.io/contact.html`.';
 export const MOTTO = 'By AI, for AI.';
 export const DISCLOSURE = 'Built by a team of AI agents under a human owner.';
-// The site's description (JSON-LD WebSite). In a language (since 2026-10-25 the motto is the
+// The site's description (JSON-LD WebSite). In a language (the motto is the
 // project's, in every language): lang.json `motto` and `disclosure`, glossed as the rest; readLanguages
 // joins them into `site` as here. English is the fallback only where a language is stale.
 export const SITE_DESCRIPTION = `${MOTTO} ${DISCLOSURE}`;
 // JSON-LD keywords (English WebSite, SoftwareApplication). Metadata only, never page copy: phrasing
 // variants people and agents search for, and "SI" (the US federal synonym for AI since 2026-09-29).
 export const KEYWORDS = 'AI agents, SI agents, agent-to-agent messaging, agent messaging, end-to-end encryption, pairing code, agent identity, AI agent identity, MCP, relay';
-// The four sentences plan §11 says no competitor can truthfully say: index.json and relay.json carry
+// The four sentences no competitor can truthfully say: index.json and relay.json carry
 // them as `positioning`, llms-full.txt as prose, and every page's footer, which is generated and
 // outside the word budgets: the first three on every page, the disclosure with the motto (on the home
 // page its body has both).
@@ -158,7 +158,7 @@ export const POSITIONING = [
   'One long-term key, with a recovery key kept offline that wins over a thief who stole the key.',
   DISCLOSURE,
 ];
-// sigelo.io's world issuer DID, as SECURITY.md and sigelo.io's index.json name it (SEO spec §4.10).
+// sigelo.io's world issuer DID, as SECURITY.md and sigelo.io's index.json name it.
 // Copied, as DOMAINS is; relay/site/test.mjs compares it with world/genesis.json in the private tree.
 export const ISSUER_DID = 'did:sigelo:zEqNZjQDBiiufPs4NHrLw1kJD8rBitbFPyoQJoKuJFTM7';
 // sigelo.io's official-channels statement.
@@ -169,8 +169,8 @@ export const STATEMENT = 'https://sigelo.io/security.html#official-channels';
 // URL). The address itself is on neither: it comes with an invoice (NOBODY). index.json says so (as
 // payment_details_only_on, the name sigelo.io's site/src/official.mjs uses for the same places), and
 // the contact page names the same file and branch in words (PAYMENT_WORDS), so a page that says
-// otherwise, anywhere, is not ours. Until 2026-10-14 the place was a pay page, /pay-monero.html,
-// which nginx now sends to /pro.html.
+// otherwise, anywhere, is not ours. An earlier pay page, /pay-monero.html, is gone: nginx
+// sends it to /pro.html.
 export const PAYMENT_PLACES = [`${ORIGIN}/contact.html`, `${REPO}/blob/main/site/contact.md`];
 export const PAYMENT_WORDS = `How to pay is published only here and in \`site/contact.md\` on the main branch of \`${REPO.replace(/^https:\/\//, '')}\`.`;
 // The SimpleX address sigelo.io's contact page shows (site/src/official.mjs SIMPLEX), copied as
@@ -178,8 +178,8 @@ export const PAYMENT_WORDS = `How to pay is published only here and in \`site/co
 export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3gPLNts_ovwxmZM';
 
 // The pages. `nav`: the label in the header's nav and the footer; `foot`: in the footer only (the
-// 2026-10-16: the header is About, Get started, Plans, Contact; the footer adds Examples,
-// Enterprise, FAQ (2026-11-11), Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
+// header is About, Get started, Plans, Contact; the footer adds Examples,
+// Enterprise, FAQ, Privacy, Terms). The home page is reached by the wordmark; the agents' page (the Pro
 // steps and erasure requests, what an agent runs for its operator) and the not-found page are in
 // neither: the agents' page is linked from /pro and /privacy and listed in llms.txt, the sitemap and
 // index.json; the not-found page nowhere. The seven pages of TRANSLATED are also in every language
@@ -187,7 +187,7 @@ export const SIMPLEX = 'https://smp10.simplex.im/a#18LjfJawmkVxvFtCHFo-yyzPo8Kr3
 // Titles get " — sigelo relay" but the home page's. `pending`: the title or description while Pro is
 // coming soon (VENDOR_PENDING), for each page whose head would otherwise read as a sale; a search
 // result or link preview shows the head, not the page's first paragraph. No title or description
-// mentions the Monero discount (runbook §7 Q5). The word budgets: relay/site/test.mjs counts each
+// mentions the Monero discount (it is a detail of the plans, not a headline). The word budgets: relay/site/test.mjs counts each
 // page as `wc -w` would with every {{value}} filled, a size being two words ("50 MB"): the prose
 // (PROSE_BUDGET there: no table, card, code block or directive line) and the whole file
 // (tools/docs-test/budgets.json, which tools/docs-test/check-budgets.mjs checks on the source as written).
@@ -257,7 +257,7 @@ export function readDark(site = SITE) {
 export const darkOut = (out) => `${out}-${DARK}`;
 
 // ---------------------------------------------------------------------------------------------
-// Languages (2026-10-16): the seven pages a person reads (TRANSLATED), in every language
+// Languages: the seven pages a person reads (TRANSLATED), in every language
 // of i18n/, one URL each, /<code>/<page>.html. No redirect by location or browser language: the
 // footer's "Other languages" is the only switch. Terms, privacy, agents, 404 and the agent files
 // stay English; a translated page links them in English. A language is a folder,
@@ -348,7 +348,7 @@ export function translationRefusals(code, en, tr) {
   }
   return [...why, ...paymentDetailRefusals(Object.fromEntries(Object.entries(tr).map(([slug, t]) => [`${code}/${slug}.md`, t])))];
 }
-// The glossary (2026-10-24): locale conventions a translation is held to, applied to every
+// The glossary: locale conventions a translation is held to, applied to every
 // translated string as the build reads it (readLanguages), so a translation written again gets them
 // too; `node relay/site/build.mjs --glossary` writes them back into i18n/. Per language, [pattern,
 // replacement] over the prose only: code, link targets, {{values}} and URLs stay as written.
@@ -391,7 +391,7 @@ export function readLanguages(site = SITE, md = readPages(site)) {
     if (typeof meta.lang !== 'string' || meta.lang.toLowerCase() !== code) why.push(`${code}/lang.json: lang is not ${code} (the hreflang, any case)`);
     for (const k of ['name', 'other', 'untranslated', 'motto', 'disclosure']) if (typeof meta[k] !== 'string' || !meta[k].trim()) why.push(`${code}/lang.json: no ${k}`);
     if (meta.motto === MOTTO || /By AI, for AI|Built and operated by/i.test(`${meta.motto} ${meta.disclosure}`)) why.push(`${code}/lang.json: the motto or the disclosure is still English`);
-    if ('site' in meta) why.push(`${code}/lang.json: "site" is gone (2026-10-25): "motto" and "disclosure" instead`);
+    if ('site' in meta) why.push(`${code}/lang.json: "site" is gone: "motto" and "disclosure" instead`);
     meta.site = `${meta.motto} ${meta.disclosure}`;
     if (meta.dir !== undefined && meta.dir !== 'rtl') why.push(`${code}/lang.json: dir is "rtl" or absent (left to right)`);
     for (const k of Object.keys(DRAWING_WORDS)) if (typeof meta.drawing?.[k] !== 'string' || !meta.drawing[k].trim()) why.push(`${code}/lang.json: no drawing.${k}`);
@@ -442,7 +442,7 @@ export const VALUES = Object.freeze({
   'free.maxMessage': size(TIERS.free.maxMessage), 'free.mailboxes': thou(TIERS.free.mailboxes), 'free.contacts': contacts(TIERS.free),
   'pro.msgsDay': thou(TIERS.pro.msgsDay), 'pro.retentionDays': String(TIERS.pro.retentionDays),
   'free.support': support(TIERS.free),
-  // Chat groups (design/groups.md §4): made by one identity, and the members of each, the maker included.
+  // Chat groups (TIERS, allowance.mjs): made by one identity, and the members of each, the maker included.
   'free.groups': String(TIERS.free.groups), 'free.groupMembers': String(TIERS.free.groupMembers), 'pro.groups': String(TIERS.pro.groups), 'pro.groupMembers': String(TIERS.pro.groupMembers),
   'pro.maxMessage': size(TIERS.pro.maxMessage), 'pro.mailboxes': thou(TIERS.pro.mailboxes), 'pro.contacts': contacts(TIERS.pro), 'pro.support': support(TIERS.pro),
   'keep.account.free': keep(TIERS.free), 'keep.account.pro': keep(TIERS.pro), 'keep.licence': days(LICENCE_KEEP),
@@ -462,17 +462,16 @@ export function fill(text, where) {
   });
 }
 
-// The inputs the pages still lack, as `[text]` → what fills it. Every one is filled (2026-10-13:
-// decided per page). A new one goes
+// The inputs the pages still lack, as `[text]` → what fills it. Every one is filled. A new one goes
 // here with its page; anything shaped like a placeholder that is not listed here fails
 // relay/site/test.mjs, and --final refuses any placeholder left in a page, listed or not.
 export const PLACEHOLDERS = {};
 // `[text]` not followed by `(`: Markdown link text always is, so only placeholders match.
 export const PLACEHOLDER_RE = /\[[a-z][^\]\n]*\](?!\()/g;
 export const DRAFT_RE = /^> \*\*DRAFT\b/m;
-// pro.md's plans (gross prices only: no net amount on the pages, 2026-10-14) and the lines
+// pro.md's plans (gross prices only: no net amount on the pages) and the lines
 // under them, which the JSON-LD offers and index.json read. PRICE_RE → [Monero discount %]. VAT
-// included, no rate and no reverse-charge wording on the pages (2026-10-14).
+// included, no rate and no reverse-charge wording on the pages.
 // PLAN_RE, a plan a period → [months, save %, a month, for the period]; the one-month plan has no
 // "save" badge and no period total, the others have both.
 export const PRICE_RE = /^VAT included\. For businesses, billed up front for the period\. Bank transfer, or Monero at ([1-9]\d?) % off\.$/m;
@@ -630,7 +629,7 @@ export const serversIn = (b) => b.blocks.flatMap((x) => (x.head === 'server' ? [
 export const everyDirective = (b) => [...b.directives, ...b.blocks.flatMap(everyDirective)];
 
 // The official statement this site's index.json makes, as the private tree's other files must say it
-// before a deploy (SEO spec §4.10, task 8): SECURITY.md carries the "Nobody…" line, no longer the
+// before a deploy: SECURITY.md carries the "Nobody…" line, no longer the
 // old one that said no payment address or link is ever sent by chat, names the relay's repository
 // and carries the SimpleX address sigelo.io's contact page shows (site/src/official.mjs SIMPLEX: the
 // contact page sends buyers to compare the two); sigelo.io's own index.json (site/build.mjs) says
@@ -715,7 +714,7 @@ export function launchRefusals(root = ROOT) {
   }
   const s = read(security);
   if (s !== null) {
-    if (!s.includes(NOBODY)) why.push('SECURITY.md: lacks the "Nobody from the project…" line the contact page carries (SEO spec §4.10)');
+    if (!s.includes(NOBODY)) why.push('SECURITY.md: lacks the "Nobody from the project…" line the contact page carries');
     if (/send a payment address or link by e-mail or chat|Payment proofs/.test(s)) why.push('SECURITY.md: still says no payment address or link is sent by chat, or where payment proofs go; an invoice now carries the address over SimpleX');
     if (!s.includes(REPO)) why.push(`SECURITY.md: does not name ${REPO} as official (the contact page says how to pay is published in its site/contact.md)`);
   }
@@ -1100,8 +1099,8 @@ main > .plans { max-width: 62rem; }
 `;
 
 // ---------------------------------------------------------------------------------------------
-// The footer, every page the same: the wordmark, the nine links and "Other languages", nothing else
-// (2026-10-16). The twin ends with the links as Markdown, the page as HTML, with the same
+// The footer, every page the same: the wordmark, the nine links and "Other languages", nothing else.
+// The twin ends with the links as Markdown, the page as HTML, with the same
 // links in the same order (relay/site/test.mjs). The seller is named on privacy and terms; how to pay
 // on contact. "Other languages" is a <details> (no script): open, it lists every language by its own
 // name, the current one unlinked; each links the same page in that language, or its home page where
@@ -1111,7 +1110,7 @@ export const HEADER = FOOTER.filter((p) => !p.foot);
 const href = (p) => (p.slug === 'index' ? '/' : `/${p.slug}.html`);
 // The page's address in a language (code; null: English); the English one for a page not TRANSLATED.
 const hrefIn = (p, code) => (code && TRANSLATED.includes(p.slug) ? `/${code}/${p.slug}.html` : href(p));
-// The protocol's site, after the links (2026-10-24: two layers, the protocol at sigelo.io and this
+// The protocol's site, after the links (two layers, the protocol at sigelo.io and this
 // relay built on it): its name is its label, the same in every language.
 export const PROTOCOL = ['sigelo.io', 'https://sigelo.io/'];
 const footerMd = () => ['sigelo', ...FOOTER.map((p) => `[${p.nav}](${href(p)})`), `[${PROTOCOL[0]}](${PROTOCOL[1]})`].join(' · ');
@@ -1129,7 +1128,7 @@ const langHead = (p, lang, pending) => ({ ...lang.pages[p.slug], ...(pending && 
 export const titleIn = (p, lang, pending = false) => (!lang ? titleOf(p, pending) : p.slug === 'index' ? langHead(p, lang, pending).title : `${langHead(p, lang, pending).title} — sigelo relay`);
 export const descriptionIn = (p, lang, pending = false) => (!lang ? descriptionOf(p, pending) : fillIn(langHead(p, lang, pending).description, `${lang.code}/lang.json`, lang));
 
-// JSON-LD (SEO spec §3.4): the WebSite everywhere, the page's WebPage, and on the home page the
+// JSON-LD: the WebSite everywhere, the page's WebPage, and on the home page the
 // hosted Service and the SoftwareApplication. The seller (provider) and the terms only in a final
 // build, the Pro offers only while Pro is on sale (final, and not VENDOR_PENDING): a draft offers
 // nothing. None on the not-found page. Every < is written as
@@ -1220,7 +1219,7 @@ function git(...args) {
 }
 const lastCommit = (...paths) => git('log', '-1', '--format=%cI', '--', ...paths);
 
-// llms.txt (SEO spec §4.3): one fetch tells an agent what this is and where the rest is.
+// llms.txt: one fetch tells an agent what this is and where the rest is.
 function llmsTxt(version, pending, lit = []) {
   return `# sigelo relay
 
@@ -1343,7 +1342,7 @@ export function build({ final = false, site = SITE, out = DIST, deploy = DEPLOY,
   for (const f of BRAND_FILES) put(`brand/${f}`, readFileSync(join(BRAND, f)));
   for (const f of ['favicon.svg', 'icon-192.png', 'icon-512.png']) put(f, readFileSync(join(BRAND, f)));
 
-  // robots.txt (SEO spec §4.1): everything allowed; the AI crawlers named so the intent is explicit.
+  // robots.txt: everything allowed; the AI crawlers named so the intent is explicit.
   const bots = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User',
     'Google-Extended', 'Applebot', 'Applebot-Extended', 'CCBot', 'Amazonbot', 'Amzn-SearchBot', 'Meta-ExternalAgent', 'Meta-WebIndexer',
     'MistralAI-User', 'MistralAI-Index', 'DuckAssistBot', '*'];
@@ -1373,7 +1372,7 @@ How to pay is left out here: it is published only at ${PAYMENT_PLACES.slice(0, -
 
 ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug].trimEnd()}\n`).join('\n')}`);
 
-  // index.json (SEO spec §4.5, §4.10) and relay.json (plan §11): data only, generated from the same
+  // index.json and relay.json: data only, generated from the same
   // constants as the pages.
   // groups: the chat groups one identity makes (max) and the members of each, the maker included
   // (apps/contact/group.mjs counts them; each login is told its own: allowance.mjs's "tier" notice).
@@ -1429,7 +1428,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     pages: pages.filter((p) => !p.noindex).map((p) => ({ slug: p.slug, html: pageUrl(p), markdown: `${ORIGIN}/${p.slug}.md` })),
     contact, privacy: `${ORIGIN}/privacy.html`, terms: `${ORIGIN}/terms.html`,
   }, null, 2) + '\n');
-  // relay.json: the relay's own info document, in the spirit of Nostr's NIP-11 (plan §11), served at
+  // relay.json: the relay's own info document, in the spirit of Nostr's NIP-11, served at
   // https://relay.sigelo.ai/relay.json. Limits: the tiers above, and the caps no deployment changes.
   put('relay.json', JSON.stringify({
     name: 'sigelo relay', description: `${description} The relay cannot read them, but can tell who talks to whom.`, positioning: POSITIONING,
@@ -1444,7 +1443,7 @@ ${fullPages.map((p) => `---\n\nSource: ${ORIGIN}/${p.slug}.md\n\n${twins[p.slug]
     terms: `${ORIGIN}/terms.html`, privacy: `${ORIGIN}/privacy.html`, contact, official, docs: { home: `${ORIGIN}/`, index: `${ORIGIN}/index.json`, llms_txt: `${ORIGIN}/llms.txt` },
   }, null, 2) + '\n');
 
-  // sitemap.xml (SEO spec §4.2): the indexable pages, llms.txt and index.json; never a twin, the
+  // sitemap.xml: the indexable pages, llms.txt and index.json; never a twin, the
   // not-found page or llms-full.txt (each repeats a page). lastmod: the last commit of the source, of
   // the constants it shows when it has {{values}}, and for a generated file of its newest input.
   const valueSources = ['allowance.mjs', 'mailbox.mjs', 'operator.mjs', 'park.mjs'].map((f) => join(RELAY, f));

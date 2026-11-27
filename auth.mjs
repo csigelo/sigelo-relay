@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/auth.mjs — login with a sigelo identity (design/relay-plan.md §3 "Login", "Errors").
+// relay/auth.mjs — login with a sigelo identity (relay/deploy/README.md "The protocol in one screen").
 //
 //   GET  /challenge?did=<current DID>   → { challenge: {v:"sigelo-relay/0", typ:"relay-login", did,
 //                 relay: the relay host, nonce}, pow_bits: what a new identity proves with this
@@ -38,7 +38,7 @@
 // login and its identity is stored here (a new one is stored with its chain). As in
 // pairing, the signature is checked before
 // the rotations already seen, so no answer before it depends on what the relay keeps. "password"
-// (the shape) is not in the plan's code list: it is pairing's "card" check, for the container. A
+// (the shape) is not in the protocol's list of check names: it is pairing's "card" check, for the container. A
 // relay failure is no check: CONNACK 3, and POST /check answers 503. No crypto for identities
 // here: every signature check is the sigelo library.
 // Loopback HTTP behind nginx, with world/server.mjs's body limit and timeouts.
@@ -65,7 +65,7 @@ export const loginBody = (did, relay, nonce) => ({ v: V, typ: TYP_LOGIN, did, re
 export const TTL = 300, MAX_ITEMS = 64, MAX_BODY = 256 * 1024, WINDOW = 60;
 export const DID_RE = /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/;
 export const CHECKS = ['rate', 'password', 'challenge_unknown', 'challenge_expired', 'bundle', 'sig', 'retired_recovery', 'client_id', 'closed', 'pow', 'relay_full', 'client_old'];
-// Plan §3 "Operator attestation": the only attestations the relay reads (M4), at most this many.
+// Operator attestations: the only attestations the relay reads (M4), at most this many.
 export const OPERATOR_CTX = 'sigelo-relay/operator', MAX_OPERATOR = 4;
 // Signature checks bundles may cost per address prefix and minute: one bundle at its largest (64
 // sent + 64 kept rotations, 4 attestations) fits, and 256 checks are ~1.3 s of the one thread.
@@ -176,13 +176,13 @@ function issuersNamed(issuers, attestations) {
   return [...out.values()];
 }
 
-// M4: proof of work (plan §3 "Proof of work", relay/pow.mjs). A new original DID proves work at its
+// M4: proof of work (relay/pow.mjs). A new original DID proves work at its
 // first mailbox claim. policy.pow, when M4 supplies it, decides the value and its shape, given the
 // bits the nonce states and the network it was issued to (newNonce); without it absence is
 // accepted and a present value is only shape-checked, so a client that already sends one is not
 // refused. → undefined, or what policy.pow answers when the proof needs its evaluation, { wait,
 // done } (allowance.mjs): login() goes on after it.
-// The dropped SHA-256 proof of a client of before 2026-11-13 (pow.mjs CLIENT_OLD): its own name, one line.
+// The dropped SHA-256 proof of a client older than the Argon2id proof (pow.mjs CLIENT_OLD): its own name, one line.
 const powCheckName = (why) => (why === CLIENT_OLD ? 'client_old' : 'pow');
 function checkPow(pow, ctx, policy) {
   if (!policy.pow) {
@@ -217,7 +217,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   const ending = new WeakMap();     // Aedes client admitted to a closed relay until a time → the timer that closes it then
   const left = new WeakSet();       // Aedes client whose socket closed (detach)
   let total = 0;
-  // The cache of plan §3: current DID → account, account → { current, original, key }, for logins
+  // The DID cache: current DID → account, account → { current, original, key }, for logins
   // without a bundle. Memory only. The rotations themselves are in the database (db.chainOf), so a
   // restart or an eviction costs a client one bundle, never the relay's memory of a rotation.
   const byCurrent = new Map(), byAccount = new Map();
@@ -249,7 +249,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
   const verifyCost = (prefix, now, n) => charge('verify', prefix, now, n, verifyBudget, `bundles from this network cost more than ${verifyBudget} signature checks this minute: wait`);
   const chargeLogin = (prefix, now) => charge('login', prefix, now, 1, loginRate, `more than ${loginRate} logins a minute from this network (logins from every device behind this address count, retries included): wait a minute`);
 
-  // The challenge nonce carries its own proof (plan §3 "Login"; single use, as world/server.mjs):
+  // The challenge nonce carries its own proof (single use, as world/server.mjs):
   // base64url of head = exp (4 bytes) ‖ pow bits (1) ‖ network (4) ‖ 7 random bytes, then the first
   // 16 bytes of HMAC-SHA256(key, "sigelo-relay/challenge\n" ‖ DID ‖ "\n" ‖ head). bits: the proof
   // of work a new identity owes with this nonce, as GET /challenge gave it (policy.powBits), so a

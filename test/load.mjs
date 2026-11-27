@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // relay/test/load.mjs — N clients (default 2,000) log in to a relay on loopback and stay connected:
 // login rate, login latency, the relay's CPU per login and its memory per connection
-// (design/relay-plan.md §4 "First VPS size", §7 M3). The relay runs in a child process, so its
+// (relay/deploy/README.md "Load test"). The relay runs in a child process, so its
 // numbers are its own; the clients share this process. --tls: over the TLS listener (a
 // self-signed certificate made per run), as production runs. Results: deploy/README.md.
 //   node relay/test/load.mjs [N] [concurrency] [--tls]

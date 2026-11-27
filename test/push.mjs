@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/test/push.mjs — UnifiedPush wakes (push.mjs, sigelo-push/0; design/push.md §1 B, §3):
+// relay/test/push.mjs — UnifiedPush wakes (push.mjs, sigelo-push/0):
 // RFC 8291's own example (Appendix A) byte for byte, the sigelo wake under the same keys (the
 // vector apps/android/test/WebPushTest.java opens), VAPID, the address guard, the POST guard against
 // fake endpoints over HTTPS on loopback (a redirect, a big reply, a slow one, a private address),

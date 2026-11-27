@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/site/test.mjs — builds relay/site/dist/ and checks sigelo.ai (design/relay-plan.md §7 M5, §11;
-// the SEO spec's checks A1–A15).
+// relay/site/test.mjs — builds relay/site/dist/ and checks sigelo.ai (the site's checks
+// A1–A15).
 //
 //   node relay/site/test.mjs     `ok …` lines, then `ALL PASS (<n> checks)` and exit 0, or `FAIL …` and exit 1
 //
@@ -19,8 +19,8 @@
 // bank transfer or Monero, no card; the agent files (llms.txt, index.json, relay.json, sitemap, robots, security.txt)
 // against the pages and the relay's own code; the numbers, fields and steps the pages promise against
 // the relay's behaviour. In the private tree it also compares the official names with sigelo.io's
-// and relay/licence.ts with apps/keeper/licence.ts, and runs the internal runbook's self-test
-// (runbook §11). No network: the registry check of --launch runs here against
+// and relay/licence.ts with apps/keeper/licence.ts, and runs an operator runbook's self-test
+// (SIGELO_RUNBOOK, below). No network: the registry check of --launch runs here against
 // stand-in registry documents.
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -73,15 +73,15 @@ ok(![...files].some((f) => !f.endsWith('.png') && read(f).includes('{{')), 'dist
 
 // ---- word budgets: words as `wc -w` counts them, on the page as a reader sees it ----------------
 // Every {{value}} filled: a size is two words ("50 MB"), so the source's count (tools/docs-test/check-budgets.mjs)
-// is too low. Two budgets. The prose (set 2026-10-14): the words a reader reads as text, so
+// is too low. Two budgets. The prose: the words a reader reads as text, so
 // no table, no card (the home page's tier cards), no code block, no container line. The whole file:
 // tools/docs-test/budgets.json must say the same (below). pro.md carries VENDOR_PENDING while Pro is coming
 // soon: both its budgets allow that sentence's words only while it is there, so the allowance cannot
 // outlive the sentence.
-// 2026-10-25: the first screens may explain in place, up to 40 words more: index +40, about +40.
-// 2026-11-10: index +10, the sub-line's why-trust sentence linking sigelo.io's FAQ (TR1).
-// 2026-11-11: index +5, the link to the relay's FAQ under the cards; faq, the twelfth page (≤ 420 words asked).
-// 2026-11-03: pro +15, the Free/Pro table's Groups row (design/groups.md §4), a table row only: no prose.
+// Raised: the first screens may explain in place, up to 40 words more: index +40, about +40.
+// index +10, the sub-line's why-trust sentence linking sigelo.io's FAQ (TR1).
+// index +5, the link to the relay's FAQ under the cards; faq, the twelfth page (≤ 420 words).
+// pro +15, the Free/Pro table's Groups row, a table row only: no prose.
 const PROSE_BUDGET = { index: 190, connect: 235, pro: 180, enterprise: 130, contact: 110, about: 180, examples: 170 };
 const FILE_BUDGET = { index: 270, connect: 450, pro: 295, enterprise: 135, contact: 110, privacy: 530, terms: 530, agents: 370, faq: 335, about: 205, examples: 200, 404: 40 };
 const words = (s) => s.split(/[ \t\n\r\f\v]+/).filter(Boolean).length;
@@ -127,7 +127,7 @@ ok(!DRAFT_RE.test(src.terms) && !r.open.includes('DRAFT') && !(src.terms.match(P
   && src.terms.includes("**Law and courts.** The law and courts of the Seller's registered seat in the European Union."),
 'terms.md: final (no DRAFT mark, no placeholder), law and courts of the Seller\'s registered seat in the EU');
 // The pages name the seller by the trade name only, the legal name on request.
-// The terms add where a buyer finds it anyway: on the invoice (runbook §1, as VAT law requires).
+// The terms add where a buyer finds it anyway: on the invoice (as VAT law requires).
 const SELLER_LINE = (where) => `${SELLER}, a business registered in the European Union; legal name and registered address ${where} \`contact@sigelo.io\``;
 ok(SELLER === 'sigelo' && src.privacy.includes(`GDPR controller: ${SELLER_LINE('on request at')}.`) && src.terms.includes(`Seller: ${SELLER_LINE('on invoices and on request at')} ("the Seller").`)
   && !/\b(?:Ltd|GmbH|BV|SRL|SA|NV|LLC|Inc|BVBA)\b\.?/.test(Object.values(src).join('\n')),
@@ -165,18 +165,18 @@ for (const p of PAGES) {
 
 // ---- head (A1–A5): titles, descriptions, one H1, canonical and noindex, the twin linked --------
 const SCRIPT = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/;
-// The why (2026-10-24), the first paragraph of both sites' home pages: one scene a newcomer gets.
-// 2026-11-10: who built it, and why trust it with its makers unnamed, linking sigelo.io's FAQ.
+// The why, the first paragraph of both sites' home pages: one scene a newcomer gets.
+// The sub-line: who built it, and why trust it with its makers unnamed, linking sigelo.io's FAQ.
 const SUBLINE = 'Built by a team of AI agents under a human owner. Why trust it? For the reason Bitcoin is trusted: the code is public, nobody needs permission, every claim can be checked (FAQ).';
 const WHY = "Your agent books, buys and asks for you. To a shop or another agent it is a stranger: no name, no history, no way to pay it. sigelo gives it an ID anyone can check, even offline: it proves who it is, keeps its good record and gets paid.";
 const H1 = { index: 'By AI, for AI.', connect: 'Try it with two agents', pro: 'Pro: all your agents on one allowance', enterprise: 'Enterprise: teams and swarms of agents',
   contact: 'Contact', privacy: 'Privacy', terms: 'Terms', agents: 'For agents: Pro setup and data requests', about: 'About sigelo', examples: 'Examples', faq: 'FAQ', 404: 'Not found' };
 // The rendered titles and descriptions, exactly (the home title keeps the SEO term). Pro's description
 // takes its numbers from relay/allowance.mjs TIERS and names the largest message, not a retention: a
-// reader away over a week takes no new messages on either tier (A5 review).
+// reader away over a week takes no new messages on either tier.
 const sizeOf = (b) => (b % (1024 * 1024) === 0 ? `${b / 1024 / 1024} MB` : `${b / 1024} KB`);
 // While Pro is coming soon (VENDOR_PENDING) the heads that would read as a sale say so: a search result
-// or a link preview shows the title and description, not the page's first paragraph (X2 review).
+// or a link preview shows the title and description, not the page's first paragraph.
 // HEAD(pending) → { TITLE, DESC }; the on-sale heads are checked on the --final build below.
 const HEAD = (pending) => ({
   TITLE: { index: 'sigelo relay — end-to-end encrypted messaging for AI agents', connect: 'Try it with two agents — sigelo relay',
@@ -208,7 +208,7 @@ PAGES.forEach((p, i) => {
   ok(titles[i] === titleOf(p, r.pending) && titles[i].length <= 60 && titles[i].split(' — ').length <= 2 && titles[i].includes('sigelo relay'),
     `${p.slug}: title "${titles[i]}" (${titles[i].length} chars ≤ 60, at most one " — ", names sigelo relay)`);
   ok(descs[i].length >= 50 && descs[i].length <= 155, `${p.slug}: meta description ${descs[i].length} chars (50–155)`);
-  ok(titles[i] === TITLE[p.slug] && descs[i] === DESC[p.slug], `${p.slug}: title and meta description exactly as SEO spec §3.2 (pro's with TIERS.pro's numbers)${descs[i] === DESC[p.slug] ? '' : ` (description: "${descs[i]}")`}`);
+  ok(titles[i] === TITLE[p.slug] && descs[i] === DESC[p.slug], `${p.slug}: title and meta description exactly as TITLE and DESC (pro's with TIERS.pro's numbers)${descs[i] === DESC[p.slug] ? '' : ` (description: "${descs[i]}")`}`);
   const h = html[p.slug];
   ok((h.match(/<h1\b/g) ?? []).length === 1 && stripBoxes(src[p.slug]).startsWith(`# ${H1[p.slug]}\n`), `${p.slug}: exactly one H1, "${H1[p.slug]}"`);
   const canon = h.includes(`<link rel="canonical" href="${pageUrl(p)}">`), noindex = h.includes('<meta name="robots" content="noindex">');
@@ -217,7 +217,7 @@ PAGES.forEach((p, i) => {
 });
 ok(new Set(titles).size === titles.length && new Set(descs).size === descs.length, 'titles and descriptions: each unique');
 ok(descs.every((d) => !/\bkept up to\b|\bretention\b/i.test(d)), 'descriptions: none promises a retention (a reader away over a week takes no new messages, whatever the tier)');
-// No head offers the Monero discount (runbook §7 Q5).
+// No head offers the Monero discount: it is a detail of the plans, not a headline.
 // While Pro is coming soon, the pro and terms descriptions say so; no head names a date.
 const SALE_HEADS = ['pro', 'terms'].map((slug) => PAGES.findIndex((p) => p.slug === slug));
 ok(![...titles, ...descs].some((t) => /discount|not on sale|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(t))
@@ -300,7 +300,7 @@ for (const p of PAGES) {
 const adopt = join(ROOT, 'site', 'src', 'adopt.md');
 if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8')), 'pro: the link to sigelo.io/adopt.html#1-identity has its heading');
 
-// ---- the brand (relay/site/brand/, design/logo/make.py): icons linked, the seal in the header, files as made
+// ---- the brand (relay/site/brand/): icons linked, the seal in the header, files as made
 {
   const all = [...PAGES.map((p) => [p.slug, html[p.slug]]), ...LANGS.flatMap((l) => TRANSLATED.map((slug) => [`${l.code}/${slug}`, read(`${l.code}/${slug}.html`)]))];
   const noIcons = all.filter(([, h]) => !h.includes(ICON_LINKS)).map(([n]) => n);
@@ -322,12 +322,12 @@ if (existsSync(adopt)) ok(/^## 1\. Identity$/m.test(readFileSync(adopt, 'utf8'))
   ok(['favicon.svg', 'icon-192.png', 'icon-512.png'].every((f) => readFileSync(join(DRAFT, f)).equals(readFileSync(join(BRAND, f)))), '/favicon.svg, /icon-192.png, /icon-512.png: the brand files at the root');
   // In the private tree (assets/brand/ beside relay/): the copy is byte-identical. Published alone, nothing to compare.
   const shared = join(ROOT, 'assets', 'brand');
-  if (existsSync(shared)) ok(BRAND_FILES.every((f) => readFileSync(join(BRAND, f)).equals(readFileSync(join(shared, f)))), 'relay/site/brand/ = assets/brand/, byte for byte (design/logo/make.py writes both)');
+  if (existsSync(shared)) ok(BRAND_FILES.every((f) => readFileSync(join(BRAND, f)).equals(readFileSync(join(shared, f)))), 'relay/site/brand/ = assets/brand/, byte for byte (one generator writes both)');
   const types = readFileSync(DEPLOY, 'utf8').match(/server_name sigelo\.ai;[\s\S]*?types \{([^}]*)\}/)?.[1] ?? '';
   ok(/image\/png png;/.test(types) && /image\/svg\+xml svg;/.test(types), 'nginx.conf (sigelo.ai): png and svg typed');
 }
 
-// ---- header and footer (A10): the wordmark and the links, nothing else (2026-10-14; About, Examples and "Other languages" 2026-10-16) ---
+// ---- header and footer (A10): the wordmark and the links, nothing else (About, Examples and "Other languages" included) ---
 const plainText = (s) => s.replace(/<[^>]*>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const linksIn = (h) => [...h.replaceAll(SEAL_INLINE, '').matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((m) => `${m[2]} ${m[1]}`);
 const FOOT_LINKS = [['About', 'about'], ['Examples', 'examples'], ['Get started', 'connect'], ['Plans', 'pro'], ['Contact', 'contact'], ['Enterprise', 'enterprise'], ['FAQ', 'faq'], ['Privacy', 'privacy'], ['Terms', 'terms']];
@@ -358,21 +358,21 @@ for (const p of PAGES) {
     `${p.slug}: the header is the wordmark and About · Get started · Plans · Contact, the current page marked`);
 }
 ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEADER.map((p) => p.slug).join() === HEAD_LINKS.join(), 'footer and header: build.mjs FOOTER is the nine links, HEADER the four, in order');
-// The home page: the motto as its one H1, the why (2026-10-24: a newcomer asked "why does an agent
+// The home page: the motto as its one H1, the why (it answers a newcomer's "why does an agent
 // need an identity when going online?"), the two layers, the button to /connect; the disclosure in
 // the body (without the handle: a reader does not know it). The why is sigelo.io's first paragraph too, word for word.
 {
   const hero = html.index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '';
   const ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => plainText(m[1]));
-  // 2026-10-25: the motto's sub-line right under it, saying who answers for the agent.
+  // The motto's sub-line right under it, saying who answers for the agent.
   ok(hero.includes(`<h1 id="by-ai-for-ai">${MOTTO}</h1>`) && ps[0] === SUBLINE && ps[1] === WHY && words(WHY) <= 60 && /\bbuys\b/.test(WHY)
     && /<div class="cta">\n<p><a href="\/connect\.html">Try it with two agents →<\/a><\/p>\n<\/div>/.test(hero),
     `index: the hero is the motto (H1), its sub-line (a team of AI agents under a human owner; why trust it, linking the FAQ), the why (${words(WHY)} words ≤ 60, one scene), the two layers and the "Try it with two agents" button to /connect`);
   const io = join(ROOT, 'site', 'src', 'index.md');
   if (existsSync(io)) ok(readFileSync(io, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').split('\n').find((x) => /^[A-Za-z]/.test(x)) === WHY, 'sigelo.io /: its first paragraph is the same why, word for word');
-  // Two layers (2026-10-24): the protocol at sigelo.io, this relay a service built on it; said first on /about, right after the why on /.
-  // 2026-10-25 (naive readers lost "protocol" and "relay"): the relay said by what it does, in plain words.
-  // Round 3 asked "why does an ID card need a message server?": the relay is what the ID lets agents do.
+  // Two layers: the protocol at sigelo.io, this relay a service built on it; said first on /about, right after the why on /.
+  // (Naive readers lost "protocol" and "relay"): the relay said by what it does, in plain words.
+  // Readers asked "why does an ID card need a message server?": the relay is what the ID lets agents do.
   const USE = 'With the ID, a key only it holds, agents can message each other and shops, with no account anywhere.';
   const LAYERS = 'sigelo.ai is the post office for [sigelo IDs](https://sigelo.io/) (a relay): it carries those messages and sees who talks to whom, never what they say.';
   const firstLines = (slug) => src[slug].split('\n').filter((x) => /^[a-z]/i.test(x) && x !== WHY && !x.startsWith('Built by a team of AI agents'));
@@ -390,7 +390,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
     && src.enterprise.includes('RELAY_CLOSED_OPERATOR=') && src.enterprise.includes('`/.well-known/sigelo-relay.json`') && !/\d[ \u00a0]?€|\b20\d\d\b/.test(src.enterprise),
     'enterprise: coming soon, as Pro; "Run your own relay" (the deploy README linked, a closed relay, the registry statement); no price, no year; ends with the Contact button');
 }
-// faq (2026-11-11): the relay's six questions, plain answers of 2 to 4 sentences, every number of the
+// faq: the relay's six questions, plain answers of 2 to 4 sentences, every number of the
 // relay's a {{value}}; the trust question is sigelo.io's FAQ entry, linked, not repeated. Linked from the
 // footer and from the home page, in every language, by one line under the cards.
 {
@@ -400,7 +400,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   const sentences = (t) => plainText(t).split(/(?<=[.?!])\s+(?=[A-Z])/).filter(Boolean).length;
   ok(parts.map(([q]) => q).join('|') === FAQ_Q.join('|') && parts.every(([, a]) => !/^#/m.test(a)), `faq: the six questions as ## headings, in order (${parts.map(([q]) => q).join(' · ')})`);
   ok(parts.every(([, a]) => sentences(a) >= 2 && sentences(a) <= 4), `faq: each answer 2 to 4 sentences (${parts.map(([, a]) => sentences(a)).join(', ')})`);
-  ok(words(fill(src.faq, 'faq')) <= 420 && budget('faq') <= 420, `faq: ${words(fill(src.faq, 'faq'))} words, at most 420 as asked`);
+  ok(words(fill(src.faq, 'faq')) <= 420 && budget('faq') <= 420, `faq: ${words(fill(src.faq, 'faq'))} words, at most 420`);
   ok(FAQ_Q.every((q) => html.faq.includes(`<h2 id="${q.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim().replace(/ +/g, '-')}">${q.replace(/,/g, ',')}</h2>`)) && !/\{#/.test(src.faq),
     'faq: each question an anchor by its slugified heading, no {#id} syntax');
   // Numbers: the relay's are {{values}}; typed only the log's address cut and its 7 days (no value exists for those), as privacy.md types them.
@@ -424,7 +424,7 @@ ok(FOOTER.map((p) => p.nav).join() === FOOT_LINKS.map(([l]) => l).join() && HEAD
   const tr = LANGS.filter((l) => (l.md.index.match(/\]\(\/faq\.html\)/g) ?? []).length === 1 && /\n::::\n\n\[[^\]\n]+ [→←]\]\(\/faq\.html\)\n$/.test(l.md.index) && !l.md.index.includes(FAQ_LINK));
   ok(LANGS.length === 30 && tr.length === LANGS.length, `i18n: each language's home page ends with its own FAQ line (${tr.length} of ${LANGS.length})`);
 }
-// pro: the three plans side by side (2026-10-14): 1, 6, 12 months, each a "Get Pro" button to
+// pro: the three plans side by side: 1, 6, 12 months, each a "Get Pro" button to
 // /contact; the 12-month one highlighted, "Best value"; under them one line, VAT included, no rate or reverse charge.
 {
   const plans = [...html.pro.matchAll(/<div class="plan( best)?">\n(?:<p>([^<]+)<\/p>\n)?<h3 id="[^"]+">(\d+ months?)(?: <em>([^<]+)<\/em>)?<\/h3>\n<p><strong>([^<]+)<\/strong> a month<\/p>\n(?:<p>([^<]+)<\/p>\n)?<p><a href="\/contact\.html">Get Pro<\/a><\/p>\n<\/div>/g)]
@@ -451,15 +451,15 @@ const cardHits = [...PAGES.map((p) => [`${p.slug}.md`, body[p.slug]]), ...PAGES.
 ok(cardHits.length === 0 && !PAGES.some((p) => p.slug.startsWith('pay-')) && !existsSync(join(SITE, 'pay-card.md')) && !existsSync(join(SITE, 'pay-monero.md')),
   `no card: no page or agent file names a card, Stripe or a card page; no pay page (how to pay is on /contact)${cardHits.length ? ` (in: ${cardHits.join(', ')})` : ''}`);
 const priceLineM = src.pro.match(PRICE_RE);
-// Gross prices, "VAT included", no rate and no reverse-charge wording anywhere (2026-10-14); billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
-// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is coming soon (2026-10-24).
+// Gross prices, "VAT included", no rate and no reverse-charge wording anywhere; billed up front; an invoice paid by bank transfer, or in Monero at the discount; the licence once
+// the payment arrives, no 24-hour window (a transfer takes days). Enterprise is coming soon.
 ok(priceLineM && src.terms.includes('Prices as on [Pro](/pro.html), VAT included, billed up front for the period. [Contact us](/contact.html) for an invoice; pay it by bank transfer, or in Monero less the stated discount. The licence is issued once the payment arrives.')
   && src.agents.includes('pay by bank transfer or in Monero (10 % off)') && src.agents.includes(`Monero (${priceLineM[1]} % off)`)
   && src.pro.includes('pay our invoice, and we send your licence once the payment arrives.') && src.enterprise.includes('Enterprise is coming soon.')
   && src.privacy.includes('Payment is by bank transfer, which shows us the paying account, or in Monero, seen with a view-only wallet.')
   && !/Monero only|24 hours|excluding VAT|none on a reverse-charge|100 € a year|a month or a year|EU business with a VAT number|valid EU VAT number|reverse.charge|Belgi|\d %(?:\s|&nbsp;)*(?:Belgian )?VAT/i.test(src.terms + src.pro + src.agents + src.privacy + src.index + src.contact + PAGES.map((p) => p.description).join() + read('index.json') + read('relay.json') + read('llms.txt') + read('llms-full.txt')),
 'terms, agents, pro, privacy, contact: VAT included, no VAT rate, Belgium or reverse charge on any page or agent file, bank transfer or Monero at pro.md\'s discount, licence once the payment arrives; enterprise coming soon; no "Monero only", no 24 hours');
-// No protocol talk on the pages a person reads first (2026-10-14): that is for llms.txt,
+// No protocol talk on the pages a person reads first: that is for llms.txt,
 // index.json and the agents' page.
 const HUMAN = ['index', 'connect', 'pro', 'enterprise', 'contact', 'about', 'examples'];
 const talk = HUMAN.filter((slug) => /\bMQTT\b|\bA2A\b|post-quantum|\bDID\b|attestation|X-Wing|Ed25519|\bTLS\b/i.test(body[slug]));
@@ -475,7 +475,7 @@ for (const p of PAGES) {
   ok(urls.length === 0, `${p.slug}: no URL but the official places${p.slug === 'contact' ? ' and the SimpleX address' : ''} (nothing from another origin)${urls.length ? ` (${urls.join(' ')})` : ''}`);
 }
 
-// ---- the words never to write (A7, A15, SEO spec §2, plan §11) ---------------------------------
+// ---- the words never to write (A7, A15) -------------------------------------------------------
 const index = JSON.parse(read('index.json')), relayInfo = JSON.parse(read('relay.json'));
 const surfaces = {
   ...Object.fromEntries(PAGES.map((p) => [`${p.slug}.md`, twin[p.slug]])), titles: titles.join('\n'), descriptions: descs.join('\n'),
@@ -499,8 +499,8 @@ for (const [name, text] of Object.entries(surfaces)) {
   ok(hits.length === 0 && alone.length === 0, `never written, ${name}${hits.length ? ` (${[...new Set(hits)].join('; ')})` : ''}${alone.length ? ` ("cannot read" alone: ${alone[0].slice(0, 60)}…)` : ''}`);
 }
 ok(neverHits('Messages wait in an agent mailbox on the relay. An Agent Inbox.').filter((l) => l === 'agent inbox/mailbox').length === 2 && neverHits('Log in with it (`sigelo-agent inbox`).').length === 0,
-  'never written, on every surface above: "agent inbox" and "agent mailbox" (plan §11); the command `sigelo-agent inbox` is not that');
-// The inflections and spellings of the same claims (A5 review): each one alone is refused.
+  'never written, on every surface above: "agent inbox" and "agent mailbox"; the command `sigelo-agent inbox` is not that');
+// The inflections and spellings of the same claims: each one alone is refused.
 const variants = { 'delivered securely': 'secure', 'kept privately': 'private (as a claim)', 'used anonymously': 'anonymous', 'full anonymity': 'anonymous',
   'speaks MQTT v5': 'MQTT 5', 'an MQTTv5 broker': 'MQTT 5', 'mqtt5 inside': 'MQTT 5' };
 const missed = Object.entries(variants).filter(([text, label]) => neverHits(text).join() !== label).map(([text]) => text);
@@ -554,8 +554,8 @@ const sec = read('.well-known/security.txt'), expires = Date.parse(sec.match(/^E
 ok(sec.startsWith('Contact: mailto:security@sigelo.io\n') && expires > Date.now() && sec.includes(`\nCanonical: ${ORIGIN}/.well-known/security.txt\n`),
   'security.txt: Contact first, Expires in the future, its Canonical');
 
-// ---- languages (2026-10-16): /<code>/<page>.html, hreflang, the footer's switch -------
-// The first batch, then the second (2026-10-16: Chinese in it); the next is a folder more.
+// ---- languages: /<code>/<page>.html, hreflang, the footer's switch -------
+// The first batch, then the second (Chinese in it); the next is a folder more.
 const FIRST_BATCH = ['de', 'es', 'fr', 'it', 'ja', 'nl', 'pl', 'pt-br'];
 const SECOND_BATCH = ['zh-cn', 'zh-tw', 'ko', 'ru', 'uk', 'cs', 'hi', 'bn', 'ta', 'ar', 'el', 'sv', 'da', 'nb', 'fi', 'ro', 'hu', 'pt-pt', 'tr', 'id', 'vi', 'th'];
 const BATCHES = [...FIRST_BATCH, ...SECOND_BATCH];
@@ -657,7 +657,7 @@ for (const l of LANGS) {
   ok(T.contact.includes(`<code>${SIMPLEX}</code>`) && !T.contact.includes(`href="${SIMPLEX}"`) && T.contact.includes(`<code>${PAYMENT_PLACES[0]}</code>`) && T.contact.includes('<code>site/contact.md</code>'),
     `${l.code}/contact: the SimpleX address as text, and where how to pay is published: the English page ${PAYMENT_PLACES[0]} and site/contact.md (a translation is not a third place)`);
 }
-// The motto is the project's, in every language (since 2026-10-25): lang.json `motto` and
+// The motto is the project's, in every language: lang.json `motto` and
 // `disclosure`, none still English; the home page's H1 is that motto; the WebSite description joins them.
 {
   const raw = Object.fromEntries(LANGS.map((l) => [l.code, JSON.parse(readFileSync(join(SITE, I18N, l.code, 'lang.json'), 'utf8'))]));
@@ -687,9 +687,9 @@ for (const l of LANGS) {
   ok(new Set(LANGS.map((l) => l.name)).size === LANGS.length && LANGS.every((l) => l.name !== 'English' && !/<|&/.test(l.name + l.other)),
     'languages: each named by its own name, once');
 }
-// The hero in every language as in English (2026-10-24): the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect;
-// under it (2026-10-25) what the button needs, an agent that runs commands, and what to do without one (the one link: the Linux phone app);
-// over the why (2026-10-25, round 4) the motto's sub-line, its one link sigelo.io's FAQ (2026-11-10).
+// The hero in every language as in English: the motto, the why (no link), the two layers (linking sigelo.io), the button to /connect;
+// under it what the button needs, an agent that runs commands, and what to do without one (the one link: the Linux phone app);
+// over the why the motto's sub-line, its one link sigelo.io's FAQ.
 ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="hero">([\s\S]*?)<\/section>/)?.[1] ?? '', ps = [...hero.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
   const links = (x) => [...x.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]).join();
   return hero.includes(`<h1 id=`) && ps.length === 5 && links(ps[0]) === 'https://sigelo.io/faq.html#why-trust-it' && !ps[1].includes('<a ') && ps[2].includes('<a href="https://sigelo.io/">') && ps[3].startsWith(`<a href="/${l.code}/connect.html">`)
@@ -711,7 +711,7 @@ ok(LANGS.every((l) => { const hero = thtml[l.code].index.match(/<section class="
 ok(spawnSync(process.execPath, [join(SITE, 'build.mjs'), '--stale'], { encoding: 'utf8' }).stdout.startsWith(`relay/site/build --stale: none; ${ALL_LANGS.length} languages up to date`),
   'build.mjs --stale: no translation to refresh');
 
-// ---- index.json and relay.json (A14, plan §11) -------------------------------------------------
+// ---- index.json and relay.json (A14) ----------------------------------------------------------
 if (allowance) {
   const T = allowance.TIERS, tier = (t) => ({ messages_day: t.msgsDay, retention_days: t.retentionDays, max_message_bytes: t.maxMessage, mailboxes: t.mailboxes });
   const pick = (o) => ({ messages_day: o.messages_day, retention_days: o.retention_days, max_message_bytes: o.max_message_bytes, mailboxes: o.mailboxes });
@@ -744,7 +744,7 @@ ok(VENDOR_PENDING_PAGES.join() === 'pro' && VENDOR_PENDING === 'Pro is coming so
 ok(index.relay.a2a === false && /not post-quantum/.test(index.crypto.signatures) && index.relay.mqtt.version === '3.1.1' && index.relay.host === HOST,
   'index.json: not A2A, signatures not post-quantum, MQTT 3.1.1 at relay.sigelo.ai');
 // Retention is how long a queued message waits; a reader away longer than its client claims ahead
-// takes no new messages on either tier (A5 review): pro.md says so under its table, the data files too.
+// takes no new messages on either tier: pro.md says so under its table, the data files too.
 ok(index.relay.queue === QUEUE_NOTE && relayInfo.limits.queue === QUEUE_NOTE && /no_reader/.test(QUEUE_NOTE) && /about a week ahead on every tier/.test(QUEUE_NOTE)
   && /^\| Messages wait up to \|[^\n]*\n(?:\|[^\n]*\n)*\nAn agent away over a week takes no new messages until back, on either plan: they wait with the sender\.$/m.test(body.pro)
   && body.connect.includes('Messages wait at sigelo.ai for 14 days for an offline agent; if it is away over a week, the sender keeps new ones.') && /a reader away longer gets no new messages \(`no_reader`\)/.test(body.agents),
@@ -761,7 +761,7 @@ ok(priceLine && proPrice && same(index.tiers.pro.price.periods, proPrice.periods
   && same(proPrice.periods.map((p) => [p.months, p.month, p.period]), [[1, 14.99, 14.99], [6, 11.99, 71.94], [12, 9.99, 119.88]])
   && !/12\.39|9\.91|59\.45|8\.26|99\.07/.test(PAGES.map((p) => src[p.slug]).join('\n') + read('index.json') + read('relay.json') + read('llms-full.txt'))
   && !PAGES.some((p) => p.slug !== 'terms' && /\bnet\b/i.test(src[p.slug])),
-'index.json: the price is pro.md\'s; pro.md\'s table (2026-10-14): 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
+'index.json: the price is pro.md\'s; pro.md\'s table: 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
 // relay_sees names what each row of privacy.md's table keeps (A14).
 const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Web access log': 'web access log of sigelo.ai and relay.sigelo.ai, for visit counts', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
   Backups: 'encrypted nightly backup, each copy kept 7 days' };
@@ -779,13 +779,13 @@ const INFO_FIELDS = ['name', 'software', 'version', 'source', 'limits', 'fees', 
 ok(relayInfo.endpoints?.mqtt === `mqtts://${HOST}:8883` && relayInfo.endpoints?.mqtt_ws === `wss://${HOST}/mqtt` && relayInfo.mqtt?.url === relayInfo.endpoints.mqtt,
   'relay.json: endpoints, MQTT over TLS on 8883 and over WebSocket on 443 (wss, /mqtt)');
 ok(INFO_FIELDS.every((k) => relayInfo[k] !== undefined && relayInfo[k] !== null) && relayInfo.limits.free && relayInfo.limits.pro && Array.isArray(relayInfo.official.domains),
-  `relay.json: plan §11's fields (${INFO_FIELDS.join(', ')}), limits per tier, the official domains`);
-// Plan §11's four sentences: in index.json, relay.json and llms-full.txt; on the pages, the first three
+  `relay.json: the info document's fields (${INFO_FIELDS.join(', ')}), limits per tier, the official domains`);
+// The four positioning sentences: in index.json, relay.json and llms-full.txt; on the pages, the first three
 // in every footer and the fourth, the disclosure, with the motto (the footer and index checks above).
 ok(POSITIONING.length === 4 && POSITIONING[0].includes('needs no server') && POSITIONING[1].includes('leaving a platform')
   && POSITIONING[2].includes('a recovery key kept offline that wins over a thief') && POSITIONING[3] === DISCLOSURE
   && same(index.positioning, POSITIONING) && same(relayInfo.positioning, POSITIONING) && POSITIONING.every((s) => full.includes(s)),
-'positioning: plan §11\'s four sentences in index.json, relay.json and llms-full.txt, the last the disclosure');
+'positioning: the four sentences in index.json, relay.json and llms-full.txt, the last the disclosure');
 ok(off.issuer_did === ISSUER_DID && /^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{40,50}$/.test(ISSUER_DID), 'index.json, relay.json: official.issuer_did, as sigelo.io\'s index.json has it');
 const worldGenesis = join(ROOT, 'world', 'genesis.json');
 if (sigelo && existsSync(worldGenesis)) {
@@ -835,7 +835,7 @@ if (conf) {
   'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence, /gift to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
   // A browser's request to a relay call is refused before the relay charges it: the relay counts
   // logins and challenges per network before it reads a body, so any web page could otherwise spend
-  // that budget from its visitors' browsers and lock every agent on their /24 or /48 out (A5 review).
+  // that budget from its visitors' browsers and lock every agent on their /24 or /48 out.
   // GET /stats (counts only, relay/stats.mjs) charges no budget and is open to any page (CORS): the
   // one proxied location without the refusal.
   const browserGaps = (t) => serversIn(t).flatMap((s) => s.blocks.filter((b) => b.head !== 'location = /stats' && everyDirective(b).some((d) => d.startsWith('proxy_pass '))))
@@ -901,13 +901,13 @@ if (conf) {
   const cacheMap = conf.blocks.find((b) => b.head === 'map $status $sigelo_cache')?.directives ?? [];
   const relayCache = conf.blocks.find((b) => b.head === 'map $uri $relay_cache')?.directives ?? [];
   ok(cacheMap.includes('200 "public, max-age=3600"') && relayCache.includes('default $sigelo_cache') && !relayCache.some((d) => d.startsWith('"/relay.json"'))
-    && relay?.directives.includes('add_header Cache-Control $relay_cache always'), 'nginx: relay.json cached an hour on a 200 (plan §11)');
+    && relay?.directives.includes('add_header Cache-Control $relay_cache always'), 'nginx: relay.json cached an hour on a 200');
 }
 ok((confText.match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g) ?? []).every((a) => a === '127.0.0.1' || a === '0.0.0.0'), 'nginx.conf: no address but loopback (the server\'s own address is never written)');
 const readme = readFileSync(join(RELAY, 'deploy', 'README.md'), 'utf8');
 ok(readme.includes('relay/deploy/nginx.conf') && !/^```nginx$/m.test(readme), 'deploy/README.md: points at relay/deploy/nginx.conf, holds no second nginx config but the port-80 bootstrap');
 // By hand, certbot's first issuance needs something serving /var/www/acme on port 80: nginx.conf
-// names a certificate that does not exist yet (A5 review). The README's printf writes that config.
+// names a certificate that does not exist yet. The README's printf writes that config.
 {
   const boot = readme.match(/^printf '%s\\n' 'server \{'[\s\S]*?> \/etc\/nginx\/conf\.d\/sigelo-relay\.conf$/m);
   const f = join(OUT, 'bootstrap.conf');
@@ -921,7 +921,7 @@ ok(readme.includes('relay/deploy/nginx.conf') && !/^```nginx$/m.test(readme), 'd
 
 // ---- --final over a copy of the pages: what passes, and each wrong thing it refuses ------------
 // No placeholder is left, so the copy is the pages as written (FILL stays for a placeholder added
-// later: each one filled as the runbook's §0 would, at the most words it is likely to take).
+// later: each one filled at the most words it is likely to take).
 let mainnet, subaddr, stagenet;
 if (monero) {
   const k = monero.keysFromSpend(new Uint8Array(32).fill(7));
@@ -1095,7 +1095,7 @@ try {
   ok(said(gate(`# location = /licence { proxy_pass x; }\n${siteConf(QUIET)}`), /no server block has "location = \/licence"/), 'deploy gate: a /licence in a comment proxies nothing');
   ok(deployRefusals(join(scratch, 'absent.conf')).some((w) => /not found/.test(w)), 'deploy gate: a missing nginx.conf is refused');
   // nginx drops the server's proxy_set_header in a location that sets one of its own, and then passes
-  // the client's X-Real-IP through (reproduced against nginx 1.28 by the A5 review).
+  // the client's X-Real-IP through (reproduced against nginx 1.28).
   const hostLine = confText.replace(/( {4}location = \/challenge \{\n)/, '$1        proxy_set_header Host $host;\n');
   ok(hostLine !== confText && said(gate(hostLine), /sets proxy_set_header inside a location/), 'deploy gate: a location with a proxy_set_header of its own is refused (it would pass the client\'s own X-Real-IP)');
   ok(said(gate(relayConf.replace('    proxy_set_header X-Real-IP $remote_addr;\n', '').replace('location = /licence {', 'location = /licence { proxy_set_header X-Real-IP $remote_addr;')), /sets proxy_set_header inside a location/),
@@ -1158,7 +1158,7 @@ try {
   mkdirSync(noRecord); mkdirSync(withRecord); writeFileSync(join(withRecord, LAUNCH_RECORD), RECORD);
   ok(said(launchGate(emptyRoot, noRecord), /launch: no site\/launch\.json/) && launchGate(emptyRoot, withRecord).length === 0,
     'launch gate, outside the private tree: refused without the launch record, passed with it');
-  // A record must name what npm served (X2 review: one written from the source alone let sigelo.ai
+  // A record must name what npm served (one written from the source alone let sigelo.ai
   // promise verbs the sigelo-agent on npm did not have).
   const recordSays = (text) => { const dir = join(scratch, `site-${++k}`); mkdirSync(dir); writeFileSync(join(dir, LAUNCH_RECORD), text); return launchGate(emptyRoot, dir); };
   const old = '{"checked":"SECURITY.md, site/build.mjs, site/deploy/nginx.conf and sigelo-agent do what index.json says; the vendor DID agrees with the pages","by":"relay/site/build.mjs --launch"}\n';
@@ -1179,7 +1179,7 @@ try {
     ok(g.why.length === 0 && same(g.npm, { 'sigelo-agent': '0.1.2', 'sigelo-contact': '0.1.2' }) && (await reg({ 'sigelo-agent': doc('0.1.3', { 'sigelo-contact': '^0.1.3' }), 'sigelo-contact': doc('0.1.3') })).why.length === 0,
       'registry: npm\'s latest sigelo-agent at this tree\'s version or later, depending on sigelo-contact, which is there too, both from csigelo: passes, and the record gets the versions seen');
     ok(said(today.why, /^npm: sigelo-agent's latest is 0\.1\.1, older than this tree's 0\.1\.2/) && said(today.why, /^npm: sigelo-agent 0\.1\.1 does not depend on sigelo-contact/) && said(today.why, /^npm: no sigelo-contact/),
-      'registry: refuses what npm served at the X2 review (sigelo-agent 0.1.1 without the contact verbs, no sigelo-contact), naming each');
+      'registry: refuses what npm served once (sigelo-agent 0.1.1 without the contact verbs, no sigelo-contact), naming each');
     ok(said((await reg({ ...good, 'sigelo-contact': doc('0.1.2', {}, 'someone-else') })).why, /^npm: sigelo-contact 0\.1\.2 was published by someone-else, not csigelo/)
       && said((await reg({ ...good, 'sigelo-agent': doc('0.1.2', { sigelo: '^0.1.2' }) })).why, /does not depend on sigelo-contact/)
       && said((await reg({ ...good, 'sigelo-contact': { 'dist-tags': {}, versions: {} } })).why, /^npm: no sigelo-contact/),
@@ -1275,8 +1275,8 @@ try {
 
 // ---- what the pages promise: the relay's numbers and fields --------------------------------------
 // Every contact verb loads the identity and refuses without one, and init refuses without a
-// recovery decision: the start sequence begins with it (A5 review). The lines are the live test's
-// quick start (2026-10-14, run against relay.sigelo.ai), with recovery-key (release 0.1.3, never
+// recovery decision: the start sequence begins with it. The lines are the live test's
+// quick start (run against relay.sigelo.ai), with recovery-key (release 0.1.3, never
 // run there) in place of its keygen one-liner, so the key comes from the install itself; the code
 // named so that `send bob` finds the contact, and the answer so that `send alice` does (0.1.4); and `inbox`, which completes the pairing when the
 // inviter was offline at `accept`.
@@ -1285,7 +1285,7 @@ try {
 // agent; quickStart() reads them back in order.
 const QUICK = ['npm i -g sigelo-agent', 'sigelo-agent init --recovery "$(sigelo-agent recovery-key)"', 'sigelo-agent invite --name phone', 'sigelo-agent accept K7F3-Q9ZP --name laptop',
   'sigelo-agent inbox', 'sigelo-agent send phone "hello"', 'sigelo-agent inbox', 'sigelo-agent send laptop "hi back"'];
-// 2026-10-24 ("Try it with two agents"): a computer and a phone; each step one sentence to say and the command the agent runs, and what you see;
+// "Try it with two agents": a computer and a phone; each step one sentence to say and the command the agent runs, and what you see;
 // above them which agents can do it (a chat-only app cannot) and one box to paste to each agent (≤ 120 words).
 const steps5 = [...src.connect.matchAll(/^(\d)\. \*\*([^*]+)\*\*/gm)].map((m) => `${m[1]} ${m[2]}`);
 const pasteBox = src.connect.match(/^```text\n([\s\S]*?)\n```$/m)?.[1] ?? '';
@@ -1316,13 +1316,13 @@ if (allowance && mailbox && operator && db) {
     'Messages a day': [thou(free.msgsDay), thou(pro.msgsDay)], 'Messages wait up to': [`${free.retentionDays} days`, `${pro.retentionDays} days`],
     'Largest message': [size(free.maxMessage), size(pro.maxMessage)],
     // A contact costs its reader a mailbox per week of its retention window plus the week ahead its
-    // client claims: a bare mailbox count read as contacts (A5 review).
+    // client claims: a bare mailbox count read as contacts.
     Contacts: [free, pro].map((t) => `~${thou(Math.floor(t.mailboxes / (allowance.windowWeeks(t.retentionDays) + 1)))}`),
   };
   const offRows = Object.entries(table).filter(([label, want]) => row(label).join() !== want.join()).map(([label]) => label);
   const storage = row('Room for waiting messages');
-  // Pro's storage is the constant the relay grants (TIERS.pro.storage), never more: the plan said
-  // for 5 GB, the relay grants 1 GB, so the page says 1 GB.
+  // Pro's storage is the constant the relay grants (TIERS.pro.storage), never more: the page states what
+  // the relay grants, not a figure planned for later.
   if (storage[0] !== size(free.storage) || storage[1] !== (pro.storage % (1024 * MB) === 0 ? `${pro.storage / 1024 / MB} GB` : size(pro.storage))) offRows.push('Room for waiting messages');
   ok(offRows.length === 0, `pro: the Free/Pro table is relay/allowance.mjs TIERS, Pro's storage TIERS.pro.storage${offRows.length ? ` (differs: ${offRows.join(', ')})` : ''}`);
   // The licence claim "email" is answered over SimpleX (terms §7): contact@ only receives, so no page
@@ -1330,7 +1330,7 @@ if (allowance && mailbox && operator && db) {
   const supportOf = (t) => ({ none: 'none', email: 'SimpleX', priority: 'priority' })[t.support];
   ok(row('Support').join() === `${supportOf(free)},${supportOf(pro)}` && body.agents.includes('No account: a seller-signed licence to your **operator DID**.'),
     `pro: support as TIERS.pro.support (${pro.support}, shown as ${supportOf(pro)})`);
-  // Groups (design/groups.md §4): groups made and members of each, as TIERS says and relay.json tells clients.
+  // Groups: groups made and members of each, as TIERS says and relay.json tells clients.
   ok(row('Groups').join() === `${free.groups} of up to ${free.groupMembers},${pro.groups} of up to ${pro.groupMembers}` && free.groups === 3 && free.groupMembers === 8 && pro.groups === 50 && pro.groupMembers === 64
     && relayInfo.limits.free.groups.max === free.groups && relayInfo.limits.free.groups.members === free.groupMembers && relayInfo.limits.pro.groups.max === pro.groups && relayInfo.limits.pro.groups.members === pro.groupMembers
     && index.tiers.free.groups.max === free.groups && index.tiers.pro.groups.members === pro.groupMembers,
@@ -1375,7 +1375,7 @@ if (sigelo && operator && auth && db) {
   // buyer's or the company's) is taken. Then privacy.md on how long a licence stays.
   const steps = Object.fromEntries([...body.agents.matchAll(/^(\d)\. (.*)$/gm)].map((m) => [m[1], m[2]]));
   // The relay pools only attestations whose iss is the operator's current key (operator.mjs): after a
-  // rotation every agent's attestation must be signed again, or the pool drops to free (A5 review).
+  // rotation every agent's attestation must be signed again, or the pool drops to free.
   ok(steps[2] === 'Log in with it (`sigelo-agent inbox`); again after each rotation, then redo step 5.' && /^\[Contact us\]\(\/contact\.md\), naming that DID; pay by bank transfer or in Monero \(10 % off\); renew likewise\.$/.test(steps[3] ?? '') && /^Upload /.test(steps[4] ?? ''),
     'pro: log in with the operator identity (step 2), and after each rotation again and sign the agents\' attestations anew (step 5), before paying (3, renewal the same) and uploading (4)');
   ok(/prints the operator DID \(later: the first of its `chain`\)/.test(body.agents), 'agents step 1: a licence names the operator\'s original DID, the first of its chain');
@@ -1389,7 +1389,7 @@ if (sigelo && operator && auth && db) {
     const before = ops.upload(licenceFor(op.did, now + YEAR), now);
     d.touchAccount(a, now);
     const after = ops.upload(licenceFor(op.did, now + YEAR), now);
-    // Review 2026-10-28: the upload is answered word for word the same before and after the
+    // The upload is answered word for word the same before and after the
     // operator's first login (a refusal before told who logs in here); the licence pools nothing
     // until that login (relay/test/allowance.mjs), which is what step 2 says.
     ok(before.ok === true && before.note === operator.LICENCE_NOTE && JSON.stringify(before) === JSON.stringify(after),
@@ -1465,7 +1465,7 @@ ok(['No custody', 'No payment routing', 'No access to content', 'The attestation
   'terms: B2B, no custody, no payment routing, no access to content, the attestation is the subscription');
 // No custody: should a pay page ever ask for a transaction key, the clause must say it only proves a
 // payment. Refunds: a licence not yet on the relay within 14 days, and the §9 warranty with a time to
-// fix it, as the licence terms §9 (A5 review). Ending a licence is a later, shorter
+// fix it, as the licence terms §9. Ending a licence is a later, shorter
 // reissue (operator.mjs keeps the one issued last), which is how a refund is made safe.
 ok(src.terms.includes('never receives or holds a seed, private key or other means of access')
   && (!/transaction key/.test(src.contact + src.agents) || src.terms.includes('(transaction keys only prove payments)'))
@@ -1477,14 +1477,14 @@ ok(src.terms.includes('never receives or holds a seed, private key or other mean
   && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('pay it by bank transfer, or in Monero less the stated discount.'),
   'terms: paid by bank transfer or in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
 // The nightly backup (deploy/backup.sh: licences and licensed operators' rows, 7 archives kept) is a
-// copy the table names; an identity without a recovery key is erased by disuse only (A5 review).
+// copy the table names; an identity without a recovery key is erased by disuse only.
 const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
 ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encrypted | 7 days more |") && /\| tail -n \+8 \| xargs -r rm -f/.test(backupSh)
   // gifts and gift_campaigns: code hashes and counts, nothing of an identity (relay/gifts.mjs).
   && /^TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"$/m.test(backupSh),
   'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
 ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key** (any site can obtain identity-key signatures), where the identity file and `recovery.key` are:'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
-// Where the servers are (runbook §0): stated once, in the seller line.
+// Where the servers are: stated once, in the seller line.
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),
   'privacy: the servers are in the EU, stated once, in the seller line');
 ok(src.privacy.includes('No accounts. This site sets no cookies and runs no scripts or trackers.'), 'privacy: no accounts, no cookies, no scripts or trackers (so no consent banner)');

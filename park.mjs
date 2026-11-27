@@ -38,8 +38,8 @@
 // a fair share (`fairCeiling`: no network more than 75 of it; 525 for any network, then a reserve
 // of 75 that gives a network not seen this window one try), so many networks guess at most
 // 600 × PARK_MAX / 2^40 per 10 minutes in all (about 1 in 37,000; an hour: 3,600 × PARK_MAX /
-// 2^40, about 1 in 6,100), and a crowd under its own brakes no longer locks out a new one (review
-// 2026-10-19). One given code is guessed with odds that grow linearly with its life: at most
+// 2^40, about 1 in 6,100), and a crowd under its own brakes no longer locks out a new one. One
+// given code is guessed with odds that grow linearly with its life: at most
 // 600 / 2^40 (5.5 × 10^-10) for each 10 minutes it lives, 3.3 × 10^-9 for a code of PARK_TTL, an
 // hour (the inviter's invite --ttl; 10 minutes by default). A code fetched by a guesser pairs it with the
 // inviter: the four words both operators compare differ, the backstop (THREAT-MODEL.md §2.10).
@@ -50,7 +50,7 @@
 // A fetched code leaves a tombstone until its original exp, and park refuses park_taken while an
 // entry or a tombstone under the hash is unexpired: else a code holder (an eavesdropper, a lucky
 // guesser) fetches the code, parks its own long code under the same hash, and the intended contact
-// gets that instead of the park_unknown that tells the inviter (review 2026-10-28, MEDIUM 3). A
+// gets that instead of the park_unknown that tells the inviter. A
 // tombstone counts against PARK_MAX as the entry did. A park that reaches the hash answers whether
 // it is taken, so auth.mjs charges it as a lookup too (the brakes above), never a free oracle.
 // A miss and a hit cost one Map lookup each; a malformed hash looks up the empty string, so every
@@ -62,7 +62,7 @@
 // code holder cannot park its own long code under the hash (park_taken, as above). It reaches the
 // hash, so it is charged as a lookup before the body or the login (LOOKUPS, then LOOKUPS_ALL).
 //
-// Public codes (contract sigelo-public/0, design/public-invite.md): a long code of version 2 (sgl2…)
+// Public codes (contract sigelo-public/0): a long code of version 2 (sgl2…)
 // parked by POST /park with an optional `cap`, under SHA-256("sigelo-public/0" ‖ the PUB code), by
 // an identity on Pro only (public_pro), at most PUBLIC_PER_ACCOUNT live per account (public_full),
 // for up to PUBLIC_TTL_MAX. Its answer topic, an ordinary mailbox m/<32 hex> = HKDF-SHA256(the
@@ -80,7 +80,7 @@
 // day's count is kept in memory and written by the sweep each minute.
 import { createHash, hkdfSync } from 'node:crypto';
 
-// Enrolment codes (apps/contact/enrol.mjs issue, the agent-setup feedback points 2, 10, 12): a short code parked
+// Enrolment codes (apps/contact/enrol.mjs issue: a worker placed unattended needs a code that outlives one fetch): a short code parked
 // with `enrol: true` by the operator who will place a worker through it. Three rules differ from an
 // invite's, nothing else:
 //   - a fetch hands it out WITHOUT spending it, at most ENROL_FETCHES times: a machine whose first try
@@ -144,7 +144,7 @@ const fail = (check, why) => { throw new ParkError(check, why); };
 const rated = (w, window, now, why) => { throw Object.assign(new ParkError('rate', why), { retryAfter: Math.max(1, Math.ceil((w + 1) * window - now)) }); };
 
 /**
- * A relay-wide ceiling that one crowd of networks cannot pin (review 2026-10-19: ~30 networks,
+ * A relay-wide ceiling that one crowd of networks cannot pin (~30 networks,
  * each under its own brake, held the hard global caps and denied every network never seen).
  * Fixed windows of `window` seconds; `n` tries in all, never more (the last defence), split:
  *   - no network takes more than `share` = n/8 (at least 1);
@@ -345,7 +345,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   }
 
   // Whether a live enrolment code waits under `hash`: GET /park/<hash> says so (enrol: true), so the
-  // machine refuses a pairing code given to init --enrol (the agent-setup feedback, the enrolment boundary).
+  // machine refuses a pairing code given to init --enrol (an enrolment code and a pairing code are never interchangeable).
   function isEnrol(hash, now = clock()) {
     const e = typeof hash === 'string' && HASH_RE.test(hash) ? held.get(hash) : undefined;
     return e?.enrol === true && e.invite !== null && e.exp > now;

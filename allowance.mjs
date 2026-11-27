@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // relay/allowance.mjs — allowances per account and per operator pool, the rate brake, and the policy
 // that wires them, the proof of work (pow.mjs) and the licence (operator.mjs) into M3's hooks
-// (auth.mjs, mailbox.mjs: `policy`). design/relay-plan.md §1 "Abuse brakes"; §3 "Allowances",
-// "Proof of work", "Errors"; §5; §11 "Allowances (pricing leak)", "Topics window and counts".
+// (auth.mjs, mailbox.mjs: `policy`). The limits a client sees: relay/README.md "Limits"; the
+// refusals: relay/deploy/README.md "The protocol in one screen".
 //
-// The tiers (§11): free allowances are per DID, and a DID costs seconds of proof of work (more
+// The tiers: free allowances are per DID, and a DID costs seconds of proof of work (more
 // from a network that mints many: pow.mjs), so free volume is not what Pro sells. Free: 14 days,
-// 512 KB, a modest daily count, 128 mailboxes (raised 2026-10-14 from 7 days, 256 KB, 1,000 a day,
+// 512 KB, a modest daily count, 128 mailboxes (earlier releases: 7 days, 256 KB, 1,000 a day,
 // 50 MB, 64). Pro sells what cannot be minted: 90 days' retention,
-// 1 MB messages, the operator pool, more groups (design/groups.md §4), support.
+// 1 MB messages, the operator pool, more groups (apps/agent/GROUPS.md "Limits" in the main repository), support.
 //
 // Charged per account (an identity's original DID, db.mjs): bytes queued to the reader, freed when
 // it acknowledges a message or the message expires; messages today (UTC) to the sender; live
@@ -69,16 +69,16 @@ export const KB = 1024, MB = 1024 * KB;
 // server.mjs closes a connection whose packet is over 1 MB plus its header room: no tier may allow
 // a larger message, or a client would see its connection drop instead of a too_large notice.
 const FRAME = 1024 * 1024;
-// The ISO weeks a reader's mailboxes span: one topic per direction per week (plan §3 "Topics"), and
-// a reader subscribes to every week its retention reaches back into (§11): 2 for 7 days, 14 for 90.
+// The ISO weeks a reader's mailboxes span: one topic per direction per week, and
+// a reader subscribes to every week its retention reaches back into: 2 for 7 days, 14 for 90.
 export const windowWeeks = (retentionDays) => Math.ceil(retentionDays / 7) + 1;
-// Plan §3 "Allowances", §11. free: every identity. pro: the most this relay grants any licence; a
+// The allowances (relay/README.md "Limits"). free: every identity. pro: the most this relay grants any licence; a
 // pool gets the licence's claims (storage_mb, msgs_day, retention_days, groups) up to these and
 // never less than free's, pro's largest message, mailboxes and group members, and the licence's
 // support. Mailboxes: a contact costs its reader windowWeeks of its retention plus the week ahead
 // a client claims, so free's 128 hold about 32 contacts (4 each at 14 days) and pro's 16,384 about 1,090 for a
-// whole pool (15 each). pro.storage is 5 GB (2026-10-16; plan §9 item
-// 3). groups: chat groups an identity may make (design/groups.md §4: free 3, Pro 50, a pool never
+// whole pool (15 each). pro.storage is 5 GB. groups: chat groups an identity may
+// make (free 3, Pro 50, a pool never
 // below free's); groupMembers: the members of one, the maker included, fixed per tier (8, 64), no
 // claim: it bounds fan-out, which msgsDay counts copy by copy.
 export const TIERS = Object.freeze({
@@ -114,14 +114,14 @@ export function freeQueueOf({ blocks, bfree, bavail, bsize }, queued) {
   const room = (RELAY_FULL * (used + bavail) - used) * bsize + queued;
   return Math.max(1, Math.floor(room / 2));
 }
-// Plan §1 "Abuse brakes": publishes, and topics subscribed, per identity: a token bucket each,
+// Abuse brakes: publishes, and topics subscribed, per identity: a token bucket each,
 // refilled every second. One client id per identity, so this is per connection too. Far above
 // honest use: the largest pool sends 50,000 messages a day, under one a second, and a reader's
 // topics come back with its persistent session, without a SUBSCRIBE. network: the same per
 // address prefix (/24 or /48, as auth.mjs counts logins), across every identity logged in from it:
 // a login costs no work, so per identity alone one network's sessions times 20 a second could keep
 // the one thread busy (a publish refused costs ~250 µs here, one stored ~390 µs, measured on a
-// phone-class CPU), and 200 a second is a tenth of it. Identities that have proven no work draw on
+// low-end ARM64 CPU), and 200 a second is a tenth of it. Identities that have proven no work draw on
 // a network bucket of their own, beside the one proven identities share: they cost nothing to mint
 // and can claim and send nothing, so in one bucket a few dozen of their sessions took every token
 // of a /24 and refused its proven identities (a Pro operator's agents among them) every publish,
@@ -131,7 +131,7 @@ export function freeQueueOf({ blocks, bfree, bavail, bsize }, queued) {
 // one: per network, nothing tells one free identity from many.
 // claim: a mailbox or invite topic claimed anew or given up (mailbox.mjs), beside the subscribe
 // token every topic takes. Each is a transaction followed by a WAL checkpoint (db.mjs settle), 7 to
-// 8 ms on flash storage (measured 2026-10-12 on the phone-class host with empty claims: claim 8.1
+// 8 ms on flash storage (measured on a low-end ARM64 machine with empty claims: claim 8.1
 // ms, release 7.2 ms; 0.16 ms on tmpfs; a release deletes at most db.mjs DELETE_BATCH queued
 // messages at once, the rest in batches), where a publish costs 0.25 to 0.39 ms: within the subscribe brake alone, one
 // network's SUBSCRIBE/UNSUBSCRIBE churn held the thread (PUBACKs elsewhere from 6.5 ms to 220 ms).
@@ -164,7 +164,7 @@ const KINDS = ['publish', 'subscribe', 'claim'];
 // the ceiling, a network that has stored more than ceiling / FREE_SHARES for free readers within
 // the free retention is refused (quota_storage): the other half stays for the others. Counted in
 // memory by the writer's /24 or /48 and UTC day (a restart forgets it); no address reaches the
-// file. Many networks (IPv6 address rotation) still beat it: plan §10, R15.
+// file. Many networks (IPv6 address rotation) still beat it (relay/deploy/README.md "Known limits").
 export const FREE_SHARES = 64;
 const SHARE_PREFIXES = 100000;
 // New identities proving work in an hour above which the proof rises to 8 bits (RELAY_POW_LOAD).
@@ -377,8 +377,8 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
   const readerOf = (t) => (t.pool ? 'the reader\'s pool' : 'the reader (free tier)');
 
   // Accounts and proofs swept by M3 (30 days after the last login) take their rows here along,
-  // pool rows and vouched ones go at their exp, licences 30 days after theirs (operator.mjs): plan §5
-  // "Privacy". At most hourly, from the sweep, inside its transaction (db.mjs): it runs after the
+  // pool rows and vouched ones go at their exp, licences 30 days after theirs (operator.mjs; relay/deploy/README.md
+  // "What the relay keeps"). At most hourly, from the sweep, inside its transaction (db.mjs): it runs after the
   // counters kept in memory are written and before the WAL is truncated. Run from a login, it wrote
   // every sender's count mid-minute, in a commit beside the reader's message, and left it in the WAL.
   function tidy(now) {
@@ -627,8 +627,8 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
         return { code: 'pow', detail: 'a new identity proves work once, before its first claim: log in again with pow, to the pow_bits GET /challenge gives' };
       }
       const t = tierOf(account, now);
-      // An enrolment code's answer topic while it waits (park.mjs enrolTopics) counts for nothing: agent-setup
-      // feedback, point 11 (an operator's codes that were never used held its free mailboxes for a day).
+      // An enrolment code's answer topic while it waits (park.mjs enrolTopics) counts for nothing
+      // (else an operator's codes that were never used held its free mailboxes for a day).
       const held = (t.pool ? s.poolClaims.get(t.pool).n : s.claimsHeld.get(account).n) - (t.pool ? 0 : enrolHeld(account, now));
       if (held >= t.limits.mailboxes) return { code: 'quota_mailboxes', detail: `${whose(t)} holds ${t.limits.mailboxes} mailboxes and invite topics, its most: give up a contact you no longer need first (sigelo-agent forget <did>; contacts lists them), or cancel a code (invite --cancel <code>)` };
       if (!t.pool && freeUsed() + CLAIM_ROW > freeQueue) {

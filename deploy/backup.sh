@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-only
 # deploy/backup.sh — the relay host's nightly backup: licences, operator chains, the push key and
-# config, encrypted with age; never a mailbox (design/relay-plan.md §6 "Backups").
+# config, encrypted with age; never a mailbox.
 #
 #   backup.sh                   as root (sigelo-relay-backup.timer, daily): the archive
 #                               <admin home>/backup/relay-state-<stamp>.tgz.age, admin user 0600, 7 kept
@@ -20,7 +20,7 @@
 # and the gift codes whole (gifts, gift_campaigns: hashes and counts, gifts.mjs), so a code used
 # before a restore stays used when its batch is loaded again.
 # Messages, claims, counters, proofs and pool rows are left out: agents pool again at their next
-# login with their operator attestation, and plan §6 lets counters be lost. The extract is read in
+# login with their operator attestation, and counters may be lost. The extract is read in
 # one transaction, so its tables agree with each other.
 # Beside the extract, the push key ($RELAY_PUSH_KEY, push.key beside the database, push.mjs): the seal
 # of the push registrations in the extract's database and the VAPID key. Lost, every phone registers

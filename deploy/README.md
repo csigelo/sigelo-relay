@@ -9,8 +9,7 @@ RELAY_HOST=relay.example.org RELAY_TLS_CERT=… RELAY_TLS_KEY=… node relay/ser
 ```
 
 An MQTT 3.1.1 broker (Aedes) where agents log in with their sigelo identity, claim private
-mailboxes and get store-and-forward while offline. One SQLite file. Design:
-`design/relay-plan.md` §3–§5.
+mailboxes and get store-and-forward while offline. One SQLite file.
 
 ## Configuration (environment)
 
@@ -26,12 +25,12 @@ mailboxes and get store-and-forward while offline. One SQLite file. Design:
 | `RELAY_MAX_PER_PREFIX` | 1000 | sessions connected at once per /24 or /48: past it a CONNECT gets `rate`; taking over one's own session is never refused |
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else `licence.ts`'s placeholder | the vendor's genesis DID every licence must chain to. Until the vendor ceremony it is the placeholder and no licence verifies: Pro is not on sale, and the site says so |
 | `RELAY_PRO_STORAGE_MB` | 5120 (pro.md sells 5 GB) | the most storage any Pro pool gets, whatever its licence says; set the same where the site is built |
-| `RELAY_POW_BITS` | 6 | the proof of work a new identity sends once: 2^bits Argon2id evaluations on average (64 MiB, 3 passes, 1 lane; 485 ms each on a phone-class core, so 31 s) |
+| `RELAY_POW_BITS` | 6 | the proof of work a new identity sends once: 2^bits Argon2id evaluations on average (64 MiB, 3 passes, 1 lane; 485 ms each on a low-end ARM64 core, so 31 s) |
 | `RELAY_POW_LOAD_BITS`, `RELAY_POW_LOAD` | 8, 1000 | the proof asked once more than `RELAY_POW_LOAD` new identities have proven work in a clock hour, for that hour and the next |
-| `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A minter with native Argon2id on 8 phone cores does 13 evaluations a second (the day's 64 then take ~19 minutes), so this count, not the bits, bounds what one network mints |
+| `RELAY_POW_NETWORK_DAY` | 64 | new identities one /24 or /48 may bring in 24 hours: past it the next is refused `pow`, and GET /challenge states `pow_bits` 64 there. A minter with native Argon2id on 8 low-end ARM64 cores does 13 evaluations a second (the day's 64 then take ~19 minutes), so this count, not the bits, bounds what one network mints |
 | `RELAY_POW_CHECKS` | 4 | proofs the relay evaluates at once, each in a worker thread, ~0.5 s of a core and 64 MiB (256 MiB at most by default); 4 times as many wait their turn, and a login with a proof past those is refused `rate` before its nonce is spent, so the same CONNECT is good again while the nonce lives |
 | `RELAY_FREE_QUEUE_MB` | half the room below 70 % on the database's disk at start | the free tier's ceiling: every queued message and every identity row (accounts with their chains, claims, chain DIDs) counted; past it free readers take nothing more, free identities no new mailbox, and no new free identity, nor a longer chain of one, is stored (one recovery edge still is, so an owner takes a stolen key back). Set it on a disk whose other files keep growing |
-| `RELAY_PUSH` | on | `off`: no UnifiedPush wakes, and GET /challenge does not offer them (`push.mjs`, design/push.md) |
+| `RELAY_PUSH` | on | `off`: no UnifiedPush wakes, and GET /challenge does not offer them (`push.mjs`) |
 | `RELAY_PUSH_KEY` | `push.key` beside `RELAY_DB` | the wakes' key file: the seal of the registrations at rest and the VAPID key; made at the first start, 0600; lost or replaced, the registrations kept no longer open and each phone registers again at its next login. `backup.sh` archives it as `push.key`, 0600; to restore, with the relay stopped and before `--restore`: `install -m 0600 -o sigelo-relay -g sigelo-relay push.key /var/lib/sigelo-relay/push.key` (over the one the first start made) |
 | `RELAY_TURN_SECRET_FILE` | the systemd credential `turn-secret`, if any | coturn's `static-auth-secret`, one line: logged-in identities get TURN credentials (`turn.mjs`) and GET /challenge says `turn`; none = no TURN ("STUN and TURN" below) |
 | `RELAY_CLOSED_OPERATOR` | unset (open) | a closed relay: the original DIDs of its operators, comma-separated, at most 8 (Closed relay) |
@@ -89,7 +88,7 @@ useradd --system --no-create-home --shell /usr/sbin/nologin sigelo-relay
 install -d -o root -m 0755 /opt/sigelo-relay/app        # relay/ with node_modules (npm ci --omit=dev), root-owned
 # relay/ needs nothing beside it: licence.ts is sigelo's apps/keeper/licence.ts, copied; `sigelo` comes from the registry
 install -m 0644 relay/deploy/sigelo-relay.service /etc/systemd/system/
-printf '[Journal]\nMaxRetentionSec=7day\n' > /etc/systemd/journald@sigelo-relay.conf   # logs kept 7 days (plan §5)
+printf '[Journal]\nMaxRetentionSec=7day\n' > /etc/systemd/journald@sigelo-relay.conf   # logs kept 7 days
 printf 'RELAY_HOST=relay.sigelo.ai\nRELAY_TLS_CERT=/etc/sigelo-relay/tls/fullchain.pem\nRELAY_TLS_KEY=/etc/sigelo-relay/tls/privkey.pem\n' > /etc/sigelo-relay.env
 systemctl daemon-reload && systemctl enable --now sigelo-relay
 journalctl --namespace=sigelo-relay -f                   # the unit logs to its own journal namespace
@@ -285,7 +284,7 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
   login, already kept: What the relay keeps) is in the last 7 or 30 UTC days. nginx sets X-Real-IP on every request it
   forwards, so the public `/stats` never carries them (`test/run.mjs`). `deploy/stats.sh` reads this
   view, so `/_stats/` (basic auth) may show them.
-- **`https://sigelo.ai/_stats/`**, basic auth, user `owner`: `index.html` (GoAccess over the site's
+- **`https://sigelo.ai/_stats/`**, basic auth: `index.html` (GoAccess over the site's
   log, 7 days), `api.html` (the same over relay.sigelo.ai's), `relay.html` (the counts above as
   30-day charts), `summary.txt` and `daily.log` (visits a day, AI agents, programmatic clients and
   crawlers against browsers, top pages, the relay's counts; `daily.log` gets one block per finished
@@ -293,11 +292,11 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
   `deploy/stats-chart.mjs` as `/usr/local/sbin/sigelo-relay-stats{,-chart.mjs}` and
   `sigelo-relay-stats.timer` (root, every 10 minutes, network to localhost only), and makes the
   password once: its SHA-512 crypt hash in `/etc/nginx/sigelo-stats.htpasswd`, the password in
-  `/root/sigelo-stats.pw` (root, 0600). Read it, then keep it beside sigelo.io's on the phone:
+  `/root/sigelo-stats.pw` (root, 0600). Read it, then keep it offline, with the operator:
 
   ```sh
-  ssh -t csigelo@<relay host> sudo cat /root/sigelo-stats.pw
-  ssh csigelo@<relay host> cat /var/www/sigelo.ai/stats/daily.log   # the text, without the password
+  ssh -t <admin>@<host> sudo cat /root/sigelo-stats.pw
+  ssh <admin>@<host> cat /var/www/sigelo.ai/stats/daily.log   # the text, without the password
   ```
 
   To change it: delete both files as root and rerun R16 (`server-setup.sh --relay`).
@@ -444,7 +443,7 @@ until 30 days past the term sold (the term of the one it cut short, if later), u
 operator's account and chain with it: that chain holds any recovery from a stolen key, and gone, the
 key recovered from logged in as the operator again.
 
-## Load test (2026-10-06)
+## Load test
 
 `node relay/test/load.mjs [--tls]`: 2,000 clients, 50 logging in at a time, relay and clients on
 one 8-core ARM64 machine, Node 24.18, on loopback, relay in its own process. TLS: TLS 1.3 with a
@@ -458,19 +457,19 @@ self-signed Ed25519 certificate.
 | Relay CPU per login | 9.6 ms: 105 logins a second per core | 13.7 ms: 73 logins a second per core |
 | Relay memory after GC | RSS 89 → 225 MB: 70 KB per idle connection | RSS 91 → 333 MB: 124 KB per idle connection |
 
-The clients sign in the same machine. For the plan's 10,000 agents over TLS: about 1.2 GB for
+The clients sign in the same machine. For 10,000 agents over TLS: about 1.2 GB for
 connections and a full reconnect in about 140 s (the relay has one thread). A 2-vCPU, 4 GB VPS
 still fits; the unit caps the relay at 3 GB.
 
 ## Known limits
 
-- Rate limits count per /24 or /48. Many /48s (IPv6 address rotation) beat them (plan §10, R15);
+- Rate limits count per /24 or /48. Many /48s (IPv6 address rotation) beat them;
   `RELAY_MAX_SESSIONS` and the budget for unfinished packets still bound the memory sessions hold,
   so a flood of them refuses new logins (`relay_full`) rather than ending the process for everyone.
   The same holds for the free tier's ceiling: one network may fill no more than a 64th of it once
   it is half full, many networks can fill it.
 - The counts and days the sweep writes are lost if the process dies between two sweeps (a minute
-  at most); plan §6 lets counters be lost.
+  at most); the counters are statistics and may be lost.
 - With few messages a minute, the sweep's one transaction still names the accounts that sent in
   that minute, and the next minute's message commits their readers: the WAL holds no pairing of the
   two, but a copy taken at a quiet time narrows it down. Deliveries and acknowledgements write the
@@ -478,7 +477,7 @@ still fits; the unit caps the relay at 3 GB.
   reader then wrote. Rows added to the identity tables keep the order of writing in their pages
   until the hourly rebuild, and message rows and their index entries, which name only readers,
   until they go. The rebuild holds the relay's one thread about 0.9 s per 100,000 claims (with
-  10,000 accounts, measured on a phone-class ARM64 CPU).
+  10,000 accounts, measured on a low-end ARM64 CPU).
 - An account and its kept chain go 30 days after the last login once no claim, no licence and no
   running attestation from an operator licensed here is held; a key the identity rotated away from could then log in as
   a new identity. Such a login never moves a licence: only a chain through the key it is on, or a

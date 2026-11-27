@@ -1,5 +1,5 @@
 # relay/deploy/ntfy/server.yml — ntfy on the relay's host: a UnifiedPush server (push.sigelo.ai) for phones with no push
-# server of their own (design/push.md §5, decided 2026-11-19). Installed as /etc/ntfy/server.yml (README.md).
+# server of their own. Installed as /etc/ntfy/server.yml (README.md).
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Only UnifiedPush: anyone may publish to and read a topic whose name begins with "up" (the ntfy app makes each one

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/pow.mjs — proof of work for a new identity (design/relay-plan.md §3 "Proof of work", §5,
-// §11 "Allowances (pricing leak)").
+// relay/pow.mjs — proof of work for a new identity (relay/deploy/README.md "The protocol in one
+// screen", step 2; relay/README.md "Limits").
 //
 // Once per new original DID, before its first claim (a mailbox or an invite topic): the client
 // finds c, a string of 1 to 16 decimal digits, such that
@@ -13,11 +13,11 @@
 // GET /challenge states the function beside pow_bits, `pow: {v: 1, alg: "argon2id", m, t, p}`, so
 // a client refuses what it does not know. Checking costs one evaluation; the nonce is single use,
 // so the proof is too, and it names this relay and this identity, so it is good nowhere else.
-// Argon2id, not SHA-256 (sigelo-relay-pow/0, dropped 2026-11-13, no outside clients yet): a GPU or
+// Argon2id, not SHA-256 (sigelo-relay-pow/0, dropped while it had no outside clients): a GPU or
 // ASIC does SHA-256 thousands of times faster than a phone, so any difficulty a phone bears was free
 // for a minter. Every Argon2id attempt fills 64 MiB, so the edge is memory bandwidth, single digits.
 //
-// Measured 2026-11-13 on a phone-class ARM CPU (Snapdragon 845, Node 24, hash-wasm 4.12.0): one
+// Measured on a low-end ARM64 CPU (Node 24, hash-wasm 4.12.0): one
 // evaluation takes 485 ms on a big core (in the main thread and in a worker alike), 1.64 s on a
 // little one; Node's native crypto.argon2 (OpenSSL) 404 ms, 1.2 times faster; @noble's pure
 // JavaScript 5.5 s. So 2^6 evaluations, the base, take 31 s on average; 2^8 2 minutes, 2^10 8.
@@ -63,7 +63,7 @@
 // one the CONNECT came from: else challenges asked from one network and logins made from another
 // kept the first at the base for ever. A heavier proof slows new DIDs only, never a known
 // identity: it proves work once. Many networks (IPv6 address rotation) still beat the per-network
-// steps: plan §10, R15.
+// steps (relay/deploy/README.md "Known limits").
 // The relay's cost: one evaluation per proof checked, ~0.5 s of a core and 64 MiB, so a check runs
 // only after every cheap one passed (auth.mjs: the password's shape, the nonce, the signature and
 // chain, the client id; allowance.mjs: c's shape, a proof already held, the network's cap), off the
@@ -77,16 +77,16 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import hashWasm from 'hash-wasm';
 
 export const POW_V = 1, POW_PREFIX = 'sigelo-relay-pow/1\n';
-// The dropped SHA-256 proof (sigelo-relay-pow/0, 50a2960): a client of before 2026-11-13 (npm 0.1.14 to
+// The dropped SHA-256 proof (sigelo-relay-pow/0, 50a2960): a client older than the Argon2id proof (npm 0.1.14 to
 // 0.1.17) still computes it, and passed the Argon2id check by chance at a low pow_bits (1 in 4 at 2 bits),
-// so it failed "at random" with a formula it could not act on (the agent-setup feedback, point 1). No grace: a proof
+// so it failed "at random" with a formula it could not act on. No grace: a proof
 // that misses Argon2id but is the old solver's answer (oldProof) is refused client_old, its one line below.
 // Checked only after Argon2id failed, so a current client's good proof never reaches it.
 export const OLD_PREFIX = 'sigelo-relay-pow/0\n', CLIENT_OLD = 'client too old: npm i -g sigelo-agent@latest';
 // The function's cost: memory in KiB, passes, lanes. A relay may be built cheaper for tests
 // (powCheck's cost); GET /challenge states whichever it checks, and a client refuses more than this.
 export const ARGON = Object.freeze({ m: 65536, t: 3, p: 1 });
-// One evaluation at ARGON on the phone-class CPU of the header, in ms (apps/contact/page.mjs's
+// One evaluation at ARGON on the low-end ARM64 CPU of the header, in ms (apps/contact/page.mjs's
 // estimate of a search scales it by m × t).
 export const EVAL_MS = 485;
 // The proof must be found within the login nonce's 300 s (auth.mjs TTL): 2^6 evaluations take 31 s
@@ -300,7 +300,7 @@ export function powCheck({ bits = POW_BITS, loadBits = POW_LOAD_BITS, loadPerHou
     // difficulty, from what came before it (CLOSED_BITS to a network at its cap), and from now on it
     // waits (above) until spent or expired.
     // enrol: the challenge names a live enrolment code (park.mjs enrolGrace): the base, not the load or the
-    // network's step (the agent-setup feedback, point 10: a machine whose own model held its CPU could not solve 8
+    // network's step (a machine whose own local model held its CPU could not solve 8
     // bits in time, and its code was spent). Still counted as waiting, and still closed at the cap.
     issue(now, network, exp, enrol = false) {
       const b = capped(now, network) ? CLOSED_BITS : enrol ? bits : required(now, network);

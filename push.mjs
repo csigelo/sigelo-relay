@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/push.mjs — UnifiedPush wakes, sigelo-push/0 (design/push.md §1 B, §3): the relay is the
+// relay/push.mjs — UnifiedPush wakes, sigelo-push/0 (relay/deploy/README.md "Push (ntfy)"): the relay is the
 // push "application server" of a phone whose app is not connected.
 //
 // Register: a session publishes (QoS 1) to $sigelo/push the JSON

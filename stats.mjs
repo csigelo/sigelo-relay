@@ -14,7 +14,7 @@
 // Day history: stats_days, one row per UTC day (day = its start, as every time in the file) with
 // that day's counts as JSON, 90 days kept. Written by the sweep, inside its transaction, every
 // minute (mailbox.mjs passes flush as part of its tidy), so a restart loses at most a minute of
-// the day's counts (plan §6 lets counters be lost) and today's row is read back at start. A count
+// the day's counts (counters may be lost) and today's row is read back at start. A count
 // tells nothing of who: the rows hold numbers only.
 //
 // The operator's view: report({ operator: true }) adds active_identities_7d and _30d, the accounts

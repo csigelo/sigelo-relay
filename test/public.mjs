@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/test/public.mjs — public codes (sigelo-public/0, park.mjs, design/public-invite.md) on a
+// relay/test/public.mjs — public codes (sigelo-public/0, park.mjs) on a
 // relay of its own: Pro only, the answer topic claimed first, fetched without being spent and on a
 // brake of its own, the mailbox's guard (once a day, the cap, Pause, Revoke), 3 per account, a year
 // at most, kept across a restart, the sweep; one-time short codes as before. Prints "ALL PASS (n)".

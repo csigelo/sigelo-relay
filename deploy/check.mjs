@@ -9,7 +9,7 @@
 // Checks: the front page (200, HTML) and its headers (HSTS, nosniff, a Content-Security-Policy, a
 // Referrer-Policy, no cookie); /pay-monero.html (301 to /pro.html); https://<relay>/stats (200, the
 // relay's counts, CORS open, cached a minute, no DID or hash); /_stats/ (401 without its password); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
-// open, cached an hour, the plan's first fields: design/relay-plan.md §11 "Relay info");
+// open, cached an hour, its first fields);
 // https://<relay>/challenge?did=… (200, a relay-login body naming this relay, a whole pow_bits);
 // MQTT over TLS on <relay>:8883 answering a CONNECT without credentials with CONNACK 4 (check
 // `password`), and nothing else: 0 means the login was accepted, 3 the login rate or the relay
@@ -73,7 +73,7 @@ await check('front page headers', `${ORIGIN}/`, (r) => {
   if (h('set-cookie')) missing.push('no Set-Cookie');
   return missing.length ? `missing ${missing.join(', ')}` : '';
 });
-// The old pay page (until 2026-10-14) answers 301 to /pro.html, so a link to it still lands (nginx.conf).
+// The former pay page answers 301 to /pro.html, so a link to it still lands (nginx.conf).
 {
   const { r, err } = await get(`${ORIGIN}/pay-monero.html`), name = '/pay-monero.html 301 to /pro.html';
   if (err) fail(name, err);

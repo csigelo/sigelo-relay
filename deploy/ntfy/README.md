@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # ntfy beside the relay: push.sigelo.ai
 
-A UnifiedPush server for phones without one of their own (design/push.md §5, decided 2026-11-19). The
-sigelo app on Android connects to it itself by default (Built in, design/push.md §6, since 2026-11-25): one
+A UnifiedPush server for phones without one of their own. The
+sigelo app on Android connects to it itself by default (Built in): one
 stream to its own random `up` topic, no second app. The alternative is the user's push app (a "distributor":
 the ntfy app from F-Droid, NextPush, Sunup…), which holds the connection and gives an endpoint URL; a user
 with no server of their own points it at `push.sigelo.ai`. The relay POSTs a 135-byte wake to the endpoint
@@ -67,7 +67,7 @@ user connect out on 443 (it does unless output is filtered).
 curl -fsS https://push.sigelo.ai/v1/health                                    # {"healthy":true}
 T=up$(head -c 9 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 12)
 curl -s -o /dev/null -w '%{http_code}\n' -d hi "https://push.sigelo.ai/$T?up=1"  # 507: no subscriber yet (50701)
-curl -fsS -o /dev/null "https://push.sigelo.ai/$T/json?poll=1"                # a subscriber (as the phone's app)
+curl -fsS -o /dev/null "https://push.sigelo.ai/$T/json?poll=1"                # a subscriber (as the app on a phone)
 curl -fsS -d hi "https://push.sigelo.ai/$T?up=1" && echo                      # 200: a UnifiedPush topic takes a message
 curl -s -o /dev/null -w '%{http_code}\n' -d hi https://push.sigelo.ai/news    # 403: any other topic is refused
 journalctl --namespace=ntfy -n 20                                             # warnings only

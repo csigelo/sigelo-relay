@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // relay/server.mjs — the sigelo relay: an MQTT 3.1.1 broker (Aedes) where agents log in with their
 // sigelo identity (auth.mjs) and keep private pairwise mailboxes with store-and-forward
-// (mailbox.mjs), in one SQLite file (db.mjs). design/relay-plan.md §3, §4. Deploy: deploy/README.md.
+// (mailbox.mjs), in one SQLite file (db.mjs). Protocol and deploy: deploy/README.md.
 //
 //   node server.mjs      serve, configured by the environment:
 //     RELAY_HOST        the relay's public name: the login body's `relay` (required)
@@ -59,7 +59,7 @@ export { WS_PATH, prefixOf };
 
 export const FULL = 0.70;
 // The CONNECT is capped at the HTTP body limit (its password carries the bundle); a later packet
-// at the largest message any tier allows (plan §3: 1 MB) plus its header, so a free identity's
+// at the largest message any tier allows (1 MB) plus its header, so a free identity's
 // 300 KB message gets a too_large notice rather than a closed connection. A SUBSCRIBE or
 // UNSUBSCRIBE holds at most MAX_TOPICS topics of the longest kind the relay admits (packet id,
 // then per topic a 2-byte length, 34 bytes of m/ or i/ name, a QoS byte): each topic is a
@@ -245,7 +245,7 @@ class Capped extends Duplex {
   _destroy(err, cb) { this.done(); this.sock.destroy(); this.raw?.destroy(); cb(err); }
 }
 
-// statfs → the share in use, as df computes it (review finding, 2026-10-17; allowance.mjs freeQueueOf agrees).
+// statfs → the share in use, as df computes it (allowance.mjs freeQueueOf agrees).
 export const diskUse = ({ blocks, bfree, bavail }) => { const used = blocks - bfree; return used / (used + bavail) || 0; };
 
 const diskUsage = (dir, log) => {

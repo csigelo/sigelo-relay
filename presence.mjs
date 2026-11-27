@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/presence.mjs — presence markers (design/transfer.md §8 T0): whether an agent is connected,
+// relay/presence.mjs — presence markers (relay/README.md "Limits": one `p/` marker per reader): whether an agent is connected,
 // for the readers it chose, and since when it is not.
 //
 //   p/<32 hex>  a presence topic: one writer, one reader. The writer derives it from the pairing key

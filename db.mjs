@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // relay/db.mjs — the relay's one SQLite file (node:sqlite, WAL): accounts, mailbox claims, queued
-// messages (design/relay-plan.md §3 "Allowances", "Retention"; §4 "Store").
+// messages (relay/deploy/README.md "What the relay keeps").
 //
 // No DID is stored in the clear. An account is keyed by the hex SHA-256 of the identity's ORIGINAL
 // DID (one account per identity, whatever its rotations), a claim and a message by the reader's
@@ -8,7 +8,7 @@
 // DIDs finds their rows, and a copy of this file says which identities read here. The rotations
 // of an account's chain (they name DIDs) are kept encrypted under a key derived from the original
 // DID: whoever can read them already knows it. What the file must not tell is who wrote to whom,
-// and when (plan §5 "Privacy"):
+// and when:
 //   - every time in it is the start of a UTC day (dayOf; messages.expires too, which is the publish
 //     time plus the retention), and a message row holds no time of its own: a second-exact time on
 //     the writer's account and on the reader's message or claim joined them;
@@ -48,7 +48,7 @@ export const RESORT_EVERY = 3600;
 export const dayOf = (t) => Math.floor(t / DAY) * DAY;
 export const hashHex = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 export const accountOf = (originalDid) => hashHex(originalDid);
-// Plan §3 "Login": client id = "s" + 24 hex digits of SHA-256(original DID). It is the first 24
+// Login: client id = "s" + 24 hex digits of SHA-256(original DID). It is the first 24
 // digits of the account key, so one identity has exactly one persistent MQTT session.
 export const clientIdOf = (originalDid) => 's' + hashHex(originalDid).slice(0, 24);
 
@@ -56,7 +56,7 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS accounts (
   account   TEXT PRIMARY KEY,           -- hex SHA-256 of the original DID
   created   INTEGER NOT NULL,           -- times here and below: the start of a UTC day (dayOf)
-  last_seen INTEGER NOT NULL,           -- day of the last login; the row goes 30 days after it (plan §5 "Privacy")
+  last_seen INTEGER NOT NULL,           -- day of the last login; the row goes 30 days after it
   day       INTEGER NOT NULL DEFAULT 0, -- UTC day (unix seconds / 86400) that msgs_day counts
   msgs_day  INTEGER NOT NULL DEFAULT 0, -- messages sent that day: charged to the sender
   chain     BLOB                        -- the chain's rotations, sealed (sealChain); NULL = none
@@ -146,15 +146,15 @@ INSERT INTO row_totals (k, bytes) SELECT '*',
 // mailbox's queue, expired messages, expired invite topics with theirs, idle mailboxes, idle
 // accounts with their chains' DIDs (the sweep's one budget for all of them). Deleting a message costs
 // its row, four index entries, the queue_out trigger and secure_delete's overwrite: about 72 µs a
-// row on tmpfs (the audit's measurement), more on a disk. One transaction that deleted a queue
+// row on tmpfs (measured), more on a disk. One transaction that deleted a queue
 // whole held the one thread for its length: 64,000 messages on one mailbox, 5 s for a single
 // UNSUBSCRIBE; a day's expired messages, swept at once at the UTC day start (messages.expires is
 // kept by the day), over a minute. Past DELETE_BATCH, what is left goes in further transactions,
 // one per turn of the event loop (reap), so each stall is one batch: 36 ms on tmpfs, 56 ms (at
-// most 72) on the phone-class host's flash, its checkpoint included (measured 2026-10-13). Idle
+// most 72) on a low-end ARM64 machine's flash, its checkpoint included (measured). Idle
 // claims and accounts went whole too: claims.last_used is kept by the UTC day, so every claim last
-// used on one day goes idle in the same minute (64,000 held the thread 4.6 s on tmpfs, measured
-// 2026-10-13: Sybil identities reconnecting on one day, or a lapsed Pro pool's 16,384 at once).
+// used on one day goes idle in the same minute (64,000 held the thread 4.6 s on tmpfs, measured:
+// Sybil identities reconnecting on one day, or a lapsed Pro pool's 16,384 at once).
 export const DELETE_BATCH = 512;
 // Expired invite topics per batch: each holds at most 4 messages (mailbox.mjs INVITE_MESSAGES),
 // which its claim's deletion takes along (the foreign key): 5 rows each, under DELETE_BATCH.
@@ -227,7 +227,7 @@ export function openDb(path) {
   const db = new DatabaseSync(path);
   // WAL: readers never block the one writer. secure_delete: an acknowledged or expired message is
   // overwritten in the file, not left in a free page. The WAL still holds the old page images
-  // until a checkpoint truncates it: sweep() does that every minute (plan §3 "Retention").
+  // until a checkpoint truncates it: sweep() does that every minute.
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; PRAGMA busy_timeout = 5000;');
   // A file written by an earlier version: accounts, claims and chain_dids with a rowid, messages
   // numbered relay-wide (and, before that, with a time of their own). A message keeps its reader's
@@ -324,8 +324,8 @@ export function openDb(path) {
   // The sender's side of each message, the day of each login and of each claim's use, until the
   // next flush (the header): account → { day, n } sent that UTC day; operator pool → { day, n }
   // sent under it that day; account → the day of its last login; topic, and client id (every claim
-  // of it), → the day it was last used. Lost with the process between two flushes, as plan §6 lets
-  // counters be: a claim's day is a day late at most.
+  // of it), → the day it was last used. Lost with the process between two flushes (counters may be
+  // lost): a claim's day is a day late at most.
   const sent = new Map(), poolsSent = new Map(), seen = new Map(), topicsUsed = new Map(), clientsUsed = new Map();
   function flush() {
     for (const [account, x] of sent) s.accountSent.run(account, x.day, x.n);
@@ -494,7 +494,7 @@ export function openDb(path) {
     unsent: (id) => s.unsentOne.get(id) !== undefined,
     message: (id) => s.message.get(id),
 
-    // ---- retention (plan §3): expired messages, expired invites, idle mailboxes, old accounts ----
+    // ---- retention: expired messages, expired invites, idle mailboxes, old accounts ----
     // A claim with nothing queued is idle once unused for idleAfter(account) seconds, at least
     // minIdle (the shortest any account gets). Its last_used is the start of the day it was last
     // used, up to a day before the use itself, so it is idle a day later than its stamp says: a

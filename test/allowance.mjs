@@ -23,7 +23,7 @@
 // pool, and the largest message the smaller of the two tiers'; the claim brake on claims and
 // releases, each a checkpoint; a long queue given up and a day's expired messages deleted in
 // batches; a CONNECT restoring at most RESTORE_MAX claims.
-// design/relay-plan.md §1, §3, §5, §7 M4, §11. Prints "ALL PASS (n)".
+// relay/README.md "Limits"; relay/deploy/README.md "The protocol in one screen". Prints "ALL PASS (n)".
 //   node relay/test/allowance.mjs
 import { existsSync, mkdtempSync, readFileSync, rmSync, statfsSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -205,11 +205,11 @@ const withVouch = (agent, op, att) => bundleOf(agent, { attestations: [att], iss
     'the function GET /challenge states: Argon2id at the cost a relay checks (by default 64 MiB, 3 passes, 1 lane)');
   const c = await solve(HOST, did, nonceA, 4, T);
   ok(leadingZeroBits(await digest(HOST, did, nonceA, c)) >= 4 && await p.check({ pow: c, host: HOST, original: did, nonce: nonceA, bits: 4 }) === null, `a proof of 4 bits over (host, original DID, nonce, c = ${c}) is accepted: one evaluation`);
-  // Independent vectors (computed with OpenSSL's Argon2id, node:crypto argon2Sync, over the plan's
-  // bytes), so a change of the layout, the salt or the cost fails here even though solve() and the
+  // Independent vectors (computed with OpenSSL's Argon2id, node:crypto argon2Sync, over the
+  // documented bytes), so a change of the layout, the salt or the cost fails here even though solve() and the
   // check would still agree with each other.
   ok(c === '8' && Buffer.from(await digest(HOST, did, nonceA, c)).toString('hex') === '0e562fec121d4473dee607a427140e2e0e181b676fda58d2455568644790d92b',
-    'plan §3\'s layout pinned: Argon2id("sigelo-relay-pow/1\\n" ‖ relay.test ‖ the "pow" fixture DID ‖ "A" × 43 ‖ c, salt SHA-256("A" × 43)[0..16], 8 KiB, 1 pass): c = 8 at 4 bits, output 0e562fec…');
+    'the documented layout pinned: Argon2id("sigelo-relay-pow/1\\n" ‖ relay.test ‖ the "pow" fixture DID ‖ "A" × 43 ‖ c, salt SHA-256("A" × 43)[0..16], 8 KiB, 1 pass): c = 8 at 4 bits, output 0e562fec…');
   // The one check at the real cost (ARGON: 64 MiB, 3 passes, ~0.5 s each): c = 10 meets 2 bits.
   const real = powCheck({ bits: 2, loadBits: 2 }), t1 = performance.now();
   const realOut = Buffer.from(await powDigest(HOST, did, nonceA, '10'));
@@ -255,7 +255,7 @@ const withVouch = (agent, op, att) => bundleOf(agent, { attestations: [att], iss
     'the load raise and a network\'s step together: the higher of the two (8), and the network\'s 6 once the load is gone');
   // Challenges waiting (issued, neither spent nor expired) count with the arrivals: each one's
   // difficulty is frozen in its nonce, so counting good proofs alone let one network fetch as many
-  // challenges as it liked at the base before redeeming any (review finding: the prefetch race).
+  // challenges as it liked at the base before redeeming any (the prefetch race).
   const pf = powCheck({ bits: 6, loadBits: 8, loadPerHour: 1000 }), tp = hour + 5 * 3600;
   const tally = (xs) => [...new Set(xs)].map((x) => `${x}x${xs.filter((y) => y === x).length}`).join(' ');
   const ahead = Array.from({ length: 70 }, () => pf.issue(tp, A, tp + 300));
@@ -272,7 +272,7 @@ const withVouch = (agent, op, att) => bundleOf(agent, { attestations: [att], iss
   [0, 1, 2, 3].forEach((i) => pl.spent(tp + 1, `net ${i}`, tp + 300));
   ok(relayWide.join() === '4,4,4,8' && pl.required(tp + 1) === 4,
     `the load raise counts waiting challenges too (2 an hour configured, one each from 4 networks): ${relayWide.join()}; 4 once they are spent`);
-  // A count, not a difficulty, bounds what one network mints (audit: a native SHA-256 solver did
+  // A count, not a difficulty, bounds what one network mints (a native SHA-256 solver did
   // 2^26 in ~3 s; Argon2id slows it to ~13 evaluations a second, still not a bound): past perDay good proofs in 24 hours the network is capped, and its challenges state
   // CLOSED_BITS. Challenges held unredeemed close nothing; another network is not touched.
   ok(NETWORK_DAY === 64 && CLOSED_BITS === 64, 'the default cap: 64 new identities a day from one network; a closed network is told 64 bits');
@@ -326,8 +326,8 @@ const erin = identity('erin');
   const staleCreds = { username: erin.did, clientId: clientId(erin), password: password(erin, second.challenge, { extra: { pow: stale } }) };
   const replayed = await mqttConnect(staleCreds);
   ok(!replayed.client && (await checkOf(staleCreds)).check === 'pow', 'a proof made over another login\'s nonce: refused, POST /check names pow');
-  // the agent-setup feedback, point 1: a client of before 2026-11-13 computes the dropped SHA-256 proof. Refused by
-  // its own name, client_old, with the one line to act on; never a formula, never let in by chance.
+  // A client older than the Argon2id proof computes the dropped SHA-256 proof, which passed a low pow_bits by
+  // chance and otherwise failed with a formula it could not act on. Refused by its own name, client_old, with the one line to act on; never a formula, never let in by chance.
   {
     const oldOne = identity('old client');
     let { challenge: oc, pow_bits: ob } = await getChallenge(oldOne.did), c = 0;
@@ -357,8 +357,8 @@ const erin = identity('erin');
   const l4 = await login(erin, { pow: 'x' });
   ok(l3.client?.connected === true && !l4.client && (await checkOf(l4.creds)).check === 'pow', 'a proven identity\'s pow is not hashed again ("0" passes) but is still shape-checked ("x": pow)');
   l3.client?.end(true);
-  // Bad proofs leave nothing behind: no proof kept, no account, no arrival (plan §5 "Proof-of-work
-  // DoS"). Five logins of a new identity, then 200 checks through the relay's own policy.
+  // Bad proofs leave nothing behind: no proof kept, no account, no arrival (proof-of-work
+  // DoS). Five logins of a new identity, then 200 checks through the relay's own policy.
   const nell = identity('nell'), nellAccount = accountOf(nell.original), nonceB = 'B'.repeat(43);
   const proofs = () => relay.db.raw.prepare('SELECT count(*) AS n FROM pow_proofs').get().n, before = proofs();
   let named = 0;
@@ -378,8 +378,8 @@ const erin = identity('erin');
   const unloaded = (await getChallenge(erin.did, loaded)).pow_bits;
   for (let i = 0; i < 4; i++) (await login(identity(`crowd ${i}`), { pow: true }, loaded)).client?.end(true);
   const raised = (await getChallenge(erin.did, loaded)).pow_bits;
-  // the agent-setup feedback, point 10: under that load a new identity naming a live enrolment code is asked the
-  // base, ENROL_GRACE times per code; a hash parked as an invite, or none, gets the load's bits.
+  // A machine whose own local model holds its CPU cannot solve the load's bits in time: under that load a new identity
+  // naming a live enrolment code is asked the base, ENROL_GRACE times per code; a hash parked as an invite, or none, gets the load's bits.
   {
     const op = identity('crowd 0'), eh = H256('sigelo-park/0ENR0LL3D').toString('hex'), ih = H256('sigelo-park/0PLA1NC0D').toString('hex');
     const pe = await parkEnrol(op, eh, longCode(op), loaded);
@@ -424,7 +424,7 @@ const erin = identity('erin');
   ok(dayOn === 4, `a day after those proofs, ${NET} is back at the base (${dayOn})`);
   now = saved;
   await N.close();
-  // The prefetch race (review finding), on a relay of its own: one /24 fetches challenges for 9
+  // The prefetch race, on a relay of its own: one /24 fetches challenges for 9
   // fresh DIDs before any login. They wait, and count as new identities to come, so the 9th states
   // 4 + 2; all 9 are redeemed at what they state and log in. Before, all 9 stated 4, and so did
   // every challenge a network could fetch within 5 minutes.
@@ -472,7 +472,7 @@ const erin = identity('erin');
   const capL = await mqttConnect(c4, C), why4 = await checkOf(c4, C);
   ok(three.every(Boolean) && closed === CLOSED_BITS && ch4.pow_bits === 4 && !capL.client && why4.check === 'pow' && /brought 3 new identities/.test(why4.detail ?? ''),
     `3 new identities from one /24 log in; then its GET /challenge states ${closed}, and a 4th with a good proof on a challenge issued before is refused "pow" (${why4.detail})`);
-  // Review finding, recorded rather than changed (relay/README.md says it): the cap closes the
+  // A known limit, documented rather than changed (relay/README.md says it): the cap closes the
   // network to a licensed operator's new agents too. GET /challenge states 64 before the relay sees
   // any bundle, and apps/contact/carrier.mjs searches no more than 10 bits; here the agent holds a
   // challenge from before the cap, a good proof and its operator attestation, and is refused all
@@ -517,7 +517,7 @@ const erin = identity('erin');
   for (const c of [lp.client, reader]) await end(c);
 }
 {
-  // The audit's case: the key cached from a login that stored nothing, then a login without a
+  // The case: the key cached from a login that stored nothing, then a login without a
   // bundle but with the proof. That stored the account with no chain and no index rows: whoever
   // held a key the identity had rotated away from logged in with its genesis alone as an original
   // of its own, took it, and the owner's next login with its chain was refused "bundle".
@@ -597,8 +597,8 @@ let F;
   ok(/sigelo-agent forget <did>/.test(notices(fm).at(-1)?.detail ?? ''), `quota_mailboxes names the verb that frees one (${notices(fm).at(-1)?.detail})`);
   await unsubscribe(fm, T3);
   ok(await subscribe(fm, T4) === 1, 'after giving one up (UNSUBSCRIBE), the 4th is granted');
-  // the agent-setup feedback, point 11: an enrolment code's answer topic, while its code waits at the relay, counts
-  // for nothing. frank gives T4 up, claims the topic of a code he then parks as an enrolment: 3 held, 2 counted.
+  // An enrolment code's answer topic, while its code waits at the relay, counts for nothing (an operator placing
+  // several workers would otherwise run out of mailboxes). frank gives T4 up, claims the topic of a code he then parks as an enrolment: 3 held, 2 counted.
   await unsubscribe(fm, T4);
   const secret = randomBytes(32), A = inviteAnswerTopic(secret), eh = H256('sigelo-park/0FRANKENR').toString('hex');
   const claimedA = await subscribe(fm, A), pk = await parkEnrol(frank, eh, longCode(frank, secret));
@@ -615,7 +615,7 @@ const POOL = accountOf(opr.original);
 let annC, benC, K;
 {
   now = Date.parse('2026-10-20T00:00:00Z') / 1000;
-  // Review 2026-10-28 (also observed): POST /licence refused a licence whose operator had never
+  // POST /licence used to refuse a licence whose operator had never
   // logged in, so anyone holding the public licence learnt whether it logs in here. It is now
   // answered the same before and after; the relay takes the operator's current key from the chain
   // it keeps with the operator's account, so until that account exists the licence pools nothing
@@ -665,7 +665,7 @@ let annC, benC, K;
   // The operator itself draws on its pool, and writes to its agents on it.
   const lo = await login(opr, { pow: true }), oc = lo.client;
   ok(oc?.connected && tierOf(opr).pool === POOL, 'the operator logs in itself: its own account is the pool\'s');
-  // Audit finding: the largest message followed the reader alone, so a free contact sent a pooled
+  // Fixed: the largest message followed the reader alone, so a free contact sent a pooled
   // agent 1 MB messages, kept on the pool for up to 90 days. Now the smaller of the two.
   await refusedPublish(ly, A1, 1001, 'too_large', 'a free sender to a Pro reader: 1,001 bytes, over the smaller of its 1,000 and the reader\'s 4,000');
   await publish(oc, A1, randomBytes(4000));
@@ -833,7 +833,7 @@ let annC, benC, K;
 
 // ================================================================ a reissue ends a term early
 {
-  // Audit finding: a licence that still held was replaced only by one running longer, so a licence
+  // Fixed: a licence that still held was replaced only by one running longer, so a licence
   // the vendor reissued to end a term (a card payment charged back, a breach: relay/site/terms.md
   // §8, §10) was refused and the first ran on to its exp. Now the licence the vendor issued last is
   // kept, whatever its term, and an older one is refused while the row is kept: until LICENCE_KEEP
@@ -897,7 +897,7 @@ const fresh = (name, extra = {}) => {
   return box;
 };
 
-// ================================================================ the rate brake (plan §1 "Abuse brakes"), on a relay of its own
+// ================================================================ the rate brake (abuse brakes), on a relay of its own
 {
   now = Date.parse('2026-11-01T00:00:10Z') / 1000;
   // Roomy quotas, so only the brake refuses.
@@ -949,7 +949,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ a member that leaves its pool takes no usage with it
 {
-  // Audit finding: the caps counted the pool's current members only, so a member whose attestation
+  // Fixed: the caps counted the pool's current members only, so a member whose attestation
   // expired, or that logged in without it, took its messages, queue and claims out of the pool, and
   // one licence gave its allowance once per member that left. Usage stays charged where it was
   // incurred: the sender's messages in the pool's day, a queued message and a claim until they go.
@@ -1098,7 +1098,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ identity rows count towards the free ceiling; a Pro pool still stores
 {
-  // Audit finding: free identities' claims, accounts and chains stopped only at relay_full, which
+  // Fixed: free identities' claims, accounts and chains stopped only at relay_full, which
   // then refused every publish and claim on the relay, Pro's too. They count towards the free
   // tier's ceiling (db.mjs row_totals). Every identity logs in first, on a relay with room; it
   // starts again with room for two more claims and not a new account on top.
@@ -1137,7 +1137,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ an operator attestation keeps an account only if its operator holds a licence here
 {
-  // Audit finding: any free identity kept its account and chain up to 90 days, renewably, with an
+  // Fixed: any free identity kept its account and chain up to 90 days, renewably, with an
   // attestation of the right shape it signed for itself; now it is kept 30 days after its last
   // login like any free one, unless the attestation's operator holds a licence here.
   now += DAY;
@@ -1184,7 +1184,7 @@ const fresh = (name, extra = {}) => {
   await sleep(100);
   R.db.tx = realTx;
   ok(txs === 0 && notices(uc).filter((x) => x.code === 'pow').length === 3 && got(rc, X).length === 7, `3 publishes from an identity with no proof: no transaction opened (${txs}), a notice "pow" for each, nothing delivered`);
-  // Review finding: identities with no proof drew on the bucket of the network's proven ones, so a
+  // Fixed: identities with no proof drew on the bucket of the network's proven ones, so a
   // few such sessions, free to mint, refused every proven identity of their /24 (a Pro operator's
   // agents among them) each publish, claim and UNSUBSCRIBE. Now they have a bucket of their own:
   // three of them empty it (4 publishes and an UNSUBSCRIBE of 8 topics each: 12 against the
@@ -1245,7 +1245,7 @@ const fresh = (name, extra = {}) => {
   await A.close();
 }
 
-// ================================================================ stolen keys against recovery (plan §5), and licences kept until 30 days after their expiry
+// ================================================================ stolen keys against recovery, and licences kept until 30 days after their expiry
 {
   now += DAY;
   const vb = identity('vendor b'), opT = identity('operator t'), agT = identity('agent t'), sold = identity('operator of a thief');
@@ -1289,7 +1289,7 @@ const fresh = (name, extra = {}) => {
   (await login(ag2, { bundle: withVouch(ag2, oRec, vouch(oRec, ag2)) }, R)).client?.end(true);
   ok(S.tier(ag2).pool === OP, 'an attestation by the recovered key pools');
   // A licence goes LICENCE_KEEP after its expiry, used or not, and its operator's account and chain
-  // stay with it (operator.mjs; the audit of the licence's retention): kept only until 30 days after
+  // stay with it (operator.mjs): kept only until 30 days after
   // its last use, it went with the operator's chain, the recovery from the thief in it.
   const licences = () => R.db.raw.prepare('SELECT operator FROM licences').all().map((x) => x.operator);
   now += 40 * DAY;
@@ -1308,7 +1308,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ an operator's key it rotated away from, stolen: kept out while the licence is kept
 {
-  // The audit's two cases. An operator rotates to its key 1, logs in, uploads its licence; key 1
+  // Two cases. An operator rotates to its key 1, logs in, uploads its licence; key 1
   // is stolen. (1) The thief logged in with key 1's genesis alone as an original of its own: that
   // took key 1's row from the operator's account, and the operator, recovered from key 1, was
   // refused ever after, its licence left on the stolen key. (2) The operator logs in once and
@@ -1457,14 +1457,14 @@ const fresh = (name, extra = {}) => {
   // blocks (ext4's 5 %), free but not available, which server.mjs counts as neither used nor room.
   const SIZE = 1e6 * 4096, disk = (bavail, reserved = 0) => ({ blocks: 1e6 + reserved, bfree: bavail + reserved, bavail, bsize: 4096 });
   ok(freeQueueOf(disk(1e6), 0) === Math.floor(FULL * SIZE / 2), `an empty disk: half of server.mjs's relay_full share (${FULL}) of it, so the two constants agree`);
-  // The review's case: the disk is 40 % used before the relay starts. A ceiling of 35 % of the disk
+  // The case: the disk is 40 % used before the relay starts. A ceiling of 35 % of the disk
   // let free messages alone take it to 75 %, past relay_full.
   const c40 = freeQueueOf(disk(600000), 0);
   ok(c40 === Math.floor((FULL * 1e6 - 400000) * 4096 / 2) && 0.4 + c40 / SIZE < FULL,
     `a disk 40 % used by other files: the ceiling is half the 30 % left below relay_full (${c40} bytes), so free messages alone stop at ${((0.4 + c40 / SIZE) * 100).toFixed(0)} %`);
   ok(freeQueueOf(disk(600000 - c40 / 4096), c40) === c40, 'restarted with that free tier full (its charge now on the disk): the same ceiling, not a higher one');
   ok(freeQueueOf(disk(250000), 0) === 1 && freeQueueOf(disk(0), 0) === 1, 'other files at 75 % or 100 % of the disk: a ceiling of 1 byte, free readers take nothing');
-  ok(freeQueueOf(disk(600000, 50000), 0) === c40, 'the same disk with 50,000 blocks reserved for root (ext4 5 %): the same ceiling, reserved blocks are neither used nor room (review finding 2026-10-17)');
+  ok(freeQueueOf(disk(600000, 50000), 0) === c40, 'the same disk with 50,000 blocks reserved for root (ext4 5 %): the same ceiling, reserved blocks are neither used nor room');
   // On a relay: no freeQueue configured, so it is measured from the database's own disk at start.
   const D = fresh('measured', { freeQueue: undefined });
   const R = await D.start();
@@ -1496,7 +1496,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ the per-network curve at its default edge, through the policy
 {
-  // Review finding: NETWORK_DAY is the top step's 64, so what GET /challenge states (policy.powBits:
+  // Fixed: NETWORK_DAY is the top step's 64, so what GET /challenge states (policy.powBits:
   // pow.mjs issue(), the cap applied) runs base, base + 2, then closed; base + 4 only while a
   // challenge waiting brings the count to 64 before the 64th good proof. The earlier edge test read
   // required(), which ignores the cap. Default steps and cap here, base 2: 2, 4, 6, 64.
@@ -1522,7 +1522,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ a good proof whose login stores nothing is kept for its retry
 {
-  // Review finding: a good proof whose login then failed (relay_full for a new free identity, a
+  // Fixed: a good proof whose login then failed (relay_full for a new free identity, a
   // session cap) was voided at that identity's next login, so every retry owed a new proof and
   // counted one more arrival against its network: honest retries behind one NAT were told the
   // network had brought its most for the day instead of relay_full. A proof from today is kept; one
@@ -1567,7 +1567,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ refusals that cost nothing else: Pro's own network bucket, every refused publish a strike
 {
-  // Audit finding: a refusal other than "rate" (no_reader, a quota) took a token from the network's
+  // Fixed: a refusal other than "rate" (no_reader, a quota) took a token from the network's
   // bucket and was no strike, so a dozen proven free identities on a shared /24 publishing to a
   // topic nobody holds kept that bucket empty, and every other identity there, Pro agents among
   // them, was refused "rate". Identities drawing on an operator pool now have a network bucket of
@@ -1605,14 +1605,14 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ a chain sent again longer: the free ceiling; a pool's rows: its storage
 {
-  // Audit finding: the free ceiling was checked only when a new identity was first stored, and
+  // Fixed: the free ceiling was checked only when a new identity was first stored, and
   // against ACCOUNT_ROW (128 bytes). A stored identity logging in again with a longer chain (64
   // rotations, minted offline for nothing) rewrote its sealed chain and chain DIDs unchecked, so
   // free rows grew past the ceiling to relay_full, which refuses every publish, Pro's too; a pooled
   // new identity was checked against nothing. Now every login that grows an identity's rows
   // (db.mjs chainRowBytes) is checked: free ones against the ceiling, pooled ones with their pool's
   // other identity rows against its storage (8,768 here). A chain edge is ~1,080 bytes (~980 before
-  // the countersign `sig_next`, the review of 2026-10-19).
+  // the countersign `sig_next`).
   now += DAY;
   let S = fresh('chains', { freeQueue: 64 * MB });
   let R = await S.start();
@@ -1657,7 +1657,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ one pooled reader's share against writers outside its pool
 {
-  // Audit finding: a pooled reader's storage was checked only against its whole pool, and its
+  // Fixed: a pooled reader's storage was checked only against its whole pool, and its
   // largest message and retention follow the reader, so one free contact of one offline agent
   // filled the operator's pool with 1 MB messages kept 90 days, and every other agent's mail was
   // refused quota_storage. Now the largest message is the smaller of the sender's and the reader's,
@@ -1695,7 +1695,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ the claim brake: claims and releases, each a checkpoint
 {
-  // Audit finding: every claim and every release is a transaction and a WAL checkpoint (db.mjs
+  // Fixed: every claim and every release is a transaction and a WAL checkpoint (db.mjs
   // settle), milliseconds on a real disk, while the subscribe brake was sized from a publish's
   // cost: one network's SUBSCRIBE/UNSUBSCRIBE churn within it held the thread. A claim made anew
   // and a release now also draw on a claim bucket, per identity and per network; a topic held
@@ -1754,7 +1754,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ deletions in batches; a restore of RESTORE_MAX claims
 {
-  // Audit findings: an UNSUBSCRIBE deleted its mailbox's whole queue in one transaction (64,000
+  // Fixed: an UNSUBSCRIBE deleted its mailbox's whole queue in one transaction (64,000
   // messages held the one thread 5 s, for one claim token), and the sweep deleted a UTC day's
   // expired messages in one (they all expire at one instant). Now no transaction deletes more than
   // DELETE_BATCH messages: the rest go in batches, a turn of the event loop each (db.mjs reap). A
@@ -1844,7 +1844,7 @@ const fresh = (name, extra = {}) => {
 
 // ================================================================ idle mailboxes and accounts: a batch a sweep
 {
-  // Audit finding: the sweep deleted every idle claim, and every idle account, in one transaction.
+  // Fixed: the sweep deleted every idle claim, and every idle account, in one transaction.
   // claims.last_used is kept by the UTC day, so every claim last used on one day goes idle in the
   // same minute: 64,000 held the one thread 4.6 s (Sybil identities reconnecting on one day, or a
   // lapsed Pro pool's 16,384). Now one sweep deletes at most DELETE_BATCH rows of every kind
@@ -1907,7 +1907,7 @@ const fresh = (name, extra = {}) => {
     return { status: res.status, after: res.headers.get('retry-after'), json: await res.json() };
   }
   const enter = async (id, opts = {}) => { const l = await login(id, opts, G); ok(l.client?.connected, `gift relay: ${id.label} logs in`); await end(l.client); };
-  // The loader, as the runbook runs it: node gifts.mjs load <file>, beside the running relay.
+  // The loader, as an operator runs it: node gifts.mjs load <file>, beside the running relay.
   const loadFile = (lines) => {
     const f = join(dir, `gifts-${randomBytes(4).toString('hex')}.jsonl`);
     writeFileSync(f, lines.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n') + '\n');
@@ -2054,11 +2054,11 @@ const fresh = (name, extra = {}) => {
 {
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   // Every variable relayPolicyFromEnv reads is in server.mjs's header, where an operator configuring
-  // the relay looks (review finding: RELAY_POW_NETWORK_DAY was missing).
+  // the relay looks (RELAY_POW_NETWORK_DAY was once missing).
   const vars = [...new Set([...read('allowance.mjs').matchAll(/whole\('(RELAY_[A-Z_]+)'|env\.(RELAY_[A-Z_]+)/g)].map((m) => m[1] ?? m[2]))];
   const header = read('server.mjs').split(/\nimport /)[0];
   ok(vars.length >= 7 && vars.every((v) => new RegExp(`\\b${v}\\b`).test(header)), `server.mjs's header names every variable relayPolicyFromEnv reads (${vars.join(', ')})`);
-  // The README's limits are the default tiers' (review finding: Pro's retention is the licence's,
+  // The README's limits are the default tiers' (Pro's retention is the licence's,
   // up to 90 days, not a flat 90), and it links the published limits document itself.
   const readme = read('README.md'), { free, pro } = DEFAULT_TIERS;
   ok(readme.includes(`| Kept | ${free.retentionDays} days, or until read | the licence's, up to ${pro.retentionDays} days |`) && readme.includes(`| Mailboxes | ${free.mailboxes} | ${pro.mailboxes.toLocaleString('en')} |`)
@@ -2084,7 +2084,7 @@ const fresh = (name, extra = {}) => {
 
 // The main relay's totals after everything above: deliveries, expiry, mailboxes given up.
 ok(totalsMatch(relay), 'the queue totals of the main relay equal its queue summed afresh');
-// M4's rows keep times by the UTC day too (plan §5 "Privacy"): a proof's or a licence's use to the
+// M4's rows keep times by the UTC day too: a proof's or a licence's use to the
 // second would tie it to the log's line of that login, and to the other rows written then.
 {
   const stamps = relay.db.raw.prepare('SELECT at AS t FROM pow_proofs').all().map((r) => r.t);

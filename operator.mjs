@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/operator.mjs — the Pro licence and the operator attestation (design/relay-plan.md §3
-// "Operator attestation", "Licence", "Errors"; §5).
+// relay/operator.mjs — the Pro licence and the operator attestation (relay/deploy/README.md
+// "The protocol in one screen", steps 2 and 6).
 //
 // Licence: what the offline issuer writes, {attestation, issuer,
 // rotations}: an attestation by the vendor's current key, ctx "sigelo-relay", claims {tier: "pro",
-// storage_mb, msgs_day, retention_days, groups, support} (design/relay-plan.md §11: what Pro sells).
+// storage_mb, msgs_day, retention_days, groups, support} (what Pro sells: relay/README.md "Limits").
 // support ("none", "email" or "priority") is what the vendor owes, not a limit the relay applies:
 // absent, it reads as Pro's "email". It is checked by licence.ts's own vendor rules (the keeper's,
 // copied; checkVendorAttestation: the vendor genesis pin, the longest vendor chain seen, recovery
@@ -14,7 +14,7 @@
 // licence. Uploaded by POST /licence and kept per operator; it counts once the operator has logged
 // in: the relay keeps the operator's chain with its account, and takes its current key from there.
 // Until then it pools nothing (live): an upload is answered the same either way, since a licence is
-// public and a refusal told its holder whether the operator logs in here (review 2026-10-28).
+// public and a refusal told its holder whether the operator logs in here.
 //
 // Operator attestation: a SPEC §5 attestation with iss = the operator's current DID, sub = the
 // agent's ORIGINAL DID, ctx "sigelo-relay/operator", admission "invite", admission_by = iss, claims
@@ -53,7 +53,7 @@
 // licence's exp while it holds, else a running gift's, else now), rounded up to a UTC day, and a
 // licence uploaded later replaces the licence and leaves gift_exp as it is. So a vendor renewing a
 // licence (issue-licence.mjs --extend-from) runs on from the old licence's exp, over any gift months
-// redeemed since: the runbook's renewal adds them. Pro is never extended past GIFT_TERM from now.
+// redeemed since: a renewal adds them. Pro is never extended past GIFT_TERM from now.
 import { canonicalize, parse } from 'sigelo';
 // licence.ts is sigelo's apps/keeper/licence.ts (MIT) byte for byte, copied because relay/ is published
 // alone; in sigelo's tree relay/site/test.mjs and release/publish.sh --relay refuse a copy that differs.
@@ -63,7 +63,7 @@ import { DAY, dayOf, hashHex } from './db.mjs';
 import { addMonths } from './gifts.mjs';
 
 export const LICENCE_CTX = 'sigelo-relay', OPERATOR_DAYS = 90;
-// Plan §1 "Tiers": support none / e-mail / priority.
+// Tiers: support none / e-mail / priority.
 export const SUPPORT = Object.freeze(['none', 'email', 'priority']);
 // A licence is kept until 30 days after its expiry (or the expiry of the licence it replaced, if
 // later), used or not, and its operator's account and chain with it (allowance.mjs accountKept):
@@ -81,8 +81,8 @@ export const GIFT_TERM = 3 * 366 * DAY;
 // vendor_key of a row that holds gift months and no licence.
 const NO_LICENCE = '';
 // POST /licence per address prefix and minute. An upload costs at most 2 × 16 signature checks
-// plus the kept chain (16 junk rotations: ~105 ms of the one thread, measured on a phone-class
-// CPU), so 3 a minute stay under the login verify budget per prefix (auth.mjs VERIFY_BUDGET,
+// plus the kept chain (16 junk rotations: ~105 ms of the one thread, measured on a low-end
+// ARM64 CPU), so 3 a minute stay under the login verify budget per prefix (auth.mjs VERIFY_BUDGET,
 // ~1 s). An operator uploads once a term.
 export const LICENCE_RATE = 3;
 // The claims' keys, sorted: without support, and with it.

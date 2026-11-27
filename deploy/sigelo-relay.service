@@ -7,7 +7,7 @@
 # /etc/sigelo-relay.env, the database in /var/lib/sigelo-relay (0700). It runs as sigelo-relay, a
 # system user with no shell and no ssh. `systemctl reload` sends SIGHUP: the relay re-reads its
 # certificate, connections stay. Logs go to the journal namespace sigelo-relay, kept 7 days by
-# /etc/systemd/journald@sigelo-relay.conf (plan §5 "Privacy").
+# /etc/systemd/journald@sigelo-relay.conf (README.md, "What it logs and keeps").
 [Unit]
 Description=sigelo relay: MQTT broker with sigelo login, mailboxes, store-and-forward
 After=network-online.target

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// relay/mailbox.mjs — mailboxes, invite topics and store-and-forward (design/relay-plan.md §3
-// "Topics", "Retention", "Errors"). Envelopes are opaque bytes here: the relay never decrypts.
+// relay/mailbox.mjs — mailboxes, invite topics and store-and-forward (relay/deploy/README.md
+// "The protocol in one screen", steps 4 and 5). Envelopes are opaque bytes here: the relay never decrypts.
 //
 //   m/<32 hex>  a mailbox: the first identity to subscribe claims it and alone reads it; anyone
 //               logged in may write to it. QoS 1; a message is deleted when the reader acknowledges
@@ -147,7 +147,7 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     const c = db.claim(topic);
     // Nobody reads this topic: dropped at the cost of one read, as any broker drops a publish
     // without subscribers, and the writer is told. A reader claims its topics before its contacts
-    // write (contacts.md §5, plan §3 "Topics"), but one away longer than it claimed ahead has not:
+    // write, but one away longer than it claimed ahead has not:
     // a silent drop cost the writer the rest of an epoch whose first envelope this was (every later
     // one fails epoch_unknown at the reader) while it believed each one sent. Only a writer who
     // knows the topic learns that nobody holds it now.

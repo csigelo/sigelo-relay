@@ -10,7 +10,7 @@
 // left unfinished (a deadline, a budget, a cap before the CONNACK), a keepalive required, the
 // session caps after the login so they tell nobody who is online, and a database of an earlier
 // version rebuilt, and `node server.mjs` as systemd runs it (its environment, SIGHUP, SIGTERM).
-// design/relay-plan.md §3, §7 M3. Prints "ALL PASS (n)".
+// relay/deploy/README.md "The protocol in one screen". Prints "ALL PASS (n)".
 //   node relay/test/run.mjs
 import { spawn } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
@@ -124,7 +124,7 @@ const closed = (c) => new Promise((resolve) => { if (c.disconnected || !c.connec
   ok((await fetch(`${base()}/nothing`)).status === 404 && (await fetch(`${base()}/challenge`, { method: 'POST' })).status === 405, 'unknown path 404, wrong method 405');
 }
 
-// ---- plan §3 "Login", pinned from the fixture seeds: the bytes a client written elsewhere must
+// ---- the login (relay/deploy/README.md, steps 1 and 2), pinned from the fixture seeds: the bytes a client written elsewhere must
 // produce, not this relay's own derivation checked against itself.
 {
   const ALICE = 'did:sigelo:zCDFLqw3LyauWECBARhAVhEN4rG3vbfVx2baQD6y5RDXm', ALICE_CLIENT = 's1296f1d5b2c502a16414944c';
@@ -284,7 +284,7 @@ let a, b;
   ok(!late.client && lc.json.check === 'challenge_expired', `a challenge answered 300 s later: challenge_expired (${lc.json.check})`);
 }
 {
-  // Review finding: spent nonces are forgotten once expired, and were judged by the clock of the
+  // Fixed: spent nonces are forgotten once expired, and were judged by the clock of the
   // moment, so a clock stepped back (an NTP step, a VM restored) made a used and forgotten nonce
   // good again: its captured password logged in a second time. On a relay with a clock of its own:
   // a login, the clock 301 s on and another login (which forgets the first nonce), the clock back
@@ -419,7 +419,7 @@ let a, b;
   if (lpo.client) await end(lpo.client);
   await refused(t1, {}, 'bundle', 'the thief\'s chain again, through opal\'s DID');
   await refused(t1, { bundle: false }, 'bundle', 'the thief without a bundle: its cached login went when opal took her DID back');
-  // The audit's case: una's chain is una -> una 1 -> una 2, and she logs in. A thief holding the
+  // The case: una's chain is una -> una 1 -> una 2, and she logs in. A thief holding the
   // key of una 1, which she rotated away from, logs in with its genesis alone as an original of
   // its own. Before, that took the row of una 1 from her account, and every later login of hers
   // was refused "bundle", a recovery from her head included.
@@ -1113,7 +1113,7 @@ const getStats = async (r = relay) => { const res = await fetch(`${base(r)}/stat
   ok(!text.includes('did:sigelo:') && dids.every((d) => !text.includes(d) && !text.includes(d.slice(11))), `no DID anywhere in the database file, its WAL or the log (${dids.length} DIDs, ${files.length} files, ${lines.length} log lines)`);
   const topics = [...dump.claims.map((r) => r.topic), ...dump.messages.map((r) => r.topic)];
   ok(topics.length > 0 && topics.every((t) => /^[mi]\/[0-9a-f]{32}$/.test(t)), `every topic stored is a random m/ or i/ name (${topics.length})`);
-  // Who wrote to whom, and when, is not in the file (plan §5 "Privacy"): every time it holds is the
+  // Who wrote to whom, and when, is not in the file: every time it holds is the
   // start of a UTC day, and a message row has no time of its own. A second-exact time on the
   // writer's account and on the reader's message or claim joined the two, and a log line's time to both.
   const TIMES = { accounts: ['created', 'last_seen'], claims: ['created', 'last_used', 'expires'], messages: ['expires'] };
@@ -1232,7 +1232,7 @@ function walStates(r, name, tag = name) {
   await W.close();
 }
 {
-  // The audit of the WAL's order: what was written for a writer landed just before the commit of
+  // The WAL's order: what was written for a writer landed just before the commit of
   // the message it wrote next: (a) its claims' day of use, at its first connection of a UTC day;
   // (b) its chain and chain_dids, at its login after a rotation; (c) a new identity's proof,
   // account and claim. Now a claim's day waits in memory for the sweep, as a login's does, and
@@ -1282,7 +1282,7 @@ function walStates(r, name, tag = name) {
   await W.close();
 }
 {
-  // The audit of the pages: a WITHOUT ROWID table has no rowid, but SQLite places each new cell
+  // The pages' order: a WITHOUT ROWID table has no rowid, but SQLite places each new cell
   // below the last in a b-tree page, so sorting a page's cells by offset gave the order they were
   // inserted in, across accounts: an invite, its answer and both sides of each pairing side by
   // side. The sweep rebuilds the tables of identities in key order every hour (db.mjs keepSorted),
@@ -1355,7 +1355,7 @@ function walStates(r, name, tag = name) {
   ok(await until(() => !s2.connected) && s1.connected, 'it sends 600 KB more, past the /24\'s budget of 1.5 MB: closed at once; the first stays');
   ok(await until(() => !s1.connected, 4000) && P.partial() === 0, 'the first is closed once its packet is not whole 1.5 s after it began, and the budget is free again');
   for (const c of [s1, s2]) c.end(true);
-  // The audit's case: sockets that never log in, each announcing a CONNECT of 256 KB (the largest)
+  // The case: sockets that never log in, each announcing a CONNECT of 256 KB (the largest)
   // and sending 4 bytes of it. Counted by the length announced, 128 of them from 8 networks held
   // 32 MB, past this relay's 4 MB for packets before the CONNACK, and every login was closed before
   // its CONNACK; counted by the bytes they hold, 512.
@@ -1491,8 +1491,8 @@ function walStates(r, name, tag = name) {
   const again = await fetchPark(h), unknown = await fetchPark(hashOf('00000000')), malformed = await fetchPark('K7F3-Q9ZP');
   ok([again, unknown, malformed].every((x) => x.status === 404 && x.json.check === 'park_unknown') && JSON.stringify(again.json) === JSON.stringify(unknown.json) && JSON.stringify(unknown.json) === JSON.stringify(malformed.json),
     'one use: the second fetch is park_unknown (404), word for word as a hash nobody parked and a malformed one');
-  // Review 2026-10-28, MEDIUM 3: a code holder fetches the code, then parks its own long code under
-  // the same hash at once, and the intended contact's lookup got the re-parked code, not park_unknown.
+  // A code holder fetches the code, then parks its own long code under
+  // the same hash at once, and the intended contact's lookup would get the re-parked code, not park_unknown.
   // A fetched hash stays taken until the original exp (a tombstone); then it is free again.
   const repark = await park(bob, { code_hash: h, invite: longCode(bob), exp: now + 600 }), victim = await fetchPark(h, '203.0.113.10');
   ok(repark.json.ok === false && repark.json.check === 'park_taken' && victim.status === 404 && victim.json.check === 'park_unknown',
@@ -1612,7 +1612,7 @@ function walStates(r, name, tag = name) {
   ok((await look4('100.64.9.1')).status === 404, 'lookups: the relay-wide count starts afresh the next 10 minutes');
   now -= 600;
   await pr4.close();
-  // Review 2026-10-28 (also observed): POST /park answered park_taken for a live hash without
+  // POST /park used to answer park_taken for a live hash without
   // consuming it and outside the relay-wide lookup ceiling, a liveness oracle. A park that reaches
   // the hash is now charged as a lookup: here a network's share is 1, so its second park is rate.
   const pr5 = await startRelay({ ...cfg, db: join(dir, 'park-oracle.db'), park: { lookupsAll: { n: 8, window: 600 } } });
@@ -1674,7 +1674,7 @@ function walStates(r, name, tag = name) {
   const c21 = await cancel6(alice, hC, { ip: '192.0.2.151' }), g21 = await get6(hashOf('CANCEL04'), '192.0.2.152');
   ok(cs.every((x) => x === 400) && c21.status === 429 && c21.json.check === 'rate' && c21.after === String(600 - (now % 600)) && g21.status === 429,
     `DELETE /park/<hash>: 20 per 10 minutes per /24 with the GETs, counted before the body and the login: the 21st rate (429), and a GET from that network too (${cs.slice(0, 3).join()}…; ${c21.status} ${c21.after}; ${g21.status})`);
-  // Enrolment codes (park.mjs "Enrolment codes", the agent-setup feedback points 2 and 12): up to a day, fetched
+  // Enrolment codes (park.mjs "Enrolment codes"): up to a day, fetched
   // again until the parker's cancel (the operator's grant), ENROL_FETCHES at most; an invite keeps an hour.
   {
     const hN = hashOf('ENR0LL01'), hP = hashOf('ENR0LL02'), hX = hashOf('ENR0LL03');
