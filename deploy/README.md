@@ -202,7 +202,7 @@ out). Not metered yet.
 `--final` takes the placeholder vendor DID only while pro.md says Pro is coming soon, and wants
 `site/launch.json` naming the sigelo-agent and sigelo-contact npm served when it was written), www.sigelo.ai
 and http:// redirect to it, and relay.sigelo.ai serves the front page, `/relay.json`, `/llms.txt`,
-its own `robots.txt`, and proxies the three HTTP calls to the relay on `127.0.0.1:8791`, and `/mqtt`
+its own `robots.txt`, and proxies the relay's HTTP calls (`/groups` and `/group/` too) to `127.0.0.1:8791`, and `/mqtt`
 as a WebSocket upgrade (below); any other path there redirects to sigelo.ai. Its header lists the headers it sets (HSTS for a year, a
 `Link: </llms.txt>; rel="describedby"` on every response of sigelo.ai and relay.sigelo.ai over TLS,
 Cache-Control, CORS open on `index.json`, `relay.json` and `llms.txt`).

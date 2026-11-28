@@ -829,10 +829,10 @@ if (conf) {
   const locs = (s) => Object.fromEntries((s?.blocks ?? []).map((b) => [b.head, everyDirective(b)]));
   ok(servers.every((s) => s.blocks.every((b) => !everyDirective(b).some((d) => d.startsWith('add_header ')))), 'nginx: no add_header in a location (it would drop every inherited header)');
   const rl = locs(relay);
-  ok(['location = /challenge', 'location = /check', 'location = /park', 'location ^~ /park/', 'location = /licence', 'location = /gift'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
+  ok(['location = /challenge', 'location = /check', 'location = /park', 'location ^~ /park/', 'location = /licence', 'location = /gift', 'location = /groups', 'location ^~ /group/'].every((l) => rl[l]?.includes('proxy_pass http://127.0.0.1:8791') && rl[l].some((d) => d.startsWith('limit_req zone=')))
     && rl['location = /relay.json'] && rl['location = /llms.txt'] && rl['location = /robots.txt']?.includes('try_files /relay-robots.txt =404')
     && rl['location /']?.includes('return 301 https://sigelo.ai$request_uri') && rl['location = /']?.includes('try_files /index.html =404'),
-  'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence, /gift to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
+  'nginx: relay.sigelo.ai proxies /challenge, /check, /park, /park/<hash>, /licence, /gift, /groups, /group/<name> to 127.0.0.1:8791 under a rate limit, serves the front page, relay.json, llms.txt and its robots.txt, sends the rest to sigelo.ai');
   // A browser's request to a relay call is refused before the relay charges it: the relay counts
   // logins and challenges per network before it reads a body, so any web page could otherwise spend
   // that budget from its visitors' browsers and lock every agent on their /24 or /48 out.
@@ -842,8 +842,8 @@ if (conf) {
     .filter((b) => !b.blocks.some((x) => x.head === 'if ($sigelo_browser)' && x.directives.join() === 'return 403')).map((b) => b.head);
   const proxied = servers.flatMap((s) => s.blocks.filter((b) => everyDirective(b).some((d) => d.startsWith('proxy_pass '))));
   const browserMap = conf.blocks.find((b) => b.head === 'map $http_sec_fetch_site$http_origin $sigelo_browser')?.directives ?? [];
-  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 8 && browserGaps(conf).length === 0,
-    `nginx: /challenge, /check, /park, /park/<hash>, /licence, /gift and /mqtt answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
+  ok(browserMap.join('|') === 'default 1|"" 0|none 0' && proxied.length === 10 && browserGaps(conf).length === 0,
+    `nginx: /challenge, /check, /park, /park/<hash>, /licence, /gift, /groups, /group/<name> and /mqtt answer 403 to a request a browser makes (Sec-Fetch-Site or Origin), before it reaches the relay${browserGaps(conf).length ? ` (lacking: ${browserGaps(conf).join(', ')})` : ''}`);
   // MQTT over WebSocket (relay/server.mjs): the upgrade passed on over HTTP/1.1, unbuffered, with
   // timeouts above 1.5 times the longest keepalive the relay allows (600 s), and Upgrade and
   // Connection set at the server's level beside X-Real-IP (a location setting its own would drop it).

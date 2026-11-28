@@ -11,6 +11,7 @@
 // relay's counts, CORS open, cached a minute, no DID or hash); /_stats/ (401 without its password); /llms.txt (200, text); https://<relay>/relay.json (200, JSON, CORS
 // open, cached an hour, its first fields);
 // https://<relay>/challenge?did=… (200, a relay-login body naming this relay, a whole pow_bits);
+// https://<relay>/groups when the challenge says home (200, {ok, groups});
 // MQTT over TLS on <relay>:8883 answering a CONNECT without credentials with CONNACK 4 (check
 // `password`), and nothing else: 0 means the login was accepted, 3 the login rate or the relay
 // itself failing (`internal`); a timeout or a closed socket is a failure too; the certificate on
@@ -105,13 +106,22 @@ await check('/stats (counts only)', `https://${RELAY}/stats`, (r, b) => {
   else if (r.status !== 401 || !/^Basic /i.test(r.headers.get('www-authenticate') ?? '') || /goaccess|sigelo relay: counts/i.test(body)) fail(name, `status ${r.status}, WWW-Authenticate ${r.headers.get('www-authenticate')}`);
   else pass(name);
 }
+let homes = false;
 await check('/challenge', `https://${RELAY}/challenge?did=${PROBE_DID}`, (r, b) => {
   const j = JSON.parse(b), c = j.challenge ?? {};
   if (c.typ !== 'relay-login') return `challenge.typ ${JSON.stringify(c.typ)}, want "relay-login"`;
   if (c.relay !== RELAY) return `challenge.relay ${JSON.stringify(c.relay)}, want "${RELAY}" (RELAY_HOST)`;
   if (c.did !== PROBE_DID) return 'challenge.did is not the DID asked for';
+  homes = j.home === 'sigelo-home/0';
   return Number.isInteger(j.pow_bits) ? '' : 'pow_bits is not a whole number';
 });
+// Home groups (GET /challenge says home): the listed supergroups through nginx, JSON from the relay.
+if (homes) {
+  await check('/groups', `https://${RELAY}/groups`, (r, b) => {
+    const j = JSON.parse(b);
+    return j.ok === true && Array.isArray(j.groups) ? '' : 'not the relay\'s {ok, groups} (nginx proxies /groups and /group/)';
+  });
+}
 
 // An MQTT 3.1.1 CONNECT with no username or password: client id "sigelo-check", clean session,
 // keepalive 60 s. The relay must refuse it with CONNACK 4 (check `password`: no username). Any
