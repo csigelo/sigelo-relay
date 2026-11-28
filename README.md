@@ -13,7 +13,7 @@ RELAY_HOST=relay.example.org RELAY_TLS_CERT=fullchain.pem RELAY_TLS_KEY=privkey.
 
 ## Run your own
 
-You need a Linux VPS with a domain name, Node.js 22.18+ (tested on 24), nginx and a Let's Encrypt
+You need a Linux VPS with a domain name, Node.js 22.18+, nginx and a Let's Encrypt
 certificate; open ports 80, 443 and 8883. The relay is one program and one SQLite file: agents
 connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/licence`, `/gift`,
 [`/stats`](https://relay.sigelo.ai/stats) and [`/relay.json`](https://relay.sigelo.ai/relay.json)
@@ -37,6 +37,7 @@ connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/l
 | `RELAY_VENDOR_DID` | `SIGELO_VENDOR_DID`, else a placeholder | vendor genesis licences chain to |
 | `RELAY_PRO_STORAGE_MB` | 1024 | the most a Pro pool queues |
 | `RELAY_FREE_QUEUE_MB` | half the disk's room below 70 % | free tier's ceiling: messages, identity rows |
+| `RELAY_HOME`, `RELAY_OPERATOR_DID` | on, unset | home groups; supergroup slots' seller |
 
 ## Limits
 
@@ -50,15 +51,15 @@ connect on 8883 (MQTT over TLS), nginx on 443 serves `/challenge`, `/check`, `/l
 | Support | none | the licence's |
 
 A contact costs its reader one mailbox per retention week plus one: about 32 contacts free. Pro
-clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: 3×8 free, 50×64 Pro. Invite topics: 4
-messages, 64 KB, 7 days. Presence: one 512-byte `p/` marker per reader.
+clients set `SIGELO_RELAY_RETENTION_DAYS`. Groups: 3×8 free, 50×64 Pro; homed here 3×8, Pro
+50×1,000, owner pays. Invite topics: 4 messages, 64 KB, 7 days. Presence: one
+512-byte `p/` marker per reader.
 
-Short codes: 40 bits, 60 s to an hour (default 10 minutes), fetched once or cancelled
-(`DELETE /park/<hash>`). With 50,000 parked, one network's guesses (20 per 10 minutes) hit one
-at most 1 in 183,000 an hour; all networks' (600), 1 in 6,100; one code 3.3 × 10⁻⁹ an hour. Enrolment codes: up
-to a day, fetched until the grant (8 at most), base proof of work, uncounted.
+Short codes: 40 bits, 60 s to an hour (default 10 minutes), fetched once or cancelled; guessing
+odds: `park.mjs`. Enrolment codes: up to a day, fetched until the grant (8 at most), base proof of
+work, uncounted. GRP codes: until the link ends, many fetches.
 
-Proof of work: 2^`pow_bits` Argon2id tries of 64 MiB (0.5 s each on a phone), one to check. Per
+Proof of work: 2^`pow_bits` Argon2id tries of 64 MiB (0.5 s each on a phone). Per
 /24 or /48: 8 from 8 new identities a day, unredeemed challenges counted, 10 from 64. The 64th
 proof closes it for a day, operators' agents too. A SHA-256 proof: `client_old`.
 Publishes: 20 a second per identity; per network 200 each for free, pooled and unproven ones. At 70 % disk: no new identity, mailbox
@@ -73,9 +74,9 @@ Kept: accounts as SHA-256 of the original DID; claims; envelopes until read or e
 rotations, encrypted; licences until 30 days past the term sold. Times by the UTC day;
 proof-of-work counts per network in memory only. Known limits: `deploy/README.md`.
 
-It sees who reads and writes which topics, when, and sizes (to 256 bytes); it cannot read,
-forge, or replay into a client. Login signs its own body (`typ:"relay-login"`), so a world's
-`sign-challenge` logs in nobody.
+It sees who reads and writes which topics, when, and sizes (to 256 bytes); of a group, entry
+headers and counts; it cannot read, forge, or replay into a client. Login signs its own body
+(`typ:"relay-login"`), so a world's `sign-challenge` logs in nobody.
 
 ## Licence
 

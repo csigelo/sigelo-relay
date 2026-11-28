@@ -33,6 +33,8 @@ mailboxes and get store-and-forward while offline. One SQLite file.
 | `RELAY_PUSH` | on | `off`: no UnifiedPush wakes, and GET /challenge does not offer them (`push.mjs`) |
 | `RELAY_PUSH_KEY` | `push.key` beside `RELAY_DB` | the wakes' key file: the seal of the registrations at rest and the VAPID key; made at the first start, 0600; lost or replaced, the registrations kept no longer open and each phone registers again at its next login. `backup.sh` archives it as `push.key`, 0600; to restore, with the relay stopped and before `--restore`: `install -m 0600 -o sigelo-relay -g sigelo-relay push.key /var/lib/sigelo-relay/push.key` (over the one the first start made) |
 | `RELAY_TURN_SECRET_FILE` | the systemd credential `turn-secret`, if any | coturn's `static-auth-secret`, one line: logged-in identities get TURN credentials (`turn.mjs`) and GET /challenge says `turn`; none = no TURN ("STUN and TURN" below) |
+| `RELAY_HOME` | on | `off`: no home-relay groups (`home.mjs`), and GET /challenge does not say `home` |
+| `RELAY_OPERATOR_DID` | unset | this relay's operator identity, its original DID, as the signed registry lists it: the supergroup slots it sells are checked against it (`node home.mjs slot <file>`, step 8); unset: none sold |
 | `RELAY_CLOSED_OPERATOR` | unset (open) | a closed relay: the original DIDs of its operators, comma-separated, at most 8 (Closed relay) |
 
 ## Closed relay
@@ -281,7 +283,8 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
   not who.
 - **Operator view, on the host only**: `curl -s http://127.0.0.1:8791/stats` (no X-Real-IP) adds
   `active_identities_7d` and `active_identities_30d`, the accounts whose `last_seen` (day of the last
-  login, already kept: What the relay keeps) is in the last 7 or 30 UTC days. nginx sets X-Real-IP on every request it
+  login, already kept: What the relay keeps) is in the last 7 or 30 UTC days, and `groups` {total, rows}: the home
+  groups and their log rows (`home.mjs`). nginx sets X-Real-IP on every request it
   forwards, so the public `/stats` never carries them (`test/run.mjs`). `deploy/stats.sh` reads this
   view, so `/_stats/` (basic auth) may show them.
 - **`https://sigelo.ai/_stats/`**, basic auth: `index.html` (GoAccess over the site's
@@ -389,7 +392,103 @@ Counts only, server-side: no script, cookie or tracker on the public pages.
    (share 75; 525 + a reserve of 75). A short code is kept as long as its inviter asks, 60 s to an
    hour (`PARK_TTL` 3600; default 10 minutes); the odds that guesses find one: `park.mjs`.
 
+8. **Home-relay groups** (`home.mjs`, `sigelo-home/0`; the wire: sigelo's `apps/contact/GROUPS.md`).
+   GET /challenge says `home: "sigelo-home/0"`. A member whose own relay is elsewhere logs in here as
+   a client (proof of work once) and pays nothing; relays never talk to each other.
+   - Control requests: JSON published (QoS 1) to `$sigelo/home`, at most 16 KiB, every one
+     `{v: "sigelo-home/0", typ, topic: "g/<32 hex>", …}` with exactly its keys: `create {write, admin,
+     members, channel}` (the session's account becomes the owner, who pays); `epoch {epoch, write,
+     admin, parts, members, channel, sig?}`; `open {epoch, since, as, proof}`; `close {forget}`;
+     `forget {account, sig}`; `door {door, exp, cap, sig}`; `undoor {door, sig}`; `handover {op,
+     chain}`; `name {card, chain, listed}`; `moved {seq}`, `end {seq}`; `drop {}`. `write` and `admin`
+     are the epoch's Ed25519 public keys (32 bytes, base64url). `sig` (64 bytes, base64url) is by the
+     epoch's admin key over `"sigelo-home/0 control\n"` ‖ JCS(the request without `sig`); an `epoch`
+     from the owner's own session needs none. `proof` is by the epoch's write key (`as: "member"`) or
+     admin key (`as: "admin"`) over `"sigelo-home/0 open\n"` ‖ topic ‖ epoch (4 bytes) ‖ the session's
+     account (64 hex) ‖ the UTC day number (4 bytes; yesterday's and tomorrow's pass). The answer
+     comes on `$sigelo/notice` before the PUBACK: `{code: "home", typ, topic, id, …}` (`created`,
+     `opened {epoch, first, last, current}`, `pending`, `door {exp}`, …), or a refusal `{code, detail,
+     id}`. Control requests draw on the subscribe brake too.
+   - An entry: one PUBLISH (QoS 1) to `g/<32 hex>`. The relay reads bytes 0-71 only: version 2, kind 3,
+     flags (admin credential, keep, letters part), keep slot (1-8 state, 9 avatar), epoch, and the
+     credential: Ed25519 by the epoch's write key, or its admin key with the admin flag, over
+     `"sigelo-home/0 entry\n"` ‖ topic ‖ bytes 0-7 ‖ SHA-256(bytes 72 to the end). It numbers the row
+     (`seq` 1, 2, 3…), keeps it to the owner's retention (14 days free, 90 Pro, a slot's), a kept row
+     until its slot's next, and sends it to every session that opened the group as lane (1 byte, 0) ‖
+     seq (8 bytes) ‖ the bytes, QoS 0. An open first sends the rows after `since` up to that epoch's
+     end (rows of earlier epochs too), 1,024 at a time, then live rows. Rows are not deleted on read; a member opens from its last seq at every
+     connection. SUBSCRIBE to the topic is granted (QoS 0) only after an open; it is not needed.
+   - A renewal: `epoch` registers the next epoch's keys and its count of letters parts; the parts go
+     under the current epoch with the letters flag; after the last the relay switches. A session open
+     under the old epoch reads to the last part, then gets `{code: "home", typ: "epoch", epoch}`; an
+     entry under it is `home_epoch`. One pending for 10 minutes; one switch per 10 s, 200 a day.
+   - The door: `door` registers a link's `d/<32 hex>` (16 a group, up to 366 days, `cap` 1-500 a UTC
+     day). Anyone logged in publishes one request (kind 4, 1,426 bytes to 16 KiB) a day per link; it is
+     stored as a lane 1 row and sent only to sessions opened `as: "admin"`.
+   - GRP codes: POST /park with a group invite (base64url, `sigelo-group/2`) under
+     SHA-256(`"sigelo-group/2 code"` ‖ the code), by an account that opened the group as admin, for a
+     live door, until the invite's exp. GET /park/<hash> hands it out as often as asked (`group:
+     true`), charged as a lookup; DELETE /park/<hash> by an admin; it goes with its door.
+   - The owner: `moved` or `end` names the owner's last entry; the log takes no more (`home_closed`),
+     its doors and name go, its rows stay to the retention so members read the end, then the group
+     goes. `drop` deletes it at once. `handover` is sent by the new owner's session with the owner's
+     signed `handover` body and chain, checked against the chain this relay keeps; the new owner pays.
+     A handover whose `at` is older than the last one taken is a replay (`home_request`, column `homes.handed`).
+     A group nobody opened or wrote for 30 days, past its retention, goes.
+   - Supergroups: the operator signs a slot (a SPEC §5 attestation, ctx `sigelo-relay/group-name`,
+     `sub` the group owner's original DID, admission `invite` by itself, claims `{relay, name, members,
+     storage_mb, retention_days}`, at most 366 days), laid out as a licence file, on its own machine:
+     `node home.mjs slot issue <operator identity file> <owner DID> <name> --members N --storage-mb N
+     --retention-days N [--days 366] --relay <host> > slot.json` (a plain identity file; the key never
+     needs to be on the relay), and loads it with
+     `RELAY_DB=… RELAY_HOST=… RELAY_OPERATOR_DID=… node home.mjs slot <file>` beside the running relay.
+     A name another owner holds (its slot, or 90 days after) is refused at load.
+     Its owner's `name` binds the name to a group with a signed card; `GET /group/<name>` answers
+     `{card, slot, chain, issuer}` (checked offline: SPEC §9 accepts the slot under the operator, and
+     the card's signature under the owner's key); a public card carries a live link's invite of that
+     group, a private one no invite and no avatar; `GET /groups[?after=<name>]` lists the listed public
+     ones (name, about), 100 a page. Both on the public-code brake. The name is kept 90 days past the slot for renewal. The
+     nightly backup (`backup.sh`) holds the slots and cards with the groups' state (never their rows): after a
+     restore a name points at its group again, members read on from a gap in `seq`.
+   - Limits (the owner's tier, `allowance.mjs` TIERS `homeGroups`, `homeMembers`): free 3 groups of 8
+     here, Pro the licence's groups (50) of 1,000, a slot its members. Members = accounts that opened
+     the group in the last 30 days: a new one past the cap is `home_cap`. Largest entry 512 KiB free,
+     1 MiB Pro or slot; 2 entries a second a group (burst 20) free, 20 (200) paid, in three buckets
+     (member-credential entries, admin-credential entries, door requests: neither a fast member nor a flood
+     of requests holds back an admin's kick or renewal); a renewal names at most the tier's members or
+     those of its last switch (an owner whose Pro ended still renews); keep slots 4 MiB or
+     3 KiB a member; in channel mode a member-credential entry 4 KiB; 64 groups open a session. Every
+     row is charged to the owner's storage (with its mailboxes; a free owner's in the free ceiling),
+     its size, at least 256, plus 384; the writer's messages today count as for a mailbox.
+   - Refusals: `home_request` (the shape), `home_unknown`, `home_taken`, `home_owner` (not the owner's
+     session), `home_limit`, `home_cap`, `home_epoch` (stale, pending, too soon, no renewal for a
+     letters part), `home_credential`, `home_channel`, `home_door` (unknown, expired, closed, its cap),
+     `home_once`, `home_closed`, `home_name`, `home_slot`, `group_entry` (the head's layout, as
+     GROUPS.md names it), and `quota_storage` (side `owner`), `quota_messages`, `rate`, `too_large`,
+     `pow`, `relay_full`.
+
+## What a home relay sees
+
+It reads only the first 72 bytes of an entry and the first two of a door request; it never holds a
+group key and never decrypts. It learns: which accounts open a group and when (accounts are hashes
+of public DIDs: whoever holds a DID finds it), so the group's size; which session sent each row and
+when, in memory only; which rows use the admin credential (who acts as admin) and which are letters
+(when someone left or was removed, and how many letters there were); door requests' number and
+times; the owner's account (it pays); sizes, counts and `seq` order. Not a text, name, role list,
+reaction, vote, mid, mention or reply, nor any key. A copy of the database holds ciphertext,
+day-rounded times, the epochs' public keys, the owner's account per group, doors, GRP invites and
+supergroup cards (both public by design); the wake lists are sealed under the push key file. It can
+refuse, delay or drop rows, show members different logs, or stop a group (members see gaps and an
+`at` beyond what they were served; the owner's `moved` recovers it); it cannot read, forge, alter,
+or let a stranger or a removed member write or read after a renewal.
+
 ## What the relay keeps
+
+Home groups (`home.mjs`): per group its owner's account and pool, day made and last used, epoch,
+seq, the epochs' public keys and seq ranges, doors, GRP invites, the rows as received (no writer, no
+time but the expiry day), and the wake list sealed (accounts and the day of their last open); a
+supergroup's slot and card. Rows go at the retention (kept ones at their slot's next, or the end);
+a group 30 days unused past it, or at `drop`.
 
 Push registrations (`push.mjs`, `sigelo-push/0`): one per account, its endpoint URL and RFC 8291 keys sealed under
 `RELAY_PUSH_KEY`, the day of its last registration; gone 90 days after it, with the account, at a 404 or 410 from
@@ -488,6 +587,12 @@ still fits; the unit caps the relay at 3 GB.
   and anything else to that contact until its next round, and begins a new epoch.
 - An invite topic lives 7 days after its claim, whatever the code's own expiry, which the relay
   cannot read (4 messages / 64 KB at most).
+- A home group's members are the accounts that opened its current epoch in 30 days (its wake list);
+  who has its write key is not known to the relay. A kicked member reads until the renewal's letters;
+  the relay forgets its account only when an admin sends `forget`. A row wakes (push.mjs) each account
+  on the list with no session that opened the group here (a door row: admins only), one wake until it
+  logs in again, so each member's app registers push at every home relay it uses. The wake lists and days of use are written each minute: a crash
+  loses at most a minute of them.
 - MQTT over WebSocket comes through nginx from 127.0.0.1: the relay counts its `X-Real-IP`, so a
   relay reached by WebSocket without nginx in front (or with a proxy of its own on the host that
   sets no `X-Real-IP`) counts every such client as one network.

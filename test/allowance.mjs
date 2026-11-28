@@ -1437,8 +1437,9 @@ const fresh = (name, extra = {}) => {
   const t = D.tier(agd).limits, f = D.tier(frd).limits;
   ok(up.ok && t.retentionDays === 90 && t.retention === 90 * DAY && t.maxMessage === MB && t.mailboxes === 16384 && t.storage === 5120 * MB && t.groups === 5 && t.groupMembers === 64 && t.support === 'priority',
     'a licence selling 365 days, 8 GB, 5 groups and priority support, under the default tiers: 90 days, 1 MB messages, 16,384 mailboxes, Pro\'s 5 GB, 5 groups of up to 64 members, support "priority"');
-  ok(ta?.tier === 'pro' && ta.groups.max === 5 && ta.groups.members === 64 && tf?.tier === 'free' && tf.groups.max === 3 && tf.groups.members === 8 && notices(la.client).length === 0,
-    `each login is told its group tier, $sigelo/notice "tier": the pooled agent ${JSON.stringify(ta?.groups)} (${ta?.detail}), a free identity ${JSON.stringify(tf?.groups)}; no refusal among them`);
+  ok(ta?.tier === 'pro' && ta.groups.max === 5 && ta.groups.members === 64 && tf?.tier === 'free' && tf.groups.max === 3 && tf.groups.members === 8 && notices(la.client).length === 0
+    && ta.home?.max === 5 && ta.home.members === 1000 && tf.home?.max === 3 && tf.home.members === 8 && t.homeGroups === 5 && f.homeMembers === 8,
+    `each login is told its group tier, $sigelo/notice "tier": the pooled agent ${JSON.stringify(ta?.groups)}, home ${JSON.stringify(ta?.home)} (${ta?.detail}), a free identity ${JSON.stringify(tf?.groups)}, home ${JSON.stringify(tf?.home)}; no refusal among them`);
   // A licence selling fewer groups than free gives: the pool keeps free's (a pool never below free's).
   const ope = identity('operator e'), age = identity('agent e');
   (await login(ope, {}, R)).client?.end(true);

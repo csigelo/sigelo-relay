@@ -48,6 +48,7 @@ import { DAY } from './db.mjs';
 import { PRESENCE } from './presence.mjs';
 import { PUSH_TOPIC } from './push.mjs';
 import { TURN_TOPIC } from './turn.mjs';
+import { DOOR, GROUP, HOME_TOPIC } from './home.mjs';
 
 export const MAILBOX = /^m\/[0-9a-f]{32}$/, INVITE = /^i\/[0-9a-f]{32}$/, NOTICE = '$sigelo/notice';
 export const MAX_MESSAGE = 256 * 1024, INVITE_MESSAGES = 4, INVITE_BYTES = 64 * 1024, INVITE_TTL = 7 * DAY;
@@ -88,7 +89,8 @@ const live = (c, now) => c !== undefined && !c.dead && (c.expires === null || c.
 // presence: presence.mjs's, for p/ topics (none: they are refused as any other topic). guard:
 // park.mjs's, for the mailboxes of public codes: check(topic, writer, now) refuses (paused, cap,
 // revoked, one a day), count(topic, writer, now) once a publish is stored.
-export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null, guard = null, push = null, turn = null }) {
+// home: home.mjs's, for g/, d/ and $sigelo/home (none: refused as any other topic).
+export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {}, stats = null, members = null, presence = null, guard = null, push = null, turn = null, home = null }) {
   // The row each queued message is stored in, by its payload Buffer. Aedes wraps a publish in new
   // packet objects on its way to the reader but always passes the payload Buffer along by
   // reference, and the payload is all the relay knows a message by; a weak key frees with it.
@@ -193,7 +195,8 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     if (!session) return cb(refusal('no session'));
     const marker = presence !== null && PRESENCE.test(packet.topic), pushing = push !== null && packet.topic === PUSH_TOPIC;
     const turning = turn !== null && packet.topic === TURN_TOPIC;
-    if (!marker && !pushing && !turning && !MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
+    const homing = home !== null && (packet.topic === HOME_TOPIC || GROUP.test(packet.topic) || DOOR.test(packet.topic));
+    if (!marker && !pushing && !turning && !homing && !MAILBOX.test(packet.topic) && !INVITE.test(packet.topic)) return cb(refusal('topic'));
     if (packet.qos !== 1) return cb(refusal('qos'));   // store-and-forward is QoS 1 (0 is not stored, 2 not offered)
     packet.retain = false;                              // nothing is retained by Aedes: a presence marker is held by presence.mjs
     let r, rated;
@@ -201,6 +204,8 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
     // fails (disk full, a bug) closes this connection instead; the client retransmits later.
     try {
       rated = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'publish', now: clock(), prefix: session.prefix }) ?? null;
+      // A control request (home.mjs) draws on the subscribe brake too: an open is a subscription.
+      if (!rated && homing && packet.topic === HOME_TOPIC) rated = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'subscribe', now: clock(), prefix: session.prefix }) ?? null;
       if (turning) {
         // A TURN credential (turn.mjs): for an identity that has proven its work, at most PER_HOUR an hour; no strike.
         packet.topic = SINK;
@@ -208,6 +213,21 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
         packet.payload = Buffer.alloc(0);
         if (t.turn) return client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify({ code: 'turn', id: packet.messageId, turn: t.turn })), qos: 0, retain: false }, () => cb(null));
         return notify(client, t.code, t.detail, () => cb(null), packet.messageId);
+      }
+      if (homing && !rated) {
+        // A home group's entry, door request or control request (home.mjs): stored and sent to
+        // the group's sessions by home.mjs itself, never routed by Aedes. A control request's
+        // answer is a notice written before the PUBACK, as a refusal is; then its rows go (then).
+        const h = home.publish(client, session, packet);
+        packet.topic = SINK; packet.payload = Buffer.alloc(0);
+        if (h && h.answer) {
+          client.publish({ topic: NOTICE, payload: Buffer.from(JSON.stringify({ code: 'home', ...h.answer, id: packet.messageId })), qos: 0, retain: false }, () => cb(null));
+          h.then?.();
+          return;
+        }
+        if (h === null) return cb(null);
+        policy.strike?.({ account: session.account, clientId: session.clientId, now: clock() });
+        return notify(client, h.code, h.detail, () => cb(null), packet.messageId, h.side);
       }
       r = rated || (pushing ? push.register(session.account, packet.payload) : marker ? presence.store(client, session, packet) : store(session, packet));
       // Every refused publish is a strike (allowance.mjs RATE): a no_reader or a quota costs the
@@ -271,6 +291,13 @@ export function mailboxes({ db, clock, diskFull, sessionOf, online, policy = {},
       const r = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'subscribe', now: clock(), prefix: session.prefix });
       if (r) return notify(client, r.code, r.detail, () => cb(null, null));
       return cb(null, { ...sub, qos: 0 });
+    }
+    // A home group's topic: granted at QoS 0 to a session that opened it (home.mjs sends its rows
+    // either way), on the subscribe brake.
+    if (home !== null && GROUP.test(sub.topic)) {
+      const r = policy.rate?.({ account: session.account, clientId: session.clientId, kind: 'subscribe', now: clock(), prefix: session.prefix });
+      if (r) return notify(client, r.code, r.detail, () => cb(null, null));
+      return cb(null, home.subscribable(client, sub.topic) ? { ...sub, qos: 0 } : null);
     }
     const invite = INVITE.test(sub.topic);
     if (!invite && !MAILBOX.test(sub.topic)) return cb(null, null);   // granted 128: no wildcards, no other topics

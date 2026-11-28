@@ -6,7 +6,8 @@
 //                 nonce (policy.powBits, M4: pow.mjs, which counts it as waiting until a login
 //                 spends it, policy.powSpent; 0 without it), pow: {v: 1, alg: "argon2id", m, t,
 //                 p}, the function it is proved with (policy.powParams; absent without it),
-//                 push: "sigelo-push/0" (push.mjs), turn: "sigelo-turn/0" (turn.mjs), each only where taken }
+//                 push: "sigelo-push/0" (push.mjs), turn: "sigelo-turn/0" (turn.mjs), home: "sigelo-home/0"
+//                 (home.mjs: groups may live here), each only where taken }
 //                 &enrol=<code hash>: a live enrolment code under it states the base (park.mjs
 //                 enrolGrace; charged as a lookup). A proof of the dropped SHA-256 kind: client_old.
 //   MQTT CONNECT  username = current DID, client id = "s" + 24 hex of SHA-256(original DID),
@@ -16,6 +17,8 @@
 //   GET  /stats   the relay's counts, no identifier (stats.mjs)
 //   POST /park, GET /park/<hash>, DELETE /park/<hash>   short invite codes (park.mjs), when a parking is given;
 //                 POST /park/<hash> {login, paused?, cap?} sets a public code's (sigelo-public/0)
+//   GET  /group/<name>  a supergroup's name card (home.mjs card): {card, slot, chain, issuer} | 404;
+//   GET  /groups[?after=<name>]  the listed public ones, [{name, about}], 100 a page by name; both on the public-code brake (park.mjs)
 //   POST /licence a Pro licence file → {ok: true, operator, exp, chain, claims} | {ok: false, check, detail}
 //                 (policy.licence, M4: operator.mjs)
 //   POST /gift    {username, client_id, password, code_hash}: a gift code redeemed by the operator
@@ -52,6 +55,7 @@ import { NOTICE } from './mailbox.mjs';
 import { CLIENT_OLD } from './pow.mjs';
 import { PUSH_V } from './push.mjs';
 import { TURN_V } from './turn.mjs';
+import { HOME_V } from './home.mjs';
 
 export const V = 'sigelo-relay/0';
 // The body a login signs: a type of its own, never a SPEC §5.2 challenge. An agent's general-purpose
@@ -207,7 +211,7 @@ function checkPow(pow, ctx, policy) {
 // asked, all stored).
 // log(line): never a DID or topic. closed: closed.mjs's, on a closed relay (null: open): a login it
 // does not admit is refused `closed`, and no challenge asks proof of work.
-export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null, push = false, turn = false }) {
+export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERIFY_BUDGET, maxSessions = MAX_SESSIONS, maxPerPrefix = MAX_PER_PREFIX, unprovenSeconds = UNPROVEN_SECONDS, policy = {}, log, stats = null, park = null, closed = null, push = false, turn = false, home = null }) {
   const sessions = new WeakMap();   // Aedes client → { account, clientId, prefix }
   const prefixes = new WeakMap();   // Aedes client → address cut to /24 or /48
   const counted = new WeakMap();    // Aedes client with a session → its prefix, until its socket closes
@@ -618,7 +622,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
     if (!Number.isInteger(bits) || bits < 0 || bits > 64) throw new Error('policy.powBits: not a whole number of bits, 0 to 64');
     // pow: the function the proof is computed with and its cost (pow.mjs), so a client refuses one it
     // does not know rather than search in vain.
-    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }), ...(push && { push: PUSH_V }), ...(turn && { turn: TURN_V }) };
+    return { challenge: loginBody(d, host, newNonce(d, exp, bits, network)), pow_bits: bits, ...(!closed && policy.powParams && { pow: policy.powParams }), ...(push && { push: PUSH_V }), ...(turn && { turn: TURN_V }), ...(home && { home: HOME_V }) };
   }
   // prefix: the login rate is already charged to it (before the body was read).
   async function check(body, prefix) {
@@ -717,7 +721,7 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         try { park.charge('lookup', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); }
         const asked = url.pathname.slice('/park/'.length), enrol = park.isEnrol(asked, clock()), invite = park.fetch(asked, clock());
         if (invite === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no code parked under this hash: mistyped, used, or expired (10 minutes unless its inviter chose up to an hour; an enrolment code up to a day)' });
-        return send(200, { ok: true, invite, ...(enrol && { enrol: true }) });
+        return send(200, { ok: true, invite, ...(enrol && { enrol: true }), ...(park.isGroup?.(asked, clock()) && { group: true }) });
       }
       // Cancel a parked code (park.mjs): reaching the hash is a lookup, charged before the body or the
       // login; then the parker's login; a miss and another's entry answer the same 404.
@@ -753,6 +757,16 @@ export function auth({ db, host, clock, diskFull, loginRate, verifyBudget = VERI
         try { r = park.set(url.pathname.slice('/park/'.length), o.session.account, { paused: body.paused, cap: body.cap }, clock()); } catch (e) { if (!(e instanceof ParkError)) throw e; return send(200, { ok: false, check: e.check, detail: e.detail }); }
         if (r === null) return send(404, { ok: false, check: 'park_unknown', detail: 'no public code of yours under this hash: mistyped, revoked, or ended' });
         return send(200, { ok: true, ...r });
+      }
+      // A supergroup's name card, the listed ones (home.mjs): public by design, on the public-code brake.
+      if (home && req.method === 'GET' && (url.pathname === '/groups' || url.pathname.startsWith('/group/'))) {
+        if (park) { try { park.charge('public', httpPrefix(req), clock()); } catch (e) { return send(429, { ok: false, check: e.check, detail: e.detail }, e.retryAfter); } }
+        if (url.pathname === '/groups') return send(200, { ok: true, groups: home.listing(clock(), url.searchParams.get('after') ?? '') });
+        let asked = '';
+        try { asked = decodeURIComponent(url.pathname.slice('/group/'.length)); } catch {}
+        const c = home.card(asked, clock());
+        if (c === null) return send(404, { ok: false, check: 'home_name', detail: 'no group has this name here, or its slot ended' });
+        return send(200, { ok: true, ...c });
       }
       // MQTT over WebSocket is an upgrade (server.mjs); a plain request gets here.
       if (url.pathname === WS_PATH) throw httpFail(426, 'MQTT over WebSocket: send a WebSocket upgrade with subprotocol mqtt');

@@ -764,7 +764,7 @@ ok(priceLine && proPrice && same(index.tiers.pro.price.periods, proPrice.periods
 'index.json: the price is pro.md\'s; pro.md\'s table: 1, 6, 12 months, gross only, adding up; no net amount on any page or agent file');
 // relay_sees names what each row of privacy.md's table keeps (A14).
 const SEES = { 'Log of logins': '/24 or /48 in the relay log', 'Web server errors': 'web server error line', 'Web access log': 'web access log of sigelo.ai and relay.sigelo.ai, for visit counts', 'Encrypted messages': 'sizes', 'Per identity': 'DID and its key rotations', "An operator's licence": 'licences (Pro)',
-  Backups: 'encrypted nightly backup, each copy kept 7 days' };
+  Backups: 'encrypted nightly backup, each copy kept 7 days', 'A group homed here': 'a group homed here: its encrypted log' };
 const rows = [...src.privacy.matchAll(/^\| ([^|]+?) \| [^|]+ \|$/gm)].map((m) => m[1]).filter((x) => x !== 'What' && !/^-+$/.test(x));
 const sees = index.crypto.relay_sees.join('\n'), missing = rows.filter((x) => !Object.entries(SEES).some(([k, v]) => x.startsWith(k) && sees.includes(v)));
 ok(rows.length === Object.keys(SEES).length && missing.length === 0, `index.json: relay_sees names what each row of privacy.md's table keeps${missing.length ? ` (missing: ${missing.join('; ')})` : ''}`);
@@ -1476,13 +1476,15 @@ ok(src.terms.includes('never receives or holds a seed, private key or other mean
   && src.terms.includes('The Seller may refuse a DID used for them and end its licence without refund; messages already delivered are not erased.')
   && src.terms.includes('A licence ends at its expiry, or earlier on refund or under §8.') && src.terms.includes('pay it by bank transfer, or in Monero less the stated discount.'),
   'terms: paid by bank transfer or in Monero; no custody; refund of a licence not yet on the relay within 14 days, or when §9\'s warranty fails unfixed for 14 days; no auto-renewal; as is; liability capped at 12 months\' payments; abuse or a refund ends a licence');
-// The nightly backup (deploy/backup.sh: licences and licensed operators' rows, 7 archives kept) is a
+// The nightly backup (deploy/backup.sh: licences, licensed operators' and group owners' rows, home groups' state, 7 archives kept) is a
 // copy the table names; an identity without a recovery key is erased by disuse only.
 const backupSh = readFileSync(join(RELAY, 'deploy', 'backup.sh'), 'utf8');
-ok(src.privacy.includes("| Backups: licences and licensed operators' rows, encrypted | 7 days more |") && /\| tail -n \+8 \| xargs -r rm -f/.test(backupSh)
+ok(src.privacy.includes("| Backups, encrypted: licences; licensed operators' and group owners' rows; groups homed here, without their log | 7 days more |") && /\| tail -n \+8 \| xargs -r rm -f/.test(backupSh)
   // gifts and gift_campaigns: code hashes and counts, nothing of an identity (relay/gifts.mjs).
-  && /^TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"$/m.test(backupSh),
-  'privacy: the encrypted backup of licences and licensed operators\' rows, 7 days more, as deploy/backup.sh keeps them (7 archives)');
+  && /^TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns homes home_epochs home_doors home_codes home_names"$/m.test(backupSh)
+  // home groups: their state, slots and cards, never home_rows (the log); owners' accounts as operators' are
+  && !/home_rows/.test(backupSh.match(/^TABLES=.*$/m)[0]) && /account IN \(SELECT owner FROM homes\)/.test(backupSh),
+  'privacy: the encrypted backup of licences, licensed operators\' and group owners\' rows and the groups homed here without their log, 7 days more, as deploy/backup.sh keeps them (7 archives)');
 ok(erasure.includes('Sooner, or to see the data, if the identity has a **recovery key** (any site can obtain identity-key signatures), where the identity file and `recovery.key` are:'), 'privacy: a request takes the recovery key; without one, disuse is the only way');
 // Where the servers are: stated once, in the seller line.
 ok(src.privacy.includes('`contact@sigelo.io`. Servers in the EU.') && src.privacy.split('Servers in').length === 2 && !/\bEU hosting provider\b/.test(src.privacy),

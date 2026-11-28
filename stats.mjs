@@ -22,6 +22,8 @@
 // last 7 or 30 UTC days, today included. No new column, no new retention. auth.mjs gives that view
 // only to a request on the loopback port with no X-Real-IP (curl on the host); nginx sets X-Real-IP
 // on every request it forwards, so the public https://relay.sigelo.ai/stats never carries them.
+// It also adds groups {total, rows}: home groups and their log rows (home.mjs), no size, member
+// count or name. Usage counts stay the operator's: the public view has none of a new kind.
 import { DAY, dayOf } from './db.mjs';
 
 export const KEEP_DAYS = 90, HISTORY_DAYS = 30, CACHE_SECONDS = 60;
@@ -57,7 +59,8 @@ function counted(json) {
 // relay's operators, original DIDs (closed.mjs), or null: the one identifier the report holds,
 // public by the operator's choice (deploy/README.md "Closed relay").
 // → { count(kind, name?), sessions(n), flush(now), report({ operator }?), close() }.
-export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed = null }) {
+// groups() → home.mjs's counts {total, rows} (home groups and their log rows), or null without it.
+export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed = null, groups = () => null }) {
   const raw = db.raw;
   raw.exec(SCHEMA);
   const has = (t) => raw.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t) !== undefined;
@@ -117,7 +120,7 @@ export function relayStats({ db, clock, sessions = () => 0, policy = {}, closed 
       const body = api.publicReport();
       if (!operator) return body;
       const d = dayOf(clock()), since = (n) => one('SELECT count(*) AS n FROM accounts WHERE last_seen >= ?', d - (n - 1) * DAY);
-      return { ...body, active_identities_7d: since(7), active_identities_30d: since(30) };
+      return { ...body, active_identities_7d: since(7), active_identities_30d: since(30), groups: groups() ?? { total: 0, rows: 0 } };
     },
     publicReport() {
       const now = clock();

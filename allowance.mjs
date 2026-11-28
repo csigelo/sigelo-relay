@@ -35,7 +35,7 @@
 // and its first claim or message is refused "pow". A login whose operator attestation pools
 // nothing still succeeds, on the free tier, and is told why ("operator" or "licence") as soon as
 // it is connected. Every login is then told its group tier, once connected: $sigelo/notice {code:
-// "tier", detail, tier: free | pro, groups: {max, members}} (TIERS groups and groupMembers, the
+// "tier", detail, tier: free | pro, groups: {max, members}, home: {max, members}} (TIERS groups and groupMembers, the
 // licence's groups claim for a pool): groups live in the clients (apps/contact/group.mjs), which count
 // the groups an identity made and its members against it; the relay counts only messages.
 //
@@ -80,12 +80,14 @@ export const windowWeeks = (retentionDays) => Math.ceil(retentionDays / 7) + 1;
 // whole pool (15 each). pro.storage is 5 GB. groups: chat groups an identity may
 // make (free 3, Pro 50, a pool never
 // below free's); groupMembers: the members of one, the maker included, fixed per tier (8, 64), no
-// claim: it bounds fan-out, which msgsDay counts copy by copy.
+// claim: it bounds fan-out, which msgsDay counts copy by copy. homeGroups, homeMembers: home-relay
+// groups (home.mjs) an owner may make at this relay (the licence's groups claim for a pool) and the
+// members of one (free 3 and 8; Pro 50 and 1,000); their rows are charged to the owner's storage.
 export const TIERS = Object.freeze({
-  free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 3, groupMembers: 8, support: 'none' }),
-  pro: Object.freeze({ storage: 5120 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 50, groupMembers: 64, support: 'email' }),
+  free: Object.freeze({ storage: 100 * MB, msgsDay: 3000, retentionDays: 14, maxMessage: 512 * KB, mailboxes: 128, groups: 3, groupMembers: 8, homeGroups: 3, homeMembers: 8, support: 'none' }),
+  pro: Object.freeze({ storage: 5120 * MB, msgsDay: 50000, retentionDays: 90, maxMessage: 1 * MB, mailboxes: 16384, groups: 50, groupMembers: 64, homeGroups: 50, homeMembers: 1000, support: 'email' }),
 });
-const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes', 'groups', 'groupMembers'];
+const COUNTS = ['storage', 'msgsDay', 'retentionDays', 'maxMessage', 'mailboxes', 'groups', 'groupMembers', 'homeGroups', 'homeMembers'];
 // What a queued message is charged: its payload, at least MESSAGE_FLOOR, plus MESSAGE_ROW for the
 // row that holds it. The payload alone let empty messages queue free of charge: a row of db.mjs's
 // messages table takes 333 bytes on disk with its four index entries (measured over 100,000 empty
@@ -360,13 +362,14 @@ export function relayPolicy({ db, host, clock, log = () => {} }, config = {}) {
       limits: {
         storage: sold(lic.storage_mb * MB, 'storage'), msgsDay: sold(lic.msgs_day, 'msgsDay'), retentionDays, retention: retentionDays * DAY,
         maxMessage: pro.maxMessage, mailboxes: pro.mailboxes, groups: sold(lic.groups, 'groups'), groupMembers: pro.groupMembers, support: lic.gift ? pro.support : lic.support,
+        homeGroups: sold(lic.groups, 'homeGroups'), homeMembers: pro.homeMembers,
       },
     };
   }
   // The group tier notice of an allowance (the header): free or pro, and its groups.
   const groupTier = (t) => {
-    const tier = t.pool ? 'pro' : 'free', g = { max: t.limits.groups, members: t.limits.groupMembers };
-    return { code: 'tier', detail: `${tier}: ${g.max} groups made, up to ${g.members} members each`, tier, groups: g };
+    const tier = t.pool ? 'pro' : 'free', g = { max: t.limits.groups, members: t.limits.groupMembers }, home = { max: t.limits.homeGroups, members: t.limits.homeMembers };
+    return { code: 'tier', detail: `${tier}: ${g.max} groups made, up to ${g.members} members each; ${home.max} home groups here, up to ${home.members}`, tier, groups: g, home };
   };
   // What the free tier's ceiling counts: every queued message's charge and the identity rows.
   const freeUsed = () => (s.queued.get('*')?.bytes ?? 0) + db.rowBytes();

@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-only
-# deploy/backup.sh — the relay host's nightly backup: licences, operator chains, the push key and
-# config, encrypted with age; never a mailbox.
+# deploy/backup.sh — the relay host's nightly backup: licences, operator chains, home groups' state
+# and supergroup slots, the push key and config, encrypted with age; never a mailbox or a group's rows.
 #
 #   backup.sh                   as root (sigelo-relay-backup.timer, daily): the archive
 #                               <admin home>/backup/relay-state-<stamp>.tgz.age, admin user 0600, 7 kept
@@ -18,7 +18,12 @@
 # vendor_chain whole, and each licensed operator's rows of accounts and chain_dids (its chain,
 # sealed as the relay keeps it, so a recovery from a stolen key stays in force after a restore);
 # and the gift codes whole (gifts, gift_campaigns: hashes and counts, gifts.mjs), so a code used
-# before a restore stays used when its batch is loaded again.
+# before a restore stays used when its batch is loaded again. Of the home groups (home.mjs): homes,
+# home_epochs, home_doors, home_codes and home_names whole (each group's owner, epochs' public keys,
+# links, GRP invites, the supergroup slots and cards: a group and its name survive a restore, and a
+# slot needs no reload), with each owner's rows of accounts and chain_dids; never home_rows (the
+# entries, ciphertext, like a mailbox's messages): homes goes out with bytes and keep_bytes 0, as
+# no row comes back, and members see a gap in seq. The wake lists stay sealed under the push key.
 # Messages, claims, counters, proofs and pool rows are left out: agents pool again at their next
 # login with their operator attestation, and counters may be lost. The extract is read in
 # one transaction, so its tables agree with each other.
@@ -44,7 +49,9 @@ DB=${RELAY_DB:-/var/lib/sigelo-relay/relay.db}
 PUSH_KEY=${RELAY_PUSH_KEY:-$(dirname "$DB")/push.key}
 ADMIN=${ADMIN:-csigelo}
 RECIPIENT_FILE=/etc/sigelo-relay-backup.recipient
-TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns"
+TABLES="licences operator_retired vendor_chain accounts chain_dids gifts gift_campaigns homes home_epochs home_doors home_codes home_names"
+# restored without replacing a row the database has: a REPLACE of a homes row would cascade to its live rows
+KEEP_TABLES="homes home_epochs home_doors home_codes home_names"
 
 die() { echo "backup.sh: $*" >&2; exit 1; }
 # setpriv, not su or runuser: no PAM session inside the backup's systemd unit
@@ -78,12 +85,15 @@ const [, , src, out] = process.argv;
 const db = new DatabaseSync(src, { readOnly: true }), x = new DatabaseSync(out);
 // A failed extract leaves no file that could pass for one.
 process.on('uncaughtException', (e) => { x.close(); rmSync(out, { force: true }); console.error(e.message); process.exit(1); });
-const OPERATORS = 'WHERE account IN (SELECT operator FROM licences)';
-const copy = (table, where = '') => {
+const has = (table) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+// A relay with RELAY_HOME=off (or older than home.mjs) has no home tables: the extract then holds them empty.
+const HOME = has('homes');
+const OPERATORS = `WHERE account IN (SELECT operator FROM licences)${HOME ? ' OR account IN (SELECT owner FROM homes) OR account IN (SELECT owner FROM home_names)' : ''}`;
+const copy = (table, where = '', select = '*') => {
   const def = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
   if (!def) throw new Error(`extract: ${src} has no table ${table}: not a relay database, or one older than the licence code`);
   x.exec(def.sql);
-  const rows = db.prepare(`SELECT * FROM ${table} ${where}`).all();
+  const rows = db.prepare(`SELECT ${select} FROM ${table} ${where}`).all();
   for (const r of rows) {
     const cols = Object.keys(r);
     x.prepare(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
@@ -93,6 +103,12 @@ const copy = (table, where = '') => {
 db.exec('BEGIN');   // one snapshot for every table
 x.exec('BEGIN');
 const n = [copy('licences'), copy('operator_retired'), copy('vendor_chain'), copy('accounts', OPERATORS), copy('chain_dids', OPERATORS), copy('gifts'), copy('gift_campaigns')];
+if (HOME) {
+  // homes without its rows' charge: home_rows stays out, so nothing is charged after a restore
+  const cols = db.prepare("SELECT name FROM pragma_table_info('homes')").all().map((c) => c.name);
+  n.push(copy('homes', '', cols.map((c) => (c === 'bytes' || c === 'keep_bytes' ? `0 AS ${c}` : c)).join(', ')));
+  for (const t of ['home_epochs', 'home_doors', 'home_codes', 'home_names']) n.push(copy(t));
+}
 x.exec('COMMIT');
 db.exec('COMMIT');
 console.log(`extract: ${n.join(', ')}`);
@@ -105,9 +121,10 @@ restore() {  # restore FILE
   if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet sigelo-relay.service; then
     die "sigelo-relay is running: systemctl stop sigelo-relay first (it keeps state in memory and would overwrite the rows)"
   fi
-  as_relay node --input-type=module - "$DB" "$1" "$TABLES" <<'JS'
+  as_relay node --input-type=module - "$DB" "$1" "$TABLES" "$KEEP_TABLES" <<'JS'
 import { DatabaseSync } from 'node:sqlite';
-const [, , dst, file, tables] = process.argv;
+const [, , dst, file, tables, keepTables] = process.argv;
+const keep = new Set(keepTables.split(' '));
 const db = new DatabaseSync(dst);
 db.prepare('ATTACH DATABASE ? AS b').run(file);
 const n = [];
@@ -115,11 +132,15 @@ db.exec('BEGIN');
 try {
   for (const t of tables.split(' ')) {
     const cols = db.prepare(`SELECT name FROM pragma_table_info(?, 'b')`).all(t).map((c) => c.name);
-    if (cols.length === 0) throw new Error(`restore: the extract has no table ${t}`);
+    if (cols.length === 0) {
+      // an extract from before home groups, or from a relay with RELAY_HOME=off
+      if (keep.has(t)) { n.push(`${t} none`); continue; }
+      throw new Error(`restore: the extract has no table ${t}`);
+    }
     const have = new Set(db.prepare(`SELECT name FROM pragma_table_info(?, 'main')`).all(t).map((c) => c.name));
     const missing = cols.filter((c) => !have.has(c));
     if (missing.length) throw new Error(`restore: ${dst} table ${t} lacks ${missing.join(', ')}: start this relay version once so it creates its tables`);
-    const r = db.prepare(`INSERT OR REPLACE INTO main.${t} (${cols.join(', ')}) SELECT ${cols.join(', ')} FROM b.${t}`).run();
+    const r = db.prepare(`INSERT OR ${keep.has(t) ? 'IGNORE' : 'REPLACE'} INTO main.${t} (${cols.join(', ')}) SELECT ${cols.join(', ')} FROM b.${t}`).run();
     n.push(`${t} ${r.changes}`);
   }
   db.exec('COMMIT');
@@ -128,11 +149,13 @@ console.log(`restore: ${n.join(', ')}`);
 JS
 }
 
-# --self-test: a database made by the relay's own code (openDb, relayPolicy: every table it has),
-# one licensed operator and one free agent with a claimed mailbox, a queued message, pool, proof and
-# daily rows; then extract() as the timer runs it. The extract must hold exactly the seven tables,
-# only the operator's rows of accounts and chain_dids, and no byte of the agent's: not its
-# account, its sealed chain, its topic or its message.
+# --self-test: a database made by the relay's own code (openDb, relayPolicy, homes: every table it has),
+# one licensed operator, one free agent with a claimed mailbox, a queued message, pool, proof and
+# daily rows, and a group owner's home group with an epoch, a row, a door, a GRP code and a name;
+# then extract() as the timer runs it. The extract must hold exactly the twelve tables, only the
+# operator's and the group owner's rows of accounts and chain_dids, homes without its rows' charge,
+# and no byte of the agent's (its account, sealed chain, topic or message) or of the group's row.
+# Then --restore of it, twice, into a new database the relay's code made.
 self_test() {
   [ "$(id -u)" != 0 ] || die "--self-test runs without root (as root the extract runs as sigelo-relay)"
   here=$(cd "$(dirname "$0")/.." && pwd)
@@ -144,11 +167,13 @@ import { pathToFileURL } from 'node:url';
 const [, , here, file] = process.argv;
 const { openDb, hashHex } = await import(pathToFileURL(`${here}/db.mjs`));
 const { relayPolicy } = await import(pathToFileURL(`${here}/allowance.mjs`));
+const { homes } = await import(pathToFileURL(`${here}/home.mjs`));
 // test-vectors.json's first DID: a well-formed vendor DID; the rows below are written directly
 const VENDOR = 'did:sigelo:zF5FYbH5zNLX5pfd7DZUjPirXeAFzLVxrdFyCrnexdpBG';
 const db = openDb(file);
-relayPolicy({ db, host: 'relay.example', clock: () => 1767225600 }, { vendor: VENDOR, freeQueue: 1 << 20 });
-const r = db.raw, op = hashHex('operator'), agent = hashHex('agent'), day = 1767225600;
+const policy = relayPolicy({ db, host: 'relay.example', clock: () => 1767225600 }, { vendor: VENDOR, freeQueue: 1 << 20 });
+homes({ db, host: 'relay.example', clock: () => 1767225600, policy, sealKey: Buffer.alloc(32, 7) });
+const r = db.raw, op = hashHex('operator'), agent = hashHex('agent'), owner = hashHex('group owner'), day = 1767225600;
 const run = (sql, ...a) => r.prepare(sql).run(...a);
 run('INSERT INTO licences (operator, current, vendor_key, iat, exp, storage_mb, msgs_day, retention_days, groups, support) VALUES (?, ?, ?, ?, ?, 1000, 50000, 90, 0, ?)', op, op, VENDOR, day, day + 86400 * 365, 'email');
 run('INSERT INTO operator_retired VALUES (?, ?)', hashHex('operator old key'), op);
@@ -165,6 +190,17 @@ run('INSERT INTO vouched VALUES (?, ?)', agent, day + 86400);
 run('INSERT INTO pool_sent VALUES (?, ?, 3)', op, 20454);
 run('INSERT INTO gifts (code_hash, campaign, months, expires, redeemed) VALUES (?, ?, 6, ?, 1)', hashHex('a gift code'), 'launch', day + 86400 * 30);
 run('INSERT INTO gift_campaigns VALUES (?, 1, 1)', 'launch');
+// a home group of the owner: its epoch, a row (the entry, never extracted), a door with a GRP code, its supergroup name
+const g = 'g/' + 'cd'.repeat(16), d = 'd/' + 'ef'.repeat(16);
+run('INSERT INTO accounts (account, created, last_seen, chain) VALUES (?, ?, ?, ?)', owner, day, day, Buffer.from('OWNER-CHAIN'));
+run('INSERT INTO chain_dids VALUES (?, ?)', hashHex('owner did'), owner);
+run('INSERT INTO homes (topic, owner, created, last_used, epoch, seq, cap, wake) VALUES (?, ?, ?, ?, 1, 1, 8, ?)', g, owner, day, day, Buffer.from('SEALED-WAKE'));
+run('INSERT INTO home_epochs VALUES (?, 1, ?, ?, 1, NULL)', g, Buffer.alloc(32, 1), Buffer.alloc(32, 2));
+run('INSERT INTO home_rows (topic, seq, lane, payload, bytes, expires) VALUES (?, 1, 0, ?, 17, ?)', g, Buffer.from('GROUP-ROW-PAYLOAD'), day + 14 * 86400);
+run('INSERT INTO home_doors (door, topic, exp, cap) VALUES (?, ?, ?, 500)', d, g, day + 86400 * 30);
+run('INSERT INTO home_codes VALUES (?, ?, ?, ?)', hashHex('a grp code'), d, 'INVITE', day + 86400 * 30);
+run('INSERT INTO home_names (name, owner, topic, slot, slot_exp, members, storage, retention) VALUES (?, ?, ?, ?, ?, 1000, 0, ?)', 'community', owner, g, Buffer.from('{"slot":1}'), day + 86400 * 366, 90 * 86400);
+if (r.prepare('SELECT bytes FROM homes').get().bytes === 0) throw new Error('the home_rows trigger charged nothing');
 db.close();
 process.exit(0);
 JS
@@ -186,14 +222,15 @@ import { createHash } from 'node:crypto';
 const file = process.argv[2], x = new DatabaseSync(file, { readOnly: true }), bad = [];
 const h = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const tables = x.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((t) => t.name).join(' ');
-if (tables !== 'accounts chain_dids gift_campaigns gifts licences operator_retired vendor_chain') bad.push(`tables: ${tables}`);
+if (tables !== 'accounts chain_dids gift_campaigns gifts home_codes home_doors home_epochs home_names homes licences operator_retired vendor_chain') bad.push(`tables: ${tables}`);
 const rows = (sql) => x.prepare(sql).all().map((o) => Object.values(o).join('|')).join(',');
-if (rows('SELECT account FROM accounts') !== h('operator')) bad.push('accounts: not the operator\'s row alone');
-if (rows('SELECT did, account FROM chain_dids') !== `${h('operator did')}|${h('operator')}`) bad.push('chain_dids: not the operator\'s row alone');
-for (const t of ['licences', 'operator_retired', 'vendor_chain', 'gifts', 'gift_campaigns']) if (x.prepare(`SELECT count(*) AS n FROM ${t}`).get().n !== 1) bad.push(`${t}: not its one row`);
+if (rows('SELECT account FROM accounts ORDER BY account') !== [h('operator'), h('group owner')].sort().join(',')) bad.push('accounts: not the operator\'s and the group owner\'s rows alone');
+if (rows('SELECT did, account FROM chain_dids ORDER BY did') !== [`${h('operator did')}|${h('operator')}`, `${h('owner did')}|${h('group owner')}`].sort().join(',')) bad.push('chain_dids: not the operator\'s and the group owner\'s rows alone');
+for (const t of ['licences', 'operator_retired', 'vendor_chain', 'gifts', 'gift_campaigns', 'homes', 'home_epochs', 'home_doors', 'home_codes', 'home_names']) if (x.prepare(`SELECT count(*) AS n FROM ${t}`).get().n !== 1) bad.push(`${t}: not its one row`);
+if (rows('SELECT bytes, keep_bytes FROM homes') !== '0|0') bad.push('homes: the rows\' charge went out with it');
 x.close();
 const bytes = readFileSync(file);
-for (const s of [h('agent'), h('agent did'), 'AGENT-CHAIN-SEALED', 'ab'.repeat(16), 'MAILBOX-PAYLOAD-BYTES']) if (bytes.includes(s)) bad.push(`the extract holds the agent's ${s.slice(0, 24)}`);
+for (const s of [h('agent'), h('agent did'), 'AGENT-CHAIN-SEALED', 'ab'.repeat(16), 'MAILBOX-PAYLOAD-BYTES', 'GROUP-ROW-PAYLOAD']) if (bytes.includes(s)) bad.push(`the extract holds the agent's or a group row's ${s.slice(0, 24)}`);
 if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
 JS
   # The push key: copied 0600 beside the extract (as the timer does) and archived 0600, its bytes whole.
@@ -208,7 +245,36 @@ JS
   [ "$m" = -rw------- ] || die "self-test FAILED: the archive holds the push key $m, not -rw------- (0600)"
   rm "$s/x/push.key"; PUSH_KEY=$t/none
   [ -z "$(keep_push_key "$s/x")" ] && [ ! -e "$s/x/push.key" ] || die "self-test FAILED: keep_push_key without a key file"
-  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the seven tables, the licensed operator's rows only, nothing of a mailbox ($(cat "$t/out")); the push key is archived 0600"
+  # --restore into a new relay database (its tables made by the relay's code), the extract twice: the
+  # second time nothing is replaced (a home table keeps what it has; the rest equal)
+  node --input-type=module - "$here" "$t/new.db" <<'JS' || die "self-test: making the restore target failed (above)"
+import { pathToFileURL } from 'node:url';
+const [, , here, file] = process.argv;
+const { openDb } = await import(pathToFileURL(`${here}/db.mjs`));
+const { relayPolicy } = await import(pathToFileURL(`${here}/allowance.mjs`));
+const { homes } = await import(pathToFileURL(`${here}/home.mjs`));
+const db = openDb(file);
+const policy = relayPolicy({ db, host: 'relay.example', clock: () => 1767225600 }, { vendor: 'did:sigelo:zF5FYbH5zNLX5pfd7DZUjPirXeAFzLVxrdFyCrnexdpBG', freeQueue: 1 << 20 });
+homes({ db, host: 'relay.example', clock: () => 1767225600, policy, sealKey: Buffer.alloc(32, 7) });
+db.close();
+process.exit(0);
+JS
+  DB=$t/new.db
+  restore "$s/x/relay-licences.db" > "$t/restored" || die "self-test FAILED: --restore: $(cat "$t/restored")"
+  restore "$s/x/relay-licences.db" > "$t/restored2" || die "self-test FAILED: --restore again: $(cat "$t/restored2")"
+  node --input-type=module - "$t/new.db" <<'JS' || die "self-test FAILED: the restored database (above)"
+import { DatabaseSync } from 'node:sqlite';
+const db = new DatabaseSync(process.argv[2], { readOnly: true }), bad = [];
+const one = (sql) => db.prepare(sql).get();
+for (const t of ['licences', 'gifts', 'homes', 'home_epochs', 'home_doors', 'home_codes', 'home_names']) if (one(`SELECT count(*) AS n FROM ${t}`).n !== 1) bad.push(`${t}: not its one row`);
+if (one('SELECT count(*) AS n FROM accounts').n !== 2) bad.push('accounts: not the two kept');
+if (one('SELECT count(*) AS n FROM home_rows').n !== 0) bad.push('home_rows came back');
+const g = one('SELECT seq, bytes, keep_bytes FROM homes');
+if (g.seq !== 1 || g.bytes !== 0 || g.keep_bytes !== 0) bad.push(`homes: seq ${g.seq}, bytes ${g.bytes}, keep_bytes ${g.keep_bytes}`);
+if (one("SELECT topic FROM home_names WHERE name = 'community'")?.topic !== 'g/' + 'cd'.repeat(16)) bad.push('home_names: the name lost its group');
+if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
+JS
+  echo "backup.sh --self-test: the scratch layout is 0711 with x/ 0700; the extract holds the twelve tables, the licensed operator's and the group owner's rows only, nothing of a mailbox or a group's rows ($(cat "$t/out")); the push key is archived 0600; --restore takes it back twice ($(cat "$t/restored2"))"
 }
 
 case ${1:-} in

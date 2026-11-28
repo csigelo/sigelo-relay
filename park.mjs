@@ -78,6 +78,13 @@
 // through `guard` (mailbox.mjs): revoked or expired (public_revoked), paused (public_paused), the
 // day's cap reached (public_cap), one answer per account per code per UTC day (public_once). The
 // day's count is kept in memory and written by the sweep each minute.
+// GRP codes (home-relay groups, home.mjs codes): a third kind, parked by POST /park with a long
+// group invite (base64url, sigelo-group/2) under SHA-256("sigelo-group/2 code" ‖ the GRP code), by
+// an admin of its group, for a live door of it here, until the invite's exp (at most its door's and
+// 366 days). Kept in SQLite (home_codes), handed out by GET /park/<hash> as often as asked
+// (group: true), each fetch charged as a lookup: a GRP code is 40 bits, as a short code. Cancelled by
+// DELETE /park/<hash> from an admin, and with its door (unlink, expiry, the group's end). The
+// link's daily cap is counted at its door (home.mjs), where the requests arrive.
 import { createHash, hkdfSync } from 'node:crypto';
 
 // Enrolment codes (apps/contact/enrol.mjs issue: a worker placed unattended needs a code that outlives one fetch): a short code parked
@@ -232,6 +239,8 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     }
   }
   const write = (fn) => db.settle(() => db.tx(fn));
+  // GRP codes: home.mjs's (setGroups, once it exists), or null.
+  let groups = null;
 
   // Fixed windows per prefix, as auth.mjs charge. kind: lookup, park, public. → throws rate.
   function charge(kind, prefix, now) {
@@ -290,7 +299,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
     if (exp > code.exp) fail('park', 'exp: after the invite\'s own expiry');
     const was = held.get(code_hash), had = pub.get(code_hash);
-    if ((was && was.exp > now) || (had && had.exp > now)) fail('park_taken', 'a code is parked under this hash: make another');
+    if ((was && was.exp > now) || (had && had.exp > now) || groups?.has(code_hash, now)) fail('park_taken', 'a code is parked under this hash: make another');
     let mineLive = 0;
     for (const e of pub.values()) if (e.owner === owner && e.invite !== null && e.exp > now) mineLive++;
     if (mineLive >= perAccount) fail('public_full', `this identity has ${perAccount} public codes on this relay, its most: revoke one first`);
@@ -312,6 +321,13 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     const { code_hash, invite, exp } = body;
     if (typeof code_hash !== 'string' || !HASH_RE.test(code_hash)) fail('park', 'code_hash: 64 lowercase hex digits, SHA-256("sigelo-park/0" ‖ the normalised short code)');
     if (typeof invite === 'string' && invite.startsWith('sgl2')) return parkPublic(body, did, now, owner, claimOf);
+    // Not a long code: a group invite, when this relay homes groups.
+    if (groups && typeof invite === 'string' && !invite.startsWith('sgl')) {
+      if (Object.hasOwn(body, 'cap') || Object.hasOwn(body, 'enrol')) fail('park', 'cap, enrol: not with a GRP code');
+      const was = held.get(code_hash);
+      if ((was && was.exp > now) || pub.get(code_hash)?.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
+      try { return groups.park(body, now, owner); } catch (e) { if (Array.isArray(e)) fail(e[0], e[1]); throw e; }
+    }
     if (Object.hasOwn(body, 'cap')) fail('park', 'cap: only with a public code (sgl2…)');
     if (Object.hasOwn(body, 'enrol') && body.enrol !== true) fail('park', 'enrol: true, or absent');
     const enrol = body.enrol === true, life = enrol ? Math.max(ttl, ENROL_TTL) : ttl;
@@ -321,7 +337,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
     if (!mine || !mine.equals(code.digest)) fail('park', 'invite: its inviter is not the DID that logged in');
     if (exp > code.exp) fail('park', 'exp: after the invite\'s own expiry');
     const was = held.get(code_hash);
-    if ((was && was.exp > now) || pub.get(code_hash)?.exp > now) fail('park_taken', 'a code is parked under this hash: make another');
+    if ((was && was.exp > now) || pub.get(code_hash)?.exp > now || groups?.has(code_hash, now)) fail('park_taken', 'a code is parked under this hash: make another');
     if (held.size >= max && sweep(now) === 0 && !was) fail('park_full', `${max} short codes are parked on this relay, its most: try again in a few minutes, or use the long code (invite --long)`);
     // Kept PARK_TTL at most by this relay's clock, whatever the inviter's says.
     const until = Math.min(exp, now + life);
@@ -334,6 +350,8 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   function fetch(hash, now = clock()) {
     const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
     if (pub.has(k)) return null;
+    const g = k !== '' && groups ? groups.fetch(k, now) : null;
+    if (g !== null) return g;
     const e = held.get(k);
     if (e === undefined) return null;
     if (e.exp <= now) { held.delete(k); return null; }
@@ -372,6 +390,7 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // expired, malformed, or another's (one answer).
   function cancel(hash, owner, now = clock()) {
     const k = typeof hash === 'string' && HASH_RE.test(hash) ? hash : '';
+    if (k !== '' && groups?.has(k, now)) return owner !== undefined && groups.cancel(k, owner, now);
     const p = pub.get(k);
     if (p !== undefined) {
       if (p.exp <= now || owner === undefined || p.owner !== owner) return false;
@@ -437,5 +456,8 @@ export function parking({ host, clock, max = PARK_MAX, lookups = LOOKUPS, parks 
   // size: the codes parked, not yet fetched (tombstones count against max, not here). publics: the public codes held, live or not.
   const size = () => { let n = 0; for (const e of held.values()) if (e.invite !== null) n++; return n; };
   const publics = () => pub.size;
-  return { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics, enrolGrace, enrolTopics, isEnrol };
+  // A live GRP code under this hash (GET /park/<hash> says group: true).
+  const isGroup = (hash, now = clock()) => typeof hash === 'string' && HASH_RE.test(hash) && groups?.has(hash, now) === true;
+  const setGroups = (g) => { groups = g; };
+  return { charge, park, fetch, cancel, set, publicOf, guard, sweep, size, publics, enrolGrace, enrolTopics, isEnrol, isGroup, setGroups };
 }

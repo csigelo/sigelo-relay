@@ -30,6 +30,9 @@
 //                       TURN credentials over $sigelo/turn and GET /challenge says turn. Default: the
 //                       systemd credential turn-secret ($CREDENTIALS_DIRECTORY/turn-secret) when there
 //                       is one; none = no TURN
+//     RELAY_HOME        off: no home-relay groups (home.mjs); else on. GET /challenge says home
+//     RELAY_OPERATOR_DID  the original DID of this relay's operator, as the signed relay registry lists
+//                       it: the supergroup slots it sells (home.mjs slot) are checked against it; unset = none
 //     RELAY_CLOSED_OPERATOR  a closed relay: the original DIDs of its operators, comma-separated
 //                       (at most 8). It admits them and the identities they attest for it, and
 //                       nobody else (closed.mjs); unset = open
@@ -52,7 +55,8 @@ import { relayStats } from './stats.mjs';
 import { parking } from './park.mjs';
 import { closedOperators, closedRelay } from './closed.mjs';
 import { PRESENCE_WILL, presence as presenceMarkers } from './presence.mjs';
-import { pushWakes } from './push.mjs';
+import { pushKeys, pushWakes } from './push.mjs';
+import { homes } from './home.mjs';
 import { readSecret, turnCredentials } from './turn.mjs';
 
 export { WS_PATH, prefixOf };
@@ -281,7 +285,7 @@ export async function startRelay(cfg) {
   let broker, a;
   const closed = cfg.closed ? closedRelay({ db, host: cfg.host, operators: cfg.closed }) : null;
   // GET /stats: counts only (stats.mjs), and a closed relay's operators; sessions read from auth once it exists.
-  const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy, closed: closed?.operators ?? null });
+  const stats = relayStats({ db, clock, sessions: () => a?.sessions() ?? 0, policy, closed: closed?.operators ?? null, groups: () => home?.counts() ?? null });
   // Short invite codes, in memory only, and public codes, in the database (park.mjs); cfg.park:
   // its limits, for tests. Pro: an account that draws on a licence (allowance.mjs pool).
   const park = parking({ host: cfg.host, clock, db, pro: (account, now) => (policy.pool?.(account, now) ?? null) !== null, ...cfg.park });
@@ -291,13 +295,19 @@ export async function startRelay(cfg) {
   const push = cfg.push === false ? null : pushWakes({ db, host: cfg.host, clock, log, keyFile: cfg.pushKey ?? join(dirname(cfg.db), 'push.key'), ...(cfg.push ?? {}) });
   // TURN credentials (turn.mjs): cfg.turnSecret, the secret coturn shares; none = off. GET /challenge says so.
   const turn = cfg.turnSecret ? turnCredentials({ secret: cfg.turnSecret, host: cfg.host, clock, ...(cfg.turnPerHour && { perHour: cfg.turnPerHour }) }) : null;
-  a = auth({ push: push !== null, turn: turn !== null, db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
+  // Home-relay groups (home.mjs): cfg.home false = off; cfg.operator: the operator's original DID
+  // (supergroup slots); cfg.homeLimits: tests' numbers. Its wake lists are sealed under the push key
+  // file's key, which is made here when push is off. GET /challenge says home.
+  const home = cfg.home === false ? null : homes({ db, host: cfg.host, clock, policy, stats, log, diskFull, operator: cfg.operator ?? null, limits: cfg.homeLimits, push,
+    sealKey: pushKeys(cfg.pushKey ?? join(dirname(cfg.db), 'push.key')).seal });
+  park.setGroups?.(home?.codes ?? null);
+  a = auth({ push: push !== null, turn: turn !== null, home, db, host: cfg.host, clock, diskFull, loginRate: cfg.loginRate, verifyBudget: cfg.verifyBudget, maxSessions: cfg.maxSessions, maxPerPrefix: cfg.maxPerPrefix,
     unprovenSeconds: cfg.unprovenSeconds ?? UNPROVEN_SECONDS, policy, log, stats, park, closed });
   const held = partials(cfg.partialPerPrefix ?? PARTIAL_PER_PREFIX, cfg.partialMax ?? PARTIAL_MAX), frameMs = cfg.frameMs ?? FRAME_MS;
   const early = partials(cfg.earlyPerPrefix ?? EARLY_PER_PREFIX, cfg.earlyMax ?? EARLY_MAX);
   // Presence markers (presence.mjs): the relay's offline goes to the readers through the broker.
   const presence = presenceMarkers({ clock, publish: (packet) => broker.publish(packet, () => {}), policy });
-  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence, guard: park.guard, push, turn });
+  const m = mailboxes({ db, clock, diskFull, sessionOf: a.sessionOf, online: (id) => broker.clients[id] !== undefined, policy, stats, members: closed, presence, guard: park.guard, push, turn, home });
   // Every delivery: first the reader's order (mailbox.mjs forward: a live publish waits while the
   // queue goes out). Then a reader past MAX_BACKLOG: this delivery is not written (forwarding null
   // never deletes it: mailbox.mjs deletes on a PUBACK only), and the reader is closed once Aedes is
@@ -335,7 +345,7 @@ export async function startRelay(cfg) {
     keepaliveLimit: KEEPALIVE_MAX,
   });
   policy.attach?.({ broker, notify: m.notify, inform: m.inform, sessionOf: a.sessionOf });   // M4: a login's operator/licence notice, then its group tier
-  broker.on('clientDisconnect', (client) => { log(`disconnect ${a.prefixOf(client)}`); presence.end(client, a.sessionOf(client)?.account); });
+  broker.on('clientDisconnect', (client) => { log(`disconnect ${a.prefixOf(client)}`); presence.end(client, a.sessionOf(client)?.account); home?.gone(client); });
   const onError = (client, err) => { if (!err.login) log(`error ${a.prefixOf(client)} ${err.check ?? 'protocol'}`); };
   broker.on('clientError', onError);
   broker.on('connectionError', onError);
@@ -353,7 +363,7 @@ export async function startRelay(cfg) {
     a.attach(client, prefix);
     // Every socket closes, whatever ended it: the session caps count down, and a session that set
     // the presence will goes offline (once: clientDisconnect may have said so first).
-    net.once('close', () => { a.detach(client); presence.end(client, a.sessionOf(client)?.account); });
+    net.once('close', () => { a.detach(client); presence.end(client, a.sessionOf(client)?.account); home?.gone(client); });
   };
   const onSocket = (sock) => onStream(sock, sock.remoteAddress);
   const listen = (server, port, host) => new Promise((resolve, reject) => {
@@ -398,6 +408,7 @@ export async function startRelay(cfg) {
   const sweep = (now) => {
     park.sweep(now ?? clock());
     turn?.tidy(now ?? clock());
+    home?.sweep(now ?? clock());   // before mailbox.mjs's: its checkpoint truncates the WAL after both
     const r = m.sweep(now);
     if (r.expired || r.invites || r.idle || r.accounts || r.presence) log(`sweep expired=${r.expired} invites=${r.invites} idle=${r.idle} accounts=${r.accounts} presence=${r.presence}`);
     return r;
@@ -416,10 +427,11 @@ export async function startRelay(cfg) {
     http.closeAllConnections();
     await Promise.all([stopped, closeServer(http)]);
     m.close();
+    home?.close();   // the wake lists and days of use kept in memory, to the file
     park.sweep(clock());   // the public codes' counts of the day to the file (park.mjs)
     db.close();
   }
-  return { broker, db, auth: a, mailboxes: m, presence, push, turn, park, stats, closed, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
+  return { broker, db, auth: a, mailboxes: m, presence, push, turn, park, stats, closed, home, sweep, ports, reloadTls, close, partial: () => held.total, early: () => early.total };
 }
 
 function fromEnv(env) {
@@ -441,7 +453,10 @@ function fromEnv(env) {
     maxSessions: Number(env.RELAY_MAX_SESSIONS ?? MAX_SESSIONS), maxPerPrefix: Number(env.RELAY_MAX_PER_PREFIX ?? MAX_PER_PREFIX),
     policy: relayPolicyFromEnv(env, die),   // M4: RELAY_VENDOR_DID, RELAY_PRO_STORAGE_MB, RELAY_POW_* (allowance.mjs)
     ...(env.RELAY_PUSH === 'off' && { push: false }), ...(env.RELAY_PUSH_KEY && { pushKey: env.RELAY_PUSH_KEY }),
+    ...(env.RELAY_HOME === 'off' && { home: false }), ...(env.RELAY_OPERATOR_DID && { operator: env.RELAY_OPERATOR_DID }),
   };
+  if (env.RELAY_HOME !== undefined && env.RELAY_HOME !== 'on' && env.RELAY_HOME !== 'off') die('RELAY_HOME: on or off');
+  if (env.RELAY_OPERATOR_DID && !/^did:sigelo:z[1-9A-HJ-NP-Za-km-z]{20,60}$/.test(env.RELAY_OPERATOR_DID)) die('RELAY_OPERATOR_DID: the operator\'s original DID, did:sigelo:z…');
   if (env.RELAY_PUSH !== undefined && env.RELAY_PUSH !== 'on' && env.RELAY_PUSH !== 'off') die('RELAY_PUSH: on or off');
   const cred = env.CREDENTIALS_DIRECTORY ? join(env.CREDENTIALS_DIRECTORY, 'turn-secret') : null;
   const turnFile = env.RELAY_TURN_SECRET_FILE || (cred && existsSync(cred) ? cred : null);
